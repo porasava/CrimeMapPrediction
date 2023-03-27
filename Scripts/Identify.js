@@ -76,9 +76,6 @@ noFeatures.html('<p>No features info</p>')
 const CrimeTAUrl=CrimeTASource.getFeatureInfoUrl(coordinate,resolution,projection,
 {'INFO_FORMAT':'application/json'});
 
-// const CrimeAreaUrl=CrimeAreaSource.getFeatureInfoUrl(coordinate,resolution,projection,
-//     {'INFO_FORMAT':'application/json'});
-
 if(CrimeTAUrl)
 {
     $.ajax({
@@ -104,30 +101,6 @@ if(CrimeTAUrl)
         }
     })
 
-    // if(CrimeAreaUrl)
-    // {
-    //     $.ajax
-    //     ({
-    //         url:CrimeAreaUrl,
-    //         method: 'GET',
-    //         success:function(result)
-    //         {
-    //             console.log(result);
-    //             const CrimeArea=result.features[0];
-    //             if(CrimeArea){
-    //             const CrimeAreaName=CrimeArea.properties.areaunitna;
-    //             const CrimeAreaName2=CrimeArea.properties.tlaname;
-    //             // const CrimeAreaArea=CrimeArea.properties.land_area_;
-    //             // const CrimeAreaInfo =$('#Crime-Area-Info');
-    //             CrimeAreaInfo.html(`<h5>Crime Area unit Info</h5>
-    //             <p>Crime Area Name: ${CrimeAreaName}</p> 
-    //             <p>Crime Area Name2: ${CrimeAreaName2}</p>
-    //             `);
-    //             noFeatures.html('');
-    //             }
-    //         }
-    //     })
-    // }
     
 
 
@@ -140,6 +113,6 @@ if(CrimeTAUrl)
 
 
 }
-//   content.innerHTML = '<p>You clicked here:</p><code>' + hdms + '</code>';
+
   overlay.setPosition(coordinate);
 });

@@ -22372,12 +22372,12 @@ Object.defineProperty(exports, "__esModule", {
   value: true
 });
 exports.getLayerByName = getLayerByName;
-var map = $('#map').data('map');
-var mapLayers = map.getLayers();
+const map = $('#map').data('map');
+const mapLayers = map.getLayers();
 
 function getLayerByName(layerName) {
-  var layer = null;
-  mapLayers.forEach(function (lyr) {
+  let layer = null;
+  mapLayers.forEach(lyr => {
     if (lyr.get('name') === layerName) layer = lyr;
   });
   return layer;
@@ -22403,14 +22403,14 @@ var _customFunctions = require("./customFunctions");
 
 function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
 
-var map = $('#map').data('map');
+const map = $('#map').data('map');
 /**
  * Elements that make up the popup.
  */
 
-var container = document.getElementById('popup');
-var content = document.getElementById('popup-content');
-var closer = document.getElementById('popup-closer');
+const container = document.getElementById('popup');
+const content = document.getElementById('popup-content');
+const closer = document.getElementById('popup-closer');
 /**
  * Create an overlay to anchor the popup to the map.
  */
@@ -22433,8 +22433,8 @@ closer.onclick = function () {
   return false;
 };
 
-var key = 'Get your own API key at https://www.maptiler.com/cloud/';
-var attributions = '<a href="https://www.maptiler.com/copyright/" target="_blank">&copy; MapTiler</a> ' + '<a href="https://www.openstreetmap.org/copyright" target="_blank">&copy; OpenStreetMap contributors</a>';
+const key = 'Get your own API key at https://www.maptiler.com/cloud/';
+const attributions = '<a href="https://www.maptiler.com/copyright/" target="_blank">&copy; MapTiler</a> ' + '<a href="https://www.openstreetmap.org/copyright" target="_blank">&copy; OpenStreetMap contributors</a>';
 /**
  * Create the map.
  */
@@ -22445,75 +22445,53 @@ map.addOverlay(overlay);
  */
 
 map.on('singleclick', function (evt) {
-  var coordinate = evt.coordinate;
-  var hdms = (0, _coordinate.toStringHDMS)((0, _proj.toLonLat)(coordinate)); //Getting The Layer Source: getting the layer itself, and then getting its sourcw
+  const coordinate = evt.coordinate;
+  const hdms = (0, _coordinate.toStringHDMS)((0, _proj.toLonLat)(coordinate)); //Getting The Layer Source: getting the layer itself, and then getting its sourcw
   //Create a function to get the layer by name
   //Get The Layer by its name
 
-  var CrimeTALayer = (0, _customFunctions.getLayerByName)('City');
-  var CrimeTASource = CrimeTALayer.getSource(); // const CrimeAreaLayer=getLayerByName('CrimeArea');
+  const CrimeTALayer = (0, _customFunctions.getLayerByName)('City');
+  const CrimeTASource = CrimeTALayer.getSource(); // const CrimeAreaLayer=getLayerByName('CrimeArea');
   // const CrimeAreaSource=CrimeAreaLayer.getSource();
 
-  var view = map.getView();
-  var resolution = view.getResolution();
-  var projection = view.getProjection(); //แสดง pop up เมื่อคลิ๊ก
+  const view = map.getView();
+  const resolution = view.getResolution();
+  const projection = view.getProjection(); //แสดง pop up เมื่อคลิ๊ก
 
-  var CrimeTAInfo = $('#Crime-Info');
+  const CrimeTAInfo = $('#Crime-Info');
   CrimeTAInfo.html('');
-  var CrimeAreaInfo = $('#Crime-Area-Info');
+  const CrimeAreaInfo = $('#Crime-Area-Info');
   CrimeAreaInfo.html('');
-  var noFeatures = $('no-features-Info');
+  const noFeatures = $('no-features-Info');
   noFeatures.html('<p>No features info</p>');
-  var CrimeTAUrl = CrimeTASource.getFeatureInfoUrl(coordinate, resolution, projection, {
+  const CrimeTAUrl = CrimeTASource.getFeatureInfoUrl(coordinate, resolution, projection, {
     'INFO_FORMAT': 'application/json'
-  }); // const CrimeAreaUrl=CrimeAreaSource.getFeatureInfoUrl(coordinate,resolution,projection,
-  //     {'INFO_FORMAT':'application/json'});
+  });
 
   if (CrimeTAUrl) {
     $.ajax({
       url: CrimeTAUrl,
       method: 'GET',
-      success: function success(result) {
+      success: function (result) {
         console.log(result);
-        var CrimeTA = result.features[0];
+        const CrimeTA = result.features[0];
 
         if (CrimeTA) {
-          var CrimeTAName = CrimeTA.properties.ta2022_v1_;
-          var CrimeTAName2 = CrimeTA.properties.ta2022_v_1;
-          var CrimeTAArea = CrimeTA.properties.land_area_; // const CrimeTAInfo =$('#Crime-Info');
+          const CrimeTAName = CrimeTA.properties.ta2022_v1_;
+          const CrimeTAName2 = CrimeTA.properties.ta2022_v_1;
+          const CrimeTAArea = CrimeTA.properties.land_area_; // const CrimeTAInfo =$('#Crime-Info');
 
-          CrimeTAInfo.html("<h5>Territorial Authority Info</h5>\n           \n            <p>Name: ".concat(CrimeTAName2, "</p>\n            <p>Area (sqm): ").concat(CrimeTAArea.toFixed(2), "</p>"));
+          CrimeTAInfo.html(`<h5>Territorial Authority Info</h5>
+           
+            <p>Name: ${CrimeTAName2}</p>
+            <p>Area (sqm): ${CrimeTAArea.toFixed(2)}</p>`);
           noFeatures.html('');
         }
       }
-    }); // if(CrimeAreaUrl)
-    // {
-    //     $.ajax
-    //     ({
-    //         url:CrimeAreaUrl,
-    //         method: 'GET',
-    //         success:function(result)
-    //         {
-    //             console.log(result);
-    //             const CrimeArea=result.features[0];
-    //             if(CrimeArea){
-    //             const CrimeAreaName=CrimeArea.properties.areaunitna;
-    //             const CrimeAreaName2=CrimeArea.properties.tlaname;
-    //             // const CrimeAreaArea=CrimeArea.properties.land_area_;
-    //             // const CrimeAreaInfo =$('#Crime-Area-Info');
-    //             CrimeAreaInfo.html(`<h5>Crime Area unit Info</h5>
-    //             <p>Crime Area Name: ${CrimeAreaName}</p> 
-    //             <p>Crime Area Name2: ${CrimeAreaName2}</p>
-    //             `);
-    //             noFeatures.html('');
-    //             }
-    //         }
-    //     })
-    // }
+    });
   }
 
-  {} //   content.innerHTML = '<p>You clicked here:</p><code>' + hdms + '</code>';
-
+  {}
   overlay.setPosition(coordinate);
 });
 },{"ol/ol.css":"node_modules/ol/ol.css","ol/Overlay":"node_modules/ol/Overlay.js","ol/layer/Tile":"node_modules/ol/layer/Tile.js","ol/View":"node_modules/ol/View.js","ol/source/XYZ":"node_modules/ol/source/XYZ.js","ol/proj":"node_modules/ol/proj.js","ol/coordinate":"node_modules/ol/coordinate.js","./customFunctions":"Scripts/customFunctions.js"}],"node_modules/parcel-bundler/src/builtins/hmr-runtime.js":[function(require,module,exports) {
@@ -22544,7 +22522,7 @@ var parent = module.bundle.parent;
 if ((!parent || !parent.isParcelRequire) && typeof WebSocket !== 'undefined') {
   var hostname = "" || location.hostname;
   var protocol = location.protocol === 'https:' ? 'wss' : 'ws';
-  var ws = new WebSocket(protocol + '://' + hostname + ':' + "56533" + '/');
+  var ws = new WebSocket(protocol + '://' + hostname + ':' + "57189" + '/');
 
   ws.onmessage = function (event) {
     checkedAssets = {};

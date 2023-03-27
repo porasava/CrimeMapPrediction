@@ -124,12 +124,12 @@ Object.defineProperty(exports, "__esModule", {
   value: true
 });
 exports.getLayerByName = getLayerByName;
-var map = $('#map').data('map');
-var mapLayers = map.getLayers();
+const map = $('#map').data('map');
+const mapLayers = map.getLayers();
 
 function getLayerByName(layerName) {
-  var layer = null;
-  mapLayers.forEach(function (lyr) {
+  let layer = null;
+  mapLayers.forEach(lyr => {
     if (lyr.get('name') === layerName) layer = lyr;
   });
   return layer;
@@ -139,27 +139,30 @@ function getLayerByName(layerName) {
 
 var _customFunctions = require("./customFunctions");
 
-var map = $('#map').data('map');
-var layers = map.getLayers();
-var closer = $('#draggable-closer');
+const map = $('#map').data('map');
+const layers = map.getLayers();
+const closer = $('#draggable-closer');
 $('#layers').click(function () {
-  var layersDiv = $('#draggable');
-  var layersDivTitle = $('#draggable-title');
-  var layersDivContent = $('#draggable-content');
+  const layersDiv = $('#draggable');
+  const layersDivTitle = $('#draggable-title');
+  const layersDivContent = $('#draggable-content');
   layersDivTitle.html('Layers');
   layersDivContent.html('');
   layersDiv.css('display', 'block');
-  layers.forEach(function (layer) {
+  layers.forEach(layer => {
     if (layer.get('name')) {
-      var element = "<div class=\"mb-3 form-check\">\n   <input type=\"checkbox\" class=\"form-check-input\" id= ".concat(layer.get('name'), ">\n   <label class=\"form-check-label\" for=\"exampleCheck1\">").concat(layer.get('name'), "</label>\n </div>");
+      const element = `<div class="mb-3 form-check">
+   <input type="checkbox" class="form-check-input" id= ${layer.get('name')}>
+   <label class="form-check-label" for="exampleCheck1">${layer.get('name')}</label>
+ </div>`;
       layersDivContent.append(element);
-      $("#".concat(layer.get('name'))).prop('checked', layer.getVisible());
+      $(`#${layer.get('name')}`).prop('checked', layer.getVisible());
     }
   });
   $('.form-check-input').change(function () {
-    var checkbox = this;
-    var layerName = checkbox.id;
-    var layer = (0, _customFunctions.getLayerByName)(layerName); // @ts-ignore
+    const checkbox = this;
+    const layerName = checkbox.id;
+    const layer = (0, _customFunctions.getLayerByName)(layerName); // @ts-ignore
 
     layer.setVisible(checkbox.checked);
   });
@@ -242,7 +245,7 @@ var parent = module.bundle.parent;
 if ((!parent || !parent.isParcelRequire) && typeof WebSocket !== 'undefined') {
   var hostname = "" || location.hostname;
   var protocol = location.protocol === 'https:' ? 'wss' : 'ws';
-  var ws = new WebSocket(protocol + '://' + hostname + ':' + "56533" + '/');
+  var ws = new WebSocket(protocol + '://' + hostname + ':' + "57189" + '/');
 
   ws.onmessage = function (event) {
     checkedAssets = {};

@@ -8,7 +8,7 @@ const map=$('#map').data('map');
 
 const searchBtn= $('#search');
 
-const wfsUrl='http://172.19.16.1:5000/geoserver/Training/wfs';
+const wfsUrl='http://localhost:5000/geoserver/Training/wfs';
 
 const vectorSource= new VectorSource();
 const style = new Style({
@@ -40,7 +40,7 @@ window.alert('Please enter City Name')
 
 const featureRequest = new WFS().writeGetFeature({
     srsName: 'EPSG:4326',
-    featureNS:  "http://172.19.16.1:5000/geoserver/wfs",
+    featureNS:  "http://localhost:5000/geoserver/wfs",
     featurePrefix: 'TA_rename',
     featureTypes: ['TA_rename'],
     outputFormat: 'application/json',

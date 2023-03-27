@@ -129,72 +129,36 @@ var _basedecoder = _interopRequireDefault(require("./basedecoder.js"));
 
 function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
 
-function _typeof(obj) { "@babel/helpers - typeof"; return _typeof = "function" == typeof Symbol && "symbol" == typeof Symbol.iterator ? function (obj) { return typeof obj; } : function (obj) { return obj && "function" == typeof Symbol && obj.constructor === Symbol && obj !== Symbol.prototype ? "symbol" : typeof obj; }, _typeof(obj); }
+class PackbitsDecoder extends _basedecoder.default {
+  decodeBlock(buffer) {
+    const dataView = new DataView(buffer);
+    const out = [];
 
-function _classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } }
+    for (let i = 0; i < buffer.byteLength; ++i) {
+      let header = dataView.getInt8(i);
 
-function _defineProperties(target, props) { for (var i = 0; i < props.length; i++) { var descriptor = props[i]; descriptor.enumerable = descriptor.enumerable || false; descriptor.configurable = true; if ("value" in descriptor) descriptor.writable = true; Object.defineProperty(target, descriptor.key, descriptor); } }
+      if (header < 0) {
+        const next = dataView.getUint8(i + 1);
+        header = -header;
 
-function _createClass(Constructor, protoProps, staticProps) { if (protoProps) _defineProperties(Constructor.prototype, protoProps); if (staticProps) _defineProperties(Constructor, staticProps); Object.defineProperty(Constructor, "prototype", { writable: false }); return Constructor; }
+        for (let j = 0; j <= header; ++j) {
+          out.push(next);
+        }
 
-function _inherits(subClass, superClass) { if (typeof superClass !== "function" && superClass !== null) { throw new TypeError("Super expression must either be null or a function"); } subClass.prototype = Object.create(superClass && superClass.prototype, { constructor: { value: subClass, writable: true, configurable: true } }); Object.defineProperty(subClass, "prototype", { writable: false }); if (superClass) _setPrototypeOf(subClass, superClass); }
+        i += 1;
+      } else {
+        for (let j = 0; j <= header; ++j) {
+          out.push(dataView.getUint8(i + j + 1));
+        }
 
-function _setPrototypeOf(o, p) { _setPrototypeOf = Object.setPrototypeOf ? Object.setPrototypeOf.bind() : function _setPrototypeOf(o, p) { o.__proto__ = p; return o; }; return _setPrototypeOf(o, p); }
+        i += header + 1;
+      }
+    }
 
-function _createSuper(Derived) { var hasNativeReflectConstruct = _isNativeReflectConstruct(); return function _createSuperInternal() { var Super = _getPrototypeOf(Derived), result; if (hasNativeReflectConstruct) { var NewTarget = _getPrototypeOf(this).constructor; result = Reflect.construct(Super, arguments, NewTarget); } else { result = Super.apply(this, arguments); } return _possibleConstructorReturn(this, result); }; }
-
-function _possibleConstructorReturn(self, call) { if (call && (_typeof(call) === "object" || typeof call === "function")) { return call; } else if (call !== void 0) { throw new TypeError("Derived constructors may only return object or undefined"); } return _assertThisInitialized(self); }
-
-function _assertThisInitialized(self) { if (self === void 0) { throw new ReferenceError("this hasn't been initialised - super() hasn't been called"); } return self; }
-
-function _isNativeReflectConstruct() { if (typeof Reflect === "undefined" || !Reflect.construct) return false; if (Reflect.construct.sham) return false; if (typeof Proxy === "function") return true; try { Boolean.prototype.valueOf.call(Reflect.construct(Boolean, [], function () {})); return true; } catch (e) { return false; } }
-
-function _getPrototypeOf(o) { _getPrototypeOf = Object.setPrototypeOf ? Object.getPrototypeOf.bind() : function _getPrototypeOf(o) { return o.__proto__ || Object.getPrototypeOf(o); }; return _getPrototypeOf(o); }
-
-var PackbitsDecoder = /*#__PURE__*/function (_BaseDecoder) {
-  _inherits(PackbitsDecoder, _BaseDecoder);
-
-  var _super = _createSuper(PackbitsDecoder);
-
-  function PackbitsDecoder() {
-    _classCallCheck(this, PackbitsDecoder);
-
-    return _super.apply(this, arguments);
+    return new Uint8Array(out).buffer;
   }
 
-  _createClass(PackbitsDecoder, [{
-    key: "decodeBlock",
-    value: function decodeBlock(buffer) {
-      var dataView = new DataView(buffer);
-      var out = [];
-
-      for (var i = 0; i < buffer.byteLength; ++i) {
-        var header = dataView.getInt8(i);
-
-        if (header < 0) {
-          var next = dataView.getUint8(i + 1);
-          header = -header;
-
-          for (var j = 0; j <= header; ++j) {
-            out.push(next);
-          }
-
-          i += 1;
-        } else {
-          for (var _j = 0; _j <= header; ++_j) {
-            out.push(dataView.getUint8(i + _j + 1));
-          }
-
-          i += header + 1;
-        }
-      }
-
-      return new Uint8Array(out).buffer;
-    }
-  }]);
-
-  return PackbitsDecoder;
-}(_basedecoder.default);
+}
 
 exports.default = PackbitsDecoder;
 },{"./basedecoder.js":"node_modules/geotiff/dist-module/compression/basedecoder.js"}],"node_modules/parcel-bundler/src/builtins/hmr-runtime.js":[function(require,module,exports) {
@@ -225,7 +189,7 @@ var parent = module.bundle.parent;
 if ((!parent || !parent.isParcelRequire) && typeof WebSocket !== 'undefined') {
   var hostname = "" || location.hostname;
   var protocol = location.protocol === 'https:' ? 'wss' : 'ws';
-  var ws = new WebSocket(protocol + '://' + hostname + ':' + "51847" + '/');
+  var ws = new WebSocket(protocol + '://' + hostname + ':' + "57189" + '/');
 
   ws.onmessage = function (event) {
     checkedAssets = {};

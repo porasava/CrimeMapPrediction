@@ -94214,7 +94214,14808 @@ function (_super) {
 
 var _default = TileWMS;
 exports.default = _default;
-},{"./common.js":"node_modules/ol/source/common.js","./TileImage.js":"node_modules/ol/source/TileImage.js","./WMSServerType.js":"node_modules/ol/source/WMSServerType.js","../uri.js":"node_modules/ol/uri.js","../asserts.js":"node_modules/ol/asserts.js","../obj.js":"node_modules/ol/obj.js","../extent.js":"node_modules/ol/extent.js","../size.js":"node_modules/ol/size.js","../reproj.js":"node_modules/ol/reproj.js","../string.js":"node_modules/ol/string.js","../proj.js":"node_modules/ol/proj.js","../math.js":"node_modules/ol/math.js","../tilecoord.js":"node_modules/ol/tilecoord.js"}],"Scripts/Map.js":[function(require,module,exports) {
+},{"./common.js":"node_modules/ol/source/common.js","./TileImage.js":"node_modules/ol/source/TileImage.js","./WMSServerType.js":"node_modules/ol/source/WMSServerType.js","../uri.js":"node_modules/ol/uri.js","../asserts.js":"node_modules/ol/asserts.js","../obj.js":"node_modules/ol/obj.js","../extent.js":"node_modules/ol/extent.js","../size.js":"node_modules/ol/size.js","../reproj.js":"node_modules/ol/reproj.js","../string.js":"node_modules/ol/string.js","../proj.js":"node_modules/ol/proj.js","../math.js":"node_modules/ol/math.js","../tilecoord.js":"node_modules/ol/tilecoord.js"}],"node_modules/ol/source/BingMaps.js":[function(require,module,exports) {
+"use strict";
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+exports.default = void 0;
+exports.quadKey = quadKey;
+
+var _State = _interopRequireDefault(require("./State.js"));
+
+var _TileImage = _interopRequireDefault(require("./TileImage.js"));
+
+var _extent = require("../extent.js");
+
+var _tileurlfunction = require("../tileurlfunction.js");
+
+var _tilecoord = require("../tilecoord.js");
+
+var _tilegrid = require("../tilegrid.js");
+
+var _proj = require("../proj.js");
+
+var _net = require("../net.js");
+
+function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
+
+/**
+ * @module ol/source/BingMaps
+ */
+var __extends = void 0 && (void 0).__extends || function () {
+  var extendStatics = function (d, b) {
+    extendStatics = Object.setPrototypeOf || {
+      __proto__: []
+    } instanceof Array && function (d, b) {
+      d.__proto__ = b;
+    } || function (d, b) {
+      for (var p in b) if (Object.prototype.hasOwnProperty.call(b, p)) d[p] = b[p];
+    };
+
+    return extendStatics(d, b);
+  };
+
+  return function (d, b) {
+    if (typeof b !== "function" && b !== null) throw new TypeError("Class extends value " + String(b) + " is not a constructor or null");
+    extendStatics(d, b);
+
+    function __() {
+      this.constructor = d;
+    }
+
+    d.prototype = b === null ? Object.create(b) : (__.prototype = b.prototype, new __());
+  };
+}();
+
+/**
+ * @param {import('../tilecoord.js').TileCoord} tileCoord Tile coord.
+ * @return {string} Quad key.
+ */
+function quadKey(tileCoord) {
+  var z = tileCoord[0];
+  var digits = new Array(z);
+  var mask = 1 << z - 1;
+  var i, charCode;
+
+  for (i = 0; i < z; ++i) {
+    // 48 is charCode for 0 - '0'.charCodeAt(0)
+    charCode = 48;
+
+    if (tileCoord[1] & mask) {
+      charCode += 1;
+    }
+
+    if (tileCoord[2] & mask) {
+      charCode += 2;
+    }
+
+    digits[i] = String.fromCharCode(charCode);
+    mask >>= 1;
+  }
+
+  return digits.join('');
+}
+/**
+ * The attribution containing a link to the Microsoft® Bing™ Maps Platform APIs’
+ * Terms Of Use.
+ * @const
+ * @type {string}
+ */
+
+
+var TOS_ATTRIBUTION = '<a class="ol-attribution-bing-tos" ' + 'href="https://www.microsoft.com/maps/product/terms.html" target="_blank">' + 'Terms of Use</a>';
+/**
+ * @typedef {Object} Options
+ * @property {number} [cacheSize] Initial tile cache size. Will auto-grow to hold at least the number of tiles in the viewport.
+ * @property {boolean} [hidpi=false] If `true` hidpi tiles will be requested.
+ * @property {string} [culture='en-us'] Culture code.
+ * @property {string} key Bing Maps API key. Get yours at https://www.bingmapsportal.com/.
+ * @property {string} imagerySet Type of imagery.
+ * @property {boolean} [imageSmoothing=true] Deprecated.  Use the `interpolate` option instead.
+ * @property {boolean} [interpolate=true] Use interpolated values when resampling.  By default,
+ * linear interpolation is used when resampling.  Set to false to use the nearest neighbor instead.
+ * @property {number} [maxZoom=21] Max zoom. Default is what's advertized by the BingMaps service.
+ * @property {number} [reprojectionErrorThreshold=0.5] Maximum allowed reprojection error (in pixels).
+ * Higher values can increase reprojection performance, but decrease precision.
+ * @property {import("../Tile.js").LoadFunction} [tileLoadFunction] Optional function to load a tile given a URL. The default is
+ * ```js
+ * function(imageTile, src) {
+ *   imageTile.getImage().src = src;
+ * };
+ * ```
+ * @property {boolean} [wrapX=true] Whether to wrap the world horizontally.
+ * @property {number} [transition] Duration of the opacity transition for rendering.
+ * To disable the opacity transition, pass `transition: 0`.
+ * @property {number|import("../array.js").NearestDirectionFunction} [zDirection=0]
+ * Choose whether to use tiles with a higher or lower zoom level when between integer
+ * zoom levels. See {@link module:ol/tilegrid/TileGrid~TileGrid#getZForResolution}.
+ */
+
+/**
+ * @typedef {Object} BingMapsImageryMetadataResponse
+ * @property {number} statusCode The response status code
+ * @property {string} statusDescription The response status description
+ * @property {string} authenticationResultCode The authentication result code
+ * @property {Array<ResourceSet>} resourceSets The array of resource sets
+ */
+
+/**
+ * @typedef {Object} ResourceSet
+ * @property {Array<Resource>} resources Resources.
+ */
+
+/**
+ * @typedef {Object} Resource
+ * @property {number} imageHeight The image height
+ * @property {number} imageWidth The image width
+ * @property {number} zoomMin The minimum zoom level
+ * @property {number} zoomMax The maximum zoom level
+ * @property {string} imageUrl The image URL
+ * @property {Array<string>} imageUrlSubdomains The image URL subdomains for rotation
+ * @property {Array<ImageryProvider>} [imageryProviders] The array of ImageryProviders
+ */
+
+/**
+ * @typedef {Object} ImageryProvider
+ * @property {Array<CoverageArea>} coverageAreas The coverage areas
+ * @property {string} [attribution] The attribution
+ */
+
+/**
+ * @typedef {Object} CoverageArea
+ * @property {number} zoomMin The minimum zoom
+ * @property {number} zoomMax The maximum zoom
+ * @property {Array<number>} bbox The coverage bounding box
+ */
+
+/**
+ * @classdesc
+ * Layer source for Bing Maps tile data.
+ * @api
+ */
+
+var BingMaps =
+/** @class */
+function (_super) {
+  __extends(BingMaps, _super);
+  /**
+   * @param {Options} options Bing Maps options.
+   */
+
+
+  function BingMaps(options) {
+    var _this = this;
+
+    var hidpi = options.hidpi !== undefined ? options.hidpi : false;
+    var interpolate = options.imageSmoothing !== undefined ? options.imageSmoothing : true;
+
+    if (options.interpolate !== undefined) {
+      interpolate = options.interpolate;
+    }
+
+    _this = _super.call(this, {
+      cacheSize: options.cacheSize,
+      crossOrigin: 'anonymous',
+      interpolate: interpolate,
+      opaque: true,
+      projection: (0, _proj.get)('EPSG:3857'),
+      reprojectionErrorThreshold: options.reprojectionErrorThreshold,
+      state: _State.default.LOADING,
+      tileLoadFunction: options.tileLoadFunction,
+      tilePixelRatio: hidpi ? 2 : 1,
+      wrapX: options.wrapX !== undefined ? options.wrapX : true,
+      transition: options.transition,
+      zDirection: options.zDirection
+    }) || this;
+    /**
+     * @private
+     * @type {boolean}
+     */
+
+    _this.hidpi_ = hidpi;
+    /**
+     * @private
+     * @type {string}
+     */
+
+    _this.culture_ = options.culture !== undefined ? options.culture : 'en-us';
+    /**
+     * @private
+     * @type {number}
+     */
+
+    _this.maxZoom_ = options.maxZoom !== undefined ? options.maxZoom : -1;
+    /**
+     * @private
+     * @type {string}
+     */
+
+    _this.apiKey_ = options.key;
+    /**
+     * @private
+     * @type {string}
+     */
+
+    _this.imagerySet_ = options.imagerySet;
+    var url = 'https://dev.virtualearth.net/REST/v1/Imagery/Metadata/' + _this.imagerySet_ + '?uriScheme=https&include=ImageryProviders&key=' + _this.apiKey_ + '&c=' + _this.culture_;
+    (0, _net.jsonp)(url, _this.handleImageryMetadataResponse.bind(_this), undefined, 'jsonp');
+    return _this;
+  }
+  /**
+   * Get the api key used for this source.
+   *
+   * @return {string} The api key.
+   * @api
+   */
+
+
+  BingMaps.prototype.getApiKey = function () {
+    return this.apiKey_;
+  };
+  /**
+   * Get the imagery set associated with this source.
+   *
+   * @return {string} The imagery set.
+   * @api
+   */
+
+
+  BingMaps.prototype.getImagerySet = function () {
+    return this.imagerySet_;
+  };
+  /**
+   * @param {BingMapsImageryMetadataResponse} response Response.
+   */
+
+
+  BingMaps.prototype.handleImageryMetadataResponse = function (response) {
+    if (response.statusCode != 200 || response.statusDescription != 'OK' || response.authenticationResultCode != 'ValidCredentials' || response.resourceSets.length != 1 || response.resourceSets[0].resources.length != 1) {
+      this.setState(_State.default.ERROR);
+      return;
+    }
+
+    var resource = response.resourceSets[0].resources[0];
+    var maxZoom = this.maxZoom_ == -1 ? resource.zoomMax : this.maxZoom_;
+    var sourceProjection = this.getProjection();
+    var extent = (0, _tilegrid.extentFromProjection)(sourceProjection);
+    var scale = this.hidpi_ ? 2 : 1;
+    var tileSize = resource.imageWidth == resource.imageHeight ? resource.imageWidth / scale : [resource.imageWidth / scale, resource.imageHeight / scale];
+    var tileGrid = (0, _tilegrid.createXYZ)({
+      extent: extent,
+      minZoom: resource.zoomMin,
+      maxZoom: maxZoom,
+      tileSize: tileSize
+    });
+    this.tileGrid = tileGrid;
+    var culture = this.culture_;
+    var hidpi = this.hidpi_;
+    this.tileUrlFunction = (0, _tileurlfunction.createFromTileUrlFunctions)(resource.imageUrlSubdomains.map(function (subdomain) {
+      /** @type {import('../tilecoord.js').TileCoord} */
+      var quadKeyTileCoord = [0, 0, 0];
+      var imageUrl = resource.imageUrl.replace('{subdomain}', subdomain).replace('{culture}', culture);
+      return (
+        /**
+         * @param {import("../tilecoord.js").TileCoord} tileCoord Tile coordinate.
+         * @param {number} pixelRatio Pixel ratio.
+         * @param {import("../proj/Projection.js").default} projection Projection.
+         * @return {string|undefined} Tile URL.
+         */
+        function (tileCoord, pixelRatio, projection) {
+          if (!tileCoord) {
+            return undefined;
+          } else {
+            (0, _tilecoord.createOrUpdate)(tileCoord[0], tileCoord[1], tileCoord[2], quadKeyTileCoord);
+            var url = imageUrl;
+
+            if (hidpi) {
+              url += '&dpi=d1&device=mobile';
+            }
+
+            return url.replace('{quadkey}', quadKey(quadKeyTileCoord));
+          }
+        }
+      );
+    }));
+
+    if (resource.imageryProviders) {
+      var transform_1 = (0, _proj.getTransformFromProjections)((0, _proj.get)('EPSG:4326'), this.getProjection());
+      this.setAttributions(function (frameState) {
+        var attributions = [];
+        var viewState = frameState.viewState;
+        var tileGrid = this.getTileGrid();
+        var z = tileGrid.getZForResolution(viewState.resolution, this.zDirection);
+        var tileCoord = tileGrid.getTileCoordForCoordAndZ(viewState.center, z);
+        var zoom = tileCoord[0];
+        resource.imageryProviders.map(function (imageryProvider) {
+          var intersecting = false;
+          var coverageAreas = imageryProvider.coverageAreas;
+
+          for (var i = 0, ii = coverageAreas.length; i < ii; ++i) {
+            var coverageArea = coverageAreas[i];
+
+            if (zoom >= coverageArea.zoomMin && zoom <= coverageArea.zoomMax) {
+              var bbox = coverageArea.bbox;
+              var epsg4326Extent = [bbox[1], bbox[0], bbox[3], bbox[2]];
+              var extent_1 = (0, _extent.applyTransform)(epsg4326Extent, transform_1);
+
+              if ((0, _extent.intersects)(extent_1, frameState.extent)) {
+                intersecting = true;
+                break;
+              }
+            }
+          }
+
+          if (intersecting) {
+            attributions.push(imageryProvider.attribution);
+          }
+        });
+        attributions.push(TOS_ATTRIBUTION);
+        return attributions;
+      }.bind(this));
+    }
+
+    this.setState(_State.default.READY);
+  };
+
+  return BingMaps;
+}(_TileImage.default);
+
+var _default = BingMaps;
+exports.default = _default;
+},{"./State.js":"node_modules/ol/source/State.js","./TileImage.js":"node_modules/ol/source/TileImage.js","../extent.js":"node_modules/ol/extent.js","../tileurlfunction.js":"node_modules/ol/tileurlfunction.js","../tilecoord.js":"node_modules/ol/tilecoord.js","../tilegrid.js":"node_modules/ol/tilegrid.js","../proj.js":"node_modules/ol/proj.js","../net.js":"node_modules/ol/net.js"}],"node_modules/ol/source/XYZ.js":[function(require,module,exports) {
+"use strict";
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+exports.default = void 0;
+
+var _TileImage = _interopRequireDefault(require("./TileImage.js"));
+
+var _tilegrid = require("../tilegrid.js");
+
+function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
+
+/**
+ * @module ol/source/XYZ
+ */
+var __extends = void 0 && (void 0).__extends || function () {
+  var extendStatics = function (d, b) {
+    extendStatics = Object.setPrototypeOf || {
+      __proto__: []
+    } instanceof Array && function (d, b) {
+      d.__proto__ = b;
+    } || function (d, b) {
+      for (var p in b) if (Object.prototype.hasOwnProperty.call(b, p)) d[p] = b[p];
+    };
+
+    return extendStatics(d, b);
+  };
+
+  return function (d, b) {
+    if (typeof b !== "function" && b !== null) throw new TypeError("Class extends value " + String(b) + " is not a constructor or null");
+    extendStatics(d, b);
+
+    function __() {
+      this.constructor = d;
+    }
+
+    d.prototype = b === null ? Object.create(b) : (__.prototype = b.prototype, new __());
+  };
+}();
+
+/**
+ * @typedef {Object} Options
+ * @property {import("./Source.js").AttributionLike} [attributions] Attributions.
+ * @property {boolean} [attributionsCollapsible=true] Attributions are collapsible.
+ * @property {number} [cacheSize] Initial tile cache size. Will auto-grow to hold at least the number of tiles in the viewport.
+ * @property {null|string} [crossOrigin] The `crossOrigin` attribute for loaded images.  Note that
+ * you must provide a `crossOrigin` value if you want to access pixel data with the Canvas renderer.
+ * See https://developer.mozilla.org/en-US/docs/Web/HTML/CORS_enabled_image for more detail.
+ * @property {boolean} [imageSmoothing=true] Deprecated.  Use the `interpolate` option instead.
+ * @property {boolean} [interpolate=true] Use interpolated values when resampling.  By default,
+ * linear interpolation is used when resampling.  Set to false to use the nearest neighbor instead.
+ * @property {boolean} [opaque=false] Whether the layer is opaque.
+ * @property {import("../proj.js").ProjectionLike} [projection='EPSG:3857'] Projection.
+ * @property {number} [reprojectionErrorThreshold=0.5] Maximum allowed reprojection error (in pixels).
+ * Higher values can increase reprojection performance, but decrease precision.
+ * @property {number} [maxZoom=42] Optional max zoom level. Not used if `tileGrid` is provided.
+ * @property {number} [minZoom=0] Optional min zoom level. Not used if `tileGrid` is provided.
+ * @property {number} [maxResolution] Optional tile grid resolution at level zero. Not used if `tileGrid` is provided.
+ * @property {import("../tilegrid/TileGrid.js").default} [tileGrid] Tile grid.
+ * @property {import("../Tile.js").LoadFunction} [tileLoadFunction] Optional function to load a tile given a URL. The default is
+ * ```js
+ * function(imageTile, src) {
+ *   imageTile.getImage().src = src;
+ * };
+ * ```
+ * @property {number} [tilePixelRatio=1] The pixel ratio used by the tile service.
+ * For example, if the tile service advertizes 256px by 256px tiles but actually sends 512px
+ * by 512px images (for retina/hidpi devices) then `tilePixelRatio`
+ * should be set to `2`.
+ * @property {number|import("../size.js").Size} [tileSize=[256, 256]] The tile size used by the tile service.
+ * Not used if `tileGrid` is provided.
+ * @property {import("../Tile.js").UrlFunction} [tileUrlFunction] Optional function to get
+ * tile URL given a tile coordinate and the projection.
+ * Required if `url` or `urls` are not provided.
+ * @property {string} [url] URL template. Must include `{x}`, `{y}` or `{-y}`,
+ * and `{z}` placeholders. A `{?-?}` template pattern, for example `subdomain{a-f}.domain.com`,
+ * may be used instead of defining each one separately in the `urls` option.
+ * @property {Array<string>} [urls] An array of URL templates.
+ * @property {boolean} [wrapX=true] Whether to wrap the world horizontally.
+ * @property {number} [transition=250] Duration of the opacity transition for rendering.
+ * To disable the opacity transition, pass `transition: 0`.
+ * @property {number|import("../array.js").NearestDirectionFunction} [zDirection=0]
+ * Choose whether to use tiles with a higher or lower zoom level when between integer
+ * zoom levels. See {@link module:ol/tilegrid/TileGrid~TileGrid#getZForResolution}.
+ */
+
+/**
+ * @classdesc
+ * Layer source for tile data with URLs in a set XYZ format that are
+ * defined in a URL template. By default, this follows the widely-used
+ * Google grid where `x` 0 and `y` 0 are in the top left. Grids like
+ * TMS where `x` 0 and `y` 0 are in the bottom left can be used by
+ * using the `{-y}` placeholder in the URL template, so long as the
+ * source does not have a custom tile grid. In this case
+ * a `tileUrlFunction` can be used, such as:
+ * ```js
+ *  tileUrlFunction: function(coordinate) {
+ *    return 'http://mapserver.com/' + coordinate[0] + '/' +
+ *      coordinate[1] + '/' + (-coordinate[2] - 1) + '.png';
+ *  }
+ * ```
+ * @api
+ */
+var XYZ =
+/** @class */
+function (_super) {
+  __extends(XYZ, _super);
+  /**
+   * @param {Options} [opt_options] XYZ options.
+   */
+
+
+  function XYZ(opt_options) {
+    var options = opt_options || {};
+    var interpolate = options.imageSmoothing !== undefined ? options.imageSmoothing : true;
+
+    if (options.interpolate !== undefined) {
+      interpolate = options.interpolate;
+    }
+
+    var projection = options.projection !== undefined ? options.projection : 'EPSG:3857';
+    var tileGrid = options.tileGrid !== undefined ? options.tileGrid : (0, _tilegrid.createXYZ)({
+      extent: (0, _tilegrid.extentFromProjection)(projection),
+      maxResolution: options.maxResolution,
+      maxZoom: options.maxZoom,
+      minZoom: options.minZoom,
+      tileSize: options.tileSize
+    });
+    return _super.call(this, {
+      attributions: options.attributions,
+      cacheSize: options.cacheSize,
+      crossOrigin: options.crossOrigin,
+      interpolate: interpolate,
+      opaque: options.opaque,
+      projection: projection,
+      reprojectionErrorThreshold: options.reprojectionErrorThreshold,
+      tileGrid: tileGrid,
+      tileLoadFunction: options.tileLoadFunction,
+      tilePixelRatio: options.tilePixelRatio,
+      tileUrlFunction: options.tileUrlFunction,
+      url: options.url,
+      urls: options.urls,
+      wrapX: options.wrapX !== undefined ? options.wrapX : true,
+      transition: options.transition,
+      attributionsCollapsible: options.attributionsCollapsible,
+      zDirection: options.zDirection
+    }) || this;
+  }
+
+  return XYZ;
+}(_TileImage.default);
+
+var _default = XYZ;
+exports.default = _default;
+},{"./TileImage.js":"node_modules/ol/source/TileImage.js","../tilegrid.js":"node_modules/ol/tilegrid.js"}],"node_modules/ol/source/CartoDB.js":[function(require,module,exports) {
+"use strict";
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+exports.default = void 0;
+
+var _State = _interopRequireDefault(require("./State.js"));
+
+var _XYZ = _interopRequireDefault(require("./XYZ.js"));
+
+var _obj = require("../obj.js");
+
+function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
+
+/**
+ * @module ol/source/CartoDB
+ */
+var __extends = void 0 && (void 0).__extends || function () {
+  var extendStatics = function (d, b) {
+    extendStatics = Object.setPrototypeOf || {
+      __proto__: []
+    } instanceof Array && function (d, b) {
+      d.__proto__ = b;
+    } || function (d, b) {
+      for (var p in b) if (Object.prototype.hasOwnProperty.call(b, p)) d[p] = b[p];
+    };
+
+    return extendStatics(d, b);
+  };
+
+  return function (d, b) {
+    if (typeof b !== "function" && b !== null) throw new TypeError("Class extends value " + String(b) + " is not a constructor or null");
+    extendStatics(d, b);
+
+    function __() {
+      this.constructor = d;
+    }
+
+    d.prototype = b === null ? Object.create(b) : (__.prototype = b.prototype, new __());
+  };
+}();
+
+/**
+ * @typedef {Object} Options
+ * @property {import("./Source.js").AttributionLike} [attributions] Attributions.
+ * @property {number} [cacheSize] Initial tile cache size. Will auto-grow to hold at least the number of tiles in the viewport.
+ * @property {null|string} [crossOrigin] The `crossOrigin` attribute for loaded images.  Note that
+ * you must provide a `crossOrigin` value if you want to access pixel data with the Canvas renderer.
+ * See https://developer.mozilla.org/en-US/docs/Web/HTML/CORS_enabled_image for more detail.
+ * @property {import("../proj.js").ProjectionLike} [projection='EPSG:3857'] Projection.
+ * @property {number} [maxZoom=18] Max zoom.
+ * @property {number} [minZoom] Minimum zoom.
+ * @property {boolean} [wrapX=true] Whether to wrap the world horizontally.
+ * @property {Object} [config] If using anonymous maps, the CartoDB config to use. See
+ * https://carto.com/developers/maps-api/guides/anonymous-maps/
+ * for more detail.
+ * If using named maps, a key-value lookup with the template parameters.
+ * See https://carto.com/developers/maps-api/guides/named-maps/
+ * for more detail.
+ * @property {string} [map] If using named maps, this will be the name of the template to load.
+ * See https://carto.com/developers/maps-api/guides/named-maps/
+ * for more detail.
+ * @property {string} [account] Username as used to access public Carto dashboard at https://{username}.carto.com/.
+ * @property {number} [transition=250] Duration of the opacity transition for rendering.
+ * To disable the opacity transition, pass `transition: 0`.
+ * @property {number|import("../array.js").NearestDirectionFunction} [zDirection=0]
+ * Choose whether to use tiles with a higher or lower zoom level when between integer
+ * zoom levels. See {@link module:ol/tilegrid/TileGrid~TileGrid#getZForResolution}.
+ */
+
+/**
+ * @typedef {Object} CartoDBLayerInfo
+ * @property {string} layergroupid The layer group ID
+ * @property {{https: string}} cdn_url The CDN URL
+ */
+
+/**
+ * @classdesc
+ * Layer source for the CartoDB Maps API.
+ * @api
+ */
+var CartoDB =
+/** @class */
+function (_super) {
+  __extends(CartoDB, _super);
+  /**
+   * @param {Options} options CartoDB options.
+   */
+
+
+  function CartoDB(options) {
+    var _this = _super.call(this, {
+      attributions: options.attributions,
+      cacheSize: options.cacheSize,
+      crossOrigin: options.crossOrigin,
+      maxZoom: options.maxZoom !== undefined ? options.maxZoom : 18,
+      minZoom: options.minZoom,
+      projection: options.projection,
+      transition: options.transition,
+      wrapX: options.wrapX,
+      zDirection: options.zDirection
+    }) || this;
+    /**
+     * @type {string}
+     * @private
+     */
+
+
+    _this.account_ = options.account;
+    /**
+     * @type {string}
+     * @private
+     */
+
+    _this.mapId_ = options.map || '';
+    /**
+     * @type {!Object}
+     * @private
+     */
+
+    _this.config_ = options.config || {};
+    /**
+     * @type {!Object<string, CartoDBLayerInfo>}
+     * @private
+     */
+
+    _this.templateCache_ = {};
+
+    _this.initializeMap_();
+
+    return _this;
+  }
+  /**
+   * Returns the current config.
+   * @return {!Object} The current configuration.
+   * @api
+   */
+
+
+  CartoDB.prototype.getConfig = function () {
+    return this.config_;
+  };
+  /**
+   * Updates the carto db config.
+   * @param {Object} config a key-value lookup. Values will replace current values
+   *     in the config.
+   * @api
+   */
+
+
+  CartoDB.prototype.updateConfig = function (config) {
+    (0, _obj.assign)(this.config_, config);
+    this.initializeMap_();
+  };
+  /**
+   * Sets the CartoDB config
+   * @param {Object} config In the case of anonymous maps, a CartoDB configuration
+   *     object.
+   * If using named maps, a key-value lookup with the template parameters.
+   * @api
+   */
+
+
+  CartoDB.prototype.setConfig = function (config) {
+    this.config_ = config || {};
+    this.initializeMap_();
+  };
+  /**
+   * Issue a request to initialize the CartoDB map.
+   * @private
+   */
+
+
+  CartoDB.prototype.initializeMap_ = function () {
+    var paramHash = JSON.stringify(this.config_);
+
+    if (this.templateCache_[paramHash]) {
+      this.applyTemplate_(this.templateCache_[paramHash]);
+      return;
+    }
+
+    var mapUrl = 'https://' + this.account_ + '.carto.com/api/v1/map';
+
+    if (this.mapId_) {
+      mapUrl += '/named/' + this.mapId_;
+    }
+
+    var client = new XMLHttpRequest();
+    client.addEventListener('load', this.handleInitResponse_.bind(this, paramHash));
+    client.addEventListener('error', this.handleInitError_.bind(this));
+    client.open('POST', mapUrl);
+    client.setRequestHeader('Content-type', 'application/json');
+    client.send(JSON.stringify(this.config_));
+  };
+  /**
+   * Handle map initialization response.
+   * @param {string} paramHash a hash representing the parameter set that was used
+   *     for the request
+   * @param {Event} event Event.
+   * @private
+   */
+
+
+  CartoDB.prototype.handleInitResponse_ = function (paramHash, event) {
+    var client =
+    /** @type {XMLHttpRequest} */
+    event.target; // status will be 0 for file:// urls
+
+    if (!client.status || client.status >= 200 && client.status < 300) {
+      var response = void 0;
+
+      try {
+        response =
+        /** @type {CartoDBLayerInfo} */
+        JSON.parse(client.responseText);
+      } catch (err) {
+        this.setState(_State.default.ERROR);
+        return;
+      }
+
+      this.applyTemplate_(response);
+      this.templateCache_[paramHash] = response;
+      this.setState(_State.default.READY);
+    } else {
+      this.setState(_State.default.ERROR);
+    }
+  };
+  /**
+   * @private
+   * @param {Event} event Event.
+   */
+
+
+  CartoDB.prototype.handleInitError_ = function (event) {
+    this.setState(_State.default.ERROR);
+  };
+  /**
+   * Apply the new tile urls returned by carto db
+   * @param {CartoDBLayerInfo} data Result of carto db call.
+   * @private
+   */
+
+
+  CartoDB.prototype.applyTemplate_ = function (data) {
+    var tilesUrl = 'https://' + data.cdn_url.https + '/' + this.account_ + '/api/v1/map/' + data.layergroupid + '/{z}/{x}/{y}.png';
+    this.setUrl(tilesUrl);
+  };
+
+  return CartoDB;
+}(_XYZ.default);
+
+var _default = CartoDB;
+exports.default = _default;
+},{"./State.js":"node_modules/ol/source/State.js","./XYZ.js":"node_modules/ol/source/XYZ.js","../obj.js":"node_modules/ol/obj.js"}],"node_modules/ol/source/Cluster.js":[function(require,module,exports) {
+"use strict";
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+exports.default = void 0;
+
+var _EventType = _interopRequireDefault(require("../events/EventType.js"));
+
+var _Feature = _interopRequireDefault(require("../Feature.js"));
+
+var _GeometryType = _interopRequireDefault(require("../geom/GeometryType.js"));
+
+var _Point = _interopRequireDefault(require("../geom/Point.js"));
+
+var _Vector = _interopRequireDefault(require("./Vector.js"));
+
+var _coordinate = require("../coordinate.js");
+
+var _asserts = require("../asserts.js");
+
+var _extent = require("../extent.js");
+
+var _util = require("../util.js");
+
+function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
+
+/**
+ * @module ol/source/Cluster
+ */
+var __extends = void 0 && (void 0).__extends || function () {
+  var extendStatics = function (d, b) {
+    extendStatics = Object.setPrototypeOf || {
+      __proto__: []
+    } instanceof Array && function (d, b) {
+      d.__proto__ = b;
+    } || function (d, b) {
+      for (var p in b) if (Object.prototype.hasOwnProperty.call(b, p)) d[p] = b[p];
+    };
+
+    return extendStatics(d, b);
+  };
+
+  return function (d, b) {
+    if (typeof b !== "function" && b !== null) throw new TypeError("Class extends value " + String(b) + " is not a constructor or null");
+    extendStatics(d, b);
+
+    function __() {
+      this.constructor = d;
+    }
+
+    d.prototype = b === null ? Object.create(b) : (__.prototype = b.prototype, new __());
+  };
+}();
+
+/**
+ * @typedef {Object} Options
+ * @property {import("./Source.js").AttributionLike} [attributions] Attributions.
+ * @property {number} [distance=20] Distance in pixels within which features will
+ * be clustered together.
+ * @property {number} [minDistance=0] Minimum distance in pixels between clusters.
+ * Will be capped at the configured distance.
+ * By default no minimum distance is guaranteed. This config can be used to avoid
+ * overlapping icons. As a tradoff, the cluster feature's position will no longer be
+ * the center of all its features.
+ * @property {function(Feature):Point} [geometryFunction]
+ * Function that takes an {@link module:ol/Feature~Feature} as argument and returns an
+ * {@link module:ol/geom/Point~Point} as cluster calculation point for the feature. When a
+ * feature should not be considered for clustering, the function should return
+ * `null`. The default, which works when the underlying source contains point
+ * features only, is
+ * ```js
+ * function(feature) {
+ *   return feature.getGeometry();
+ * }
+ * ```
+ * See {@link module:ol/geom/Polygon~Polygon#getInteriorPoint} for a way to get a cluster
+ * calculation point for polygons.
+ * @property {function(Point, Array<Feature>):Feature} [createCluster]
+ * Function that takes the cluster's center {@link module:ol/geom/Point~Point} and an array
+ * of {@link module:ol/Feature~Feature} included in this cluster. Must return a
+ * {@link module:ol/Feature~Feature} that will be used to render. Default implementation is:
+ * ```js
+ * function(point, features) {
+ *   return new Feature({
+ *     geometry: point,
+ *     features: features
+ *   });
+ * }
+ * ```
+ * @property {VectorSource} [source=null] Source.
+ * @property {boolean} [wrapX=true] Whether to wrap the world horizontally.
+ */
+
+/**
+ * @classdesc
+ * Layer source to cluster vector data. Works out of the box with point
+ * geometries. For other geometry types, or if not all geometries should be
+ * considered for clustering, a custom `geometryFunction` can be defined.
+ *
+ * If the instance is disposed without also disposing the underlying
+ * source `setSource(null)` has to be called to remove the listener reference
+ * from the wrapped source.
+ * @api
+ */
+var Cluster =
+/** @class */
+function (_super) {
+  __extends(Cluster, _super);
+  /**
+   * @param {Options} options Cluster options.
+   */
+
+
+  function Cluster(options) {
+    var _this = _super.call(this, {
+      attributions: options.attributions,
+      wrapX: options.wrapX
+    }) || this;
+    /**
+     * @type {number|undefined}
+     * @protected
+     */
+
+
+    _this.resolution = undefined;
+    /**
+     * @type {number}
+     * @protected
+     */
+
+    _this.distance = options.distance !== undefined ? options.distance : 20;
+    /**
+     * @type {number}
+     * @protected
+     */
+
+    _this.minDistance = options.minDistance || 0;
+    /**
+     * @type {number}
+     * @protected
+     */
+
+    _this.interpolationRatio = 0;
+    /**
+     * @type {Array<Feature>}
+     * @protected
+     */
+
+    _this.features = [];
+    /**
+     * @param {Feature} feature Feature.
+     * @return {Point} Cluster calculation point.
+     * @protected
+     */
+
+    _this.geometryFunction = options.geometryFunction || function (feature) {
+      var geometry =
+      /** @type {Point} */
+      feature.getGeometry();
+      (0, _asserts.assert)(geometry.getType() == _GeometryType.default.POINT, 10); // The default `geometryFunction` can only handle `Point` geometries
+
+      return geometry;
+    };
+    /**
+     * @type {function(Point, Array<Feature>):Feature}
+     * @private
+     */
+
+
+    _this.createCustomCluster_ = options.createCluster;
+    /**
+     * @type {VectorSource|null}
+     * @protected
+     */
+
+    _this.source = null;
+    /**
+     * @private
+     */
+
+    _this.boundRefresh_ = _this.refresh.bind(_this);
+
+    _this.updateDistance(_this.distance, _this.minDistance);
+
+    _this.setSource(options.source || null);
+
+    return _this;
+  }
+  /**
+   * Remove all features from the source.
+   * @param {boolean} [opt_fast] Skip dispatching of {@link module:ol/source/VectorEventType~VectorEventType#removefeature} events.
+   * @api
+   */
+
+
+  Cluster.prototype.clear = function (opt_fast) {
+    this.features.length = 0;
+
+    _super.prototype.clear.call(this, opt_fast);
+  };
+  /**
+   * Get the distance in pixels between clusters.
+   * @return {number} Distance.
+   * @api
+   */
+
+
+  Cluster.prototype.getDistance = function () {
+    return this.distance;
+  };
+  /**
+   * Get a reference to the wrapped source.
+   * @return {VectorSource|null} Source.
+   * @api
+   */
+
+
+  Cluster.prototype.getSource = function () {
+    return this.source;
+  };
+  /**
+   * @param {import("../extent.js").Extent} extent Extent.
+   * @param {number} resolution Resolution.
+   * @param {import("../proj/Projection.js").default} projection Projection.
+   */
+
+
+  Cluster.prototype.loadFeatures = function (extent, resolution, projection) {
+    this.source.loadFeatures(extent, resolution, projection);
+
+    if (resolution !== this.resolution) {
+      this.resolution = resolution;
+      this.refresh();
+    }
+  };
+  /**
+   * Set the distance within which features will be clusterd together.
+   * @param {number} distance The distance in pixels.
+   * @api
+   */
+
+
+  Cluster.prototype.setDistance = function (distance) {
+    this.updateDistance(distance, this.minDistance);
+  };
+  /**
+   * Set the minimum distance between clusters. Will be capped at the
+   * configured distance.
+   * @param {number} minDistance The minimum distance in pixels.
+   * @api
+   */
+
+
+  Cluster.prototype.setMinDistance = function (minDistance) {
+    this.updateDistance(this.distance, minDistance);
+  };
+  /**
+   * The configured minimum distance between clusters.
+   * @return {number} The minimum distance in pixels.
+   * @api
+   */
+
+
+  Cluster.prototype.getMinDistance = function () {
+    return this.minDistance;
+  };
+  /**
+   * Replace the wrapped source.
+   * @param {VectorSource|null} source The new source for this instance.
+   * @api
+   */
+
+
+  Cluster.prototype.setSource = function (source) {
+    if (this.source) {
+      this.source.removeEventListener(_EventType.default.CHANGE, this.boundRefresh_);
+    }
+
+    this.source = source;
+
+    if (source) {
+      source.addEventListener(_EventType.default.CHANGE, this.boundRefresh_);
+    }
+
+    this.refresh();
+  };
+  /**
+   * Handle the source changing.
+   */
+
+
+  Cluster.prototype.refresh = function () {
+    this.clear();
+    this.cluster();
+    this.addFeatures(this.features);
+  };
+  /**
+   * Update the distances and refresh the source if necessary.
+   * @param {number} distance The new distance.
+   * @param {number} minDistance The new minimum distance.
+   */
+
+
+  Cluster.prototype.updateDistance = function (distance, minDistance) {
+    var ratio = distance === 0 ? 0 : Math.min(minDistance, distance) / distance;
+    var changed = distance !== this.distance || this.interpolationRatio !== ratio;
+    this.distance = distance;
+    this.minDistance = minDistance;
+    this.interpolationRatio = ratio;
+
+    if (changed) {
+      this.refresh();
+    }
+  };
+  /**
+   * @protected
+   */
+
+
+  Cluster.prototype.cluster = function () {
+    if (this.resolution === undefined || !this.source) {
+      return;
+    }
+
+    var extent = (0, _extent.createEmpty)();
+    var mapDistance = this.distance * this.resolution;
+    var features = this.source.getFeatures();
+    /** @type {Object<string, true>} */
+
+    var clustered = {};
+
+    for (var i = 0, ii = features.length; i < ii; i++) {
+      var feature = features[i];
+
+      if (!((0, _util.getUid)(feature) in clustered)) {
+        var geometry = this.geometryFunction(feature);
+
+        if (geometry) {
+          var coordinates = geometry.getCoordinates();
+          (0, _extent.createOrUpdateFromCoordinate)(coordinates, extent);
+          (0, _extent.buffer)(extent, mapDistance, extent);
+          var neighbors = this.source.getFeaturesInExtent(extent).filter(function (neighbor) {
+            var uid = (0, _util.getUid)(neighbor);
+
+            if (uid in clustered) {
+              return false;
+            }
+
+            clustered[uid] = true;
+            return true;
+          });
+          this.features.push(this.createCluster(neighbors, extent));
+        }
+      }
+    }
+  };
+  /**
+   * @param {Array<Feature>} features Features
+   * @param {import("../extent.js").Extent} extent The searched extent for these features.
+   * @return {Feature} The cluster feature.
+   * @protected
+   */
+
+
+  Cluster.prototype.createCluster = function (features, extent) {
+    var centroid = [0, 0];
+
+    for (var i = features.length - 1; i >= 0; --i) {
+      var geometry_1 = this.geometryFunction(features[i]);
+
+      if (geometry_1) {
+        (0, _coordinate.add)(centroid, geometry_1.getCoordinates());
+      } else {
+        features.splice(i, 1);
+      }
+    }
+
+    (0, _coordinate.scale)(centroid, 1 / features.length);
+    var searchCenter = (0, _extent.getCenter)(extent);
+    var ratio = this.interpolationRatio;
+    var geometry = new _Point.default([centroid[0] * (1 - ratio) + searchCenter[0] * ratio, centroid[1] * (1 - ratio) + searchCenter[1] * ratio]);
+
+    if (this.createCustomCluster_) {
+      return this.createCustomCluster_(geometry, features);
+    } else {
+      return new _Feature.default({
+        geometry: geometry,
+        features: features
+      });
+    }
+  };
+
+  return Cluster;
+}(_Vector.default);
+
+var _default = Cluster;
+exports.default = _default;
+},{"../events/EventType.js":"node_modules/ol/events/EventType.js","../Feature.js":"node_modules/ol/Feature.js","../geom/GeometryType.js":"node_modules/ol/geom/GeometryType.js","../geom/Point.js":"node_modules/ol/geom/Point.js","./Vector.js":"node_modules/ol/source/Vector.js","../coordinate.js":"node_modules/ol/coordinate.js","../asserts.js":"node_modules/ol/asserts.js","../extent.js":"node_modules/ol/extent.js","../util.js":"node_modules/ol/util.js"}],"node_modules/ol/source/DataTile.js":[function(require,module,exports) {
+"use strict";
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+exports.default = void 0;
+
+var _DataTile = _interopRequireDefault(require("../DataTile.js"));
+
+var _EventType = _interopRequireDefault(require("../events/EventType.js"));
+
+var _TileEventType = _interopRequireDefault(require("./TileEventType.js"));
+
+var _Tile = _interopRequireWildcard(require("./Tile.js"));
+
+var _TileState = _interopRequireDefault(require("../TileState.js"));
+
+var _obj = require("../obj.js");
+
+var _tilegrid = require("../tilegrid.js");
+
+var _tilecoord = require("../tilecoord.js");
+
+var _util = require("../util.js");
+
+var _functions = require("../functions.js");
+
+function _getRequireWildcardCache(nodeInterop) { if (typeof WeakMap !== "function") return null; var cacheBabelInterop = new WeakMap(); var cacheNodeInterop = new WeakMap(); return (_getRequireWildcardCache = function (nodeInterop) { return nodeInterop ? cacheNodeInterop : cacheBabelInterop; })(nodeInterop); }
+
+function _interopRequireWildcard(obj, nodeInterop) { if (!nodeInterop && obj && obj.__esModule) { return obj; } if (obj === null || typeof obj !== "object" && typeof obj !== "function") { return { default: obj }; } var cache = _getRequireWildcardCache(nodeInterop); if (cache && cache.has(obj)) { return cache.get(obj); } var newObj = {}; var hasPropertyDescriptor = Object.defineProperty && Object.getOwnPropertyDescriptor; for (var key in obj) { if (key !== "default" && Object.prototype.hasOwnProperty.call(obj, key)) { var desc = hasPropertyDescriptor ? Object.getOwnPropertyDescriptor(obj, key) : null; if (desc && (desc.get || desc.set)) { Object.defineProperty(newObj, key, desc); } else { newObj[key] = obj[key]; } } } newObj.default = obj; if (cache) { cache.set(obj, newObj); } return newObj; }
+
+function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
+
+var __extends = void 0 && (void 0).__extends || function () {
+  var extendStatics = function (d, b) {
+    extendStatics = Object.setPrototypeOf || {
+      __proto__: []
+    } instanceof Array && function (d, b) {
+      d.__proto__ = b;
+    } || function (d, b) {
+      for (var p in b) if (Object.prototype.hasOwnProperty.call(b, p)) d[p] = b[p];
+    };
+
+    return extendStatics(d, b);
+  };
+
+  return function (d, b) {
+    if (typeof b !== "function" && b !== null) throw new TypeError("Class extends value " + String(b) + " is not a constructor or null");
+    extendStatics(d, b);
+
+    function __() {
+      this.constructor = d;
+    }
+
+    d.prototype = b === null ? Object.create(b) : (__.prototype = b.prototype, new __());
+  };
+}();
+/**
+ * @module ol/source/DataTile
+ */
+
+
+/**
+ * Data tile loading function.  The function is called with z, x, and y tile coordinates and
+ * returns {@link import("../DataTile.js").Data data} for a tile or a promise for the same.
+ * @typedef {function(number, number, number) : (import("../DataTile.js").Data|Promise<import("../DataTile.js").Data>)} Loader
+ */
+
+/**
+ * @typedef {Object} Options
+ * @property {Loader} [loader] Data loader.  Called with z, x, and y tile coordinates.
+ * Returns {@link import("../DataTile.js").Data data} for a tile or a promise for the same.
+ * @property {import("./Source.js").AttributionLike} [attributions] Attributions.
+ * @property {boolean} [attributionsCollapsible=true] Attributions are collapsible.
+ * @property {number} [maxZoom=42] Optional max zoom level. Not used if `tileGrid` is provided.
+ * @property {number} [minZoom=0] Optional min zoom level. Not used if `tileGrid` is provided.
+ * @property {number|import("../size.js").Size} [tileSize=[256, 256]] The pixel width and height of the tiles.
+ * @property {number} [maxResolution] Optional tile grid resolution at level zero. Not used if `tileGrid` is provided.
+ * @property {import("../proj.js").ProjectionLike} [projection='EPSG:3857'] Tile projection.
+ * @property {import("../tilegrid/TileGrid.js").default} [tileGrid] Tile grid.
+ * @property {boolean} [opaque=false] Whether the layer is opaque.
+ * @property {import("./State.js").default} [state] The source state.
+ * @property {number} [tilePixelRatio] Tile pixel ratio.
+ * @property {boolean} [wrapX=false] Render tiles beyond the antimeridian.
+ * @property {number} [transition] Transition time when fading in new tiles (in miliseconds).
+ * @property {number} [bandCount=4] Number of bands represented in the data.
+ * @property {boolean} [interpolate=false] Use interpolated values when resampling.  By default,
+ * the nearest neighbor is used when resampling.
+ */
+
+/**
+ * @classdesc
+ * A source for typed array data tiles.
+ *
+ * @fires import("./Tile.js").TileSourceEvent
+ * @api
+ */
+var DataTileSource =
+/** @class */
+function (_super) {
+  __extends(DataTileSource, _super);
+  /**
+   * @param {Options} options Image tile options.
+   */
+
+
+  function DataTileSource(options) {
+    var _this = this;
+
+    var projection = options.projection === undefined ? 'EPSG:3857' : options.projection;
+    var tileGrid = options.tileGrid;
+
+    if (tileGrid === undefined && projection) {
+      tileGrid = (0, _tilegrid.createXYZ)({
+        extent: (0, _tilegrid.extentFromProjection)(projection),
+        maxResolution: options.maxResolution,
+        maxZoom: options.maxZoom,
+        minZoom: options.minZoom,
+        tileSize: options.tileSize
+      });
+    }
+
+    _this = _super.call(this, {
+      cacheSize: 0.1,
+      attributions: options.attributions,
+      attributionsCollapsible: options.attributionsCollapsible,
+      projection: projection,
+      tileGrid: tileGrid,
+      opaque: options.opaque,
+      state: options.state,
+      tilePixelRatio: options.tilePixelRatio,
+      wrapX: options.wrapX,
+      transition: options.transition,
+      interpolate: options.interpolate
+    }) || this;
+    /**
+     * @private
+     * @type {!Object<string, boolean>}
+     */
+
+    _this.tileLoadingKeys_ = {};
+    /**
+     * @private
+     */
+
+    _this.loader_ = options.loader;
+    _this.handleTileChange_ = _this.handleTileChange_.bind(_this);
+    /**
+     * @type {number}
+     */
+
+    _this.bandCount = options.bandCount === undefined ? 4 : options.bandCount; // assume RGBA if undefined
+
+    return _this;
+  }
+  /**
+   * @param {Loader} loader The data loader.
+   * @protected
+   */
+
+
+  DataTileSource.prototype.setLoader = function (loader) {
+    this.loader_ = loader;
+  };
+  /**
+   * @param {number} z Tile coordinate z.
+   * @param {number} x Tile coordinate x.
+   * @param {number} y Tile coordinate y.
+   * @param {number} pixelRatio Pixel ratio.
+   * @param {import("../proj/Projection.js").default} projection Projection.
+   * @return {!DataTile} Tile.
+   */
+
+
+  DataTileSource.prototype.getTile = function (z, x, y, pixelRatio, projection) {
+    var tileCoordKey = (0, _tilecoord.getKeyZXY)(z, x, y);
+
+    if (this.tileCache.containsKey(tileCoordKey)) {
+      return this.tileCache.get(tileCoordKey);
+    }
+
+    var sourceLoader = this.loader_;
+
+    function loader() {
+      return (0, _functions.toPromise)(function () {
+        return sourceLoader(z, x, y);
+      });
+    }
+
+    var tile = new _DataTile.default((0, _obj.assign)({
+      tileCoord: [z, x, y],
+      loader: loader
+    }, this.tileOptions));
+    tile.key = this.getKey();
+    tile.addEventListener(_EventType.default.CHANGE, this.handleTileChange_);
+    this.tileCache.set(tileCoordKey, tile);
+    return tile;
+  };
+  /**
+   * Handle tile change events.
+   * @param {import("../events/Event.js").default} event Event.
+   */
+
+
+  DataTileSource.prototype.handleTileChange_ = function (event) {
+    var tile =
+    /** @type {import("../Tile.js").default} */
+    event.target;
+    var uid = (0, _util.getUid)(tile);
+    var tileState = tile.getState();
+    var type;
+
+    if (tileState == _TileState.default.LOADING) {
+      this.tileLoadingKeys_[uid] = true;
+      type = _TileEventType.default.TILELOADSTART;
+    } else if (uid in this.tileLoadingKeys_) {
+      delete this.tileLoadingKeys_[uid];
+      type = tileState == _TileState.default.ERROR ? _TileEventType.default.TILELOADERROR : tileState == _TileState.default.LOADED ? _TileEventType.default.TILELOADEND : undefined;
+    }
+
+    if (type) {
+      this.dispatchEvent(new _Tile.TileSourceEvent(type, tile));
+    }
+  };
+
+  return DataTileSource;
+}(_Tile.default);
+
+var _default = DataTileSource;
+exports.default = _default;
+},{"../DataTile.js":"node_modules/ol/DataTile.js","../events/EventType.js":"node_modules/ol/events/EventType.js","./TileEventType.js":"node_modules/ol/source/TileEventType.js","./Tile.js":"node_modules/ol/source/Tile.js","../TileState.js":"node_modules/ol/TileState.js","../obj.js":"node_modules/ol/obj.js","../tilegrid.js":"node_modules/ol/tilegrid.js","../tilecoord.js":"node_modules/ol/tilecoord.js","../util.js":"node_modules/ol/util.js","../functions.js":"node_modules/ol/functions.js"}],"node_modules/@petamoriken/float16/browser/float16.js":[function(require,module,exports) {
+/*! @petamoriken/float16 v3.6.5 | MIT License - https://github.com/petamoriken/float16 */
+
+const float16 = (function (exports) {
+  'use strict';
+
+  const THIS_IS_NOT_AN_OBJECT = "This is not an object";
+  const THIS_IS_NOT_A_FLOAT16ARRAY_OBJECT = "This is not a Float16Array object";
+  const THIS_CONSTRUCTOR_IS_NOT_A_SUBCLASS_OF_FLOAT16ARRAY =
+    "This constructor is not a subclass of Float16Array";
+  const THE_CONSTRUCTOR_PROPERTY_VALUE_IS_NOT_AN_OBJECT =
+    "The constructor property value is not an object";
+  const SPECIES_CONSTRUCTOR_DIDNT_RETURN_TYPEDARRAY_OBJECT =
+    "Species constructor didn't return TypedArray object";
+  const DERIVED_CONSTRUCTOR_CREATED_TYPEDARRAY_OBJECT_WHICH_WAS_TOO_SMALL_LENGTH =
+    "Derived constructor created TypedArray object which was too small length";
+  const ATTEMPTING_TO_ACCESS_DETACHED_ARRAYBUFFER =
+    "Attempting to access detached ArrayBuffer";
+  const CANNOT_CONVERT_UNDEFINED_OR_NULL_TO_OBJECT =
+    "Cannot convert undefined or null to object";
+  const CANNOT_CONVERT_A_BIGINT_VALUE_TO_A_NUMBER =
+    "Cannot convert a BigInt value to a number";
+  const CANNOT_MIX_BIGINT_AND_OTHER_TYPES =
+    "Cannot mix BigInt and other types, use explicit conversions";
+  const ITERATOR_PROPERTY_IS_NOT_CALLABLE = "@@iterator property is not callable";
+  const REDUCE_OF_EMPTY_ARRAY_WITH_NO_INITIAL_VALUE =
+    "Reduce of empty array with no initial value";
+  const OFFSET_IS_OUT_OF_BOUNDS = "Offset is out of bounds";
+
+  function uncurryThis(target) {
+    return (thisArg, ...args) => {
+      return ReflectApply(target, thisArg, args);
+    };
+  }
+  function uncurryThisGetter(target, key) {
+    return uncurryThis(
+      ReflectGetOwnPropertyDescriptor(
+        target,
+        key
+      ).get
+    );
+  }
+  const {
+    apply: ReflectApply,
+    construct: ReflectConstruct,
+    defineProperty: ReflectDefineProperty,
+    get: ReflectGet,
+    getOwnPropertyDescriptor: ReflectGetOwnPropertyDescriptor,
+    getPrototypeOf: ReflectGetPrototypeOf,
+    has: ReflectHas,
+    ownKeys: ReflectOwnKeys,
+    set: ReflectSet,
+    setPrototypeOf: ReflectSetPrototypeOf,
+  } = Reflect;
+  const NativeProxy = Proxy;
+  const NativeNumber = Number;
+  const {
+    isFinite: NumberIsFinite,
+    isNaN: NumberIsNaN,
+  } = NativeNumber;
+  const {
+    iterator: SymbolIterator,
+    species: SymbolSpecies,
+    toStringTag: SymbolToStringTag,
+    for: SymbolFor,
+  } = Symbol;
+  const NativeObject = Object;
+  const {
+    create: ObjectCreate,
+    defineProperty: ObjectDefineProperty,
+    freeze: ObjectFreeze,
+    is: ObjectIs,
+  } = NativeObject;
+  const ObjectPrototype = NativeObject.prototype;
+  const ObjectPrototype__lookupGetter__ =  (ObjectPrototype).__lookupGetter__
+    ? uncurryThis( (ObjectPrototype).__lookupGetter__)
+    : (object, key) => {
+      if (object == null) {
+        throw NativeTypeError(
+          CANNOT_CONVERT_UNDEFINED_OR_NULL_TO_OBJECT
+        );
+      }
+      let target = NativeObject(object);
+      do {
+        const descriptor = ReflectGetOwnPropertyDescriptor(target, key);
+        if (descriptor !== undefined) {
+          if (ObjectHasOwn(descriptor, "get")) {
+            return descriptor.get;
+          }
+          return;
+        }
+      } while ((target = ReflectGetPrototypeOf(target)) !== null);
+    };
+  const ObjectHasOwn =  (NativeObject).hasOwn ||
+    uncurryThis(ObjectPrototype.hasOwnProperty);
+  const NativeArray = Array;
+  const ArrayIsArray = NativeArray.isArray;
+  const ArrayPrototype = NativeArray.prototype;
+  const ArrayPrototypeJoin = uncurryThis(ArrayPrototype.join);
+  const ArrayPrototypePush = uncurryThis(ArrayPrototype.push);
+  const ArrayPrototypeToLocaleString = uncurryThis(
+    ArrayPrototype.toLocaleString
+  );
+  const NativeArrayPrototypeSymbolIterator = ArrayPrototype[SymbolIterator];
+  const ArrayPrototypeSymbolIterator = uncurryThis(NativeArrayPrototypeSymbolIterator);
+  const MathTrunc = Math.trunc;
+  const NativeArrayBuffer = ArrayBuffer;
+  const ArrayBufferIsView = NativeArrayBuffer.isView;
+  const ArrayBufferPrototype = NativeArrayBuffer.prototype;
+  const ArrayBufferPrototypeSlice = uncurryThis(ArrayBufferPrototype.slice);
+  const ArrayBufferPrototypeGetByteLength = uncurryThisGetter(ArrayBufferPrototype, "byteLength");
+  const NativeSharedArrayBuffer = typeof SharedArrayBuffer !== "undefined" ? SharedArrayBuffer : null;
+  const SharedArrayBufferPrototypeGetByteLength = NativeSharedArrayBuffer
+    && uncurryThisGetter(NativeSharedArrayBuffer.prototype, "byteLength");
+  const TypedArray = ReflectGetPrototypeOf(Uint8Array);
+  const TypedArrayFrom = TypedArray.from;
+  const TypedArrayPrototype = TypedArray.prototype;
+  const NativeTypedArrayPrototypeSymbolIterator = TypedArrayPrototype[SymbolIterator];
+  const TypedArrayPrototypeKeys = uncurryThis(TypedArrayPrototype.keys);
+  const TypedArrayPrototypeValues = uncurryThis(
+    TypedArrayPrototype.values
+  );
+  const TypedArrayPrototypeEntries = uncurryThis(
+    TypedArrayPrototype.entries
+  );
+  const TypedArrayPrototypeSet = uncurryThis(TypedArrayPrototype.set);
+  const TypedArrayPrototypeReverse = uncurryThis(
+    TypedArrayPrototype.reverse
+  );
+  const TypedArrayPrototypeFill = uncurryThis(TypedArrayPrototype.fill);
+  const TypedArrayPrototypeCopyWithin = uncurryThis(
+    TypedArrayPrototype.copyWithin
+  );
+  const TypedArrayPrototypeSort = uncurryThis(TypedArrayPrototype.sort);
+  const TypedArrayPrototypeSlice = uncurryThis(TypedArrayPrototype.slice);
+  const TypedArrayPrototypeSubarray = uncurryThis(
+    TypedArrayPrototype.subarray
+  );
+  const TypedArrayPrototypeGetBuffer = uncurryThisGetter(
+    TypedArrayPrototype,
+    "buffer"
+  );
+  const TypedArrayPrototypeGetByteOffset = uncurryThisGetter(
+    TypedArrayPrototype,
+    "byteOffset"
+  );
+  const TypedArrayPrototypeGetLength = uncurryThisGetter(
+    TypedArrayPrototype,
+    "length"
+  );
+  const TypedArrayPrototypeGetSymbolToStringTag = uncurryThisGetter(
+    TypedArrayPrototype,
+    SymbolToStringTag
+  );
+  const NativeUint16Array = Uint16Array;
+  const Uint16ArrayFrom = (...args) => {
+    return ReflectApply(TypedArrayFrom, NativeUint16Array, args);
+  };
+  const NativeUint32Array = Uint32Array;
+  const NativeFloat32Array = Float32Array;
+  const ArrayIteratorPrototype = ReflectGetPrototypeOf([][SymbolIterator]());
+  const ArrayIteratorPrototypeNext = uncurryThis(ArrayIteratorPrototype.next);
+  const GeneratorPrototypeNext = uncurryThis((function* () {})().next);
+  const IteratorPrototype = ReflectGetPrototypeOf(ArrayIteratorPrototype);
+  const DataViewPrototype = DataView.prototype;
+  const DataViewPrototypeGetUint16 = uncurryThis(
+    DataViewPrototype.getUint16
+  );
+  const DataViewPrototypeSetUint16 = uncurryThis(
+    DataViewPrototype.setUint16
+  );
+  const NativeTypeError = TypeError;
+  const NativeRangeError = RangeError;
+  const NativeWeakSet = WeakSet;
+  const WeakSetPrototype = NativeWeakSet.prototype;
+  const WeakSetPrototypeAdd = uncurryThis(WeakSetPrototype.add);
+  const WeakSetPrototypeHas = uncurryThis(WeakSetPrototype.has);
+  const NativeWeakMap = WeakMap;
+  const WeakMapPrototype = NativeWeakMap.prototype;
+  const WeakMapPrototypeGet = uncurryThis(WeakMapPrototype.get);
+  const WeakMapPrototypeHas = uncurryThis(WeakMapPrototype.has);
+  const WeakMapPrototypeSet = uncurryThis(WeakMapPrototype.set);
+
+  const arrayIterators = new NativeWeakMap();
+  const SafeIteratorPrototype = ObjectCreate(null, {
+    next: {
+      value: function next() {
+        const arrayIterator = WeakMapPrototypeGet(arrayIterators, this);
+        return ArrayIteratorPrototypeNext(arrayIterator);
+      },
+    },
+    [SymbolIterator]: {
+      value: function values() {
+        return this;
+      },
+    },
+  });
+  function safeIfNeeded(array) {
+    if (array[SymbolIterator] === NativeArrayPrototypeSymbolIterator) {
+      return array;
+    }
+    const safe = ObjectCreate(SafeIteratorPrototype);
+    WeakMapPrototypeSet(arrayIterators, safe, ArrayPrototypeSymbolIterator(array));
+    return safe;
+  }
+  const generators = new NativeWeakMap();
+  const DummyArrayIteratorPrototype = ObjectCreate(IteratorPrototype, {
+    next: {
+      value: function next() {
+        const generator = WeakMapPrototypeGet(generators, this);
+        return GeneratorPrototypeNext(generator);
+      },
+      writable: true,
+      configurable: true,
+    },
+  });
+  for (const key of ReflectOwnKeys(ArrayIteratorPrototype)) {
+    if (key === "next") {
+      continue;
+    }
+    ObjectDefineProperty(DummyArrayIteratorPrototype, key, ReflectGetOwnPropertyDescriptor(ArrayIteratorPrototype, key));
+  }
+  function wrap(generator) {
+    const dummy = ObjectCreate(DummyArrayIteratorPrototype);
+    WeakMapPrototypeSet(generators, dummy, generator);
+    return dummy;
+  }
+
+  function isObject(value) {
+    return (value !== null && typeof value === "object") ||
+      typeof value === "function";
+  }
+  function isObjectLike(value) {
+    return value !== null && typeof value === "object";
+  }
+  function isNativeTypedArray(value) {
+    return TypedArrayPrototypeGetSymbolToStringTag(value) !== undefined;
+  }
+  function isNativeBigIntTypedArray(value) {
+    const typedArrayName = TypedArrayPrototypeGetSymbolToStringTag(value);
+    return typedArrayName === "BigInt64Array" ||
+      typedArrayName === "BigUint64Array";
+  }
+  function isArrayBuffer(value) {
+    try {
+      ArrayBufferPrototypeGetByteLength( (value));
+      return true;
+    } catch (e) {
+      return false;
+    }
+  }
+  function isSharedArrayBuffer(value) {
+    if (NativeSharedArrayBuffer === null) {
+      return false;
+    }
+    try {
+      SharedArrayBufferPrototypeGetByteLength( (value));
+      return true;
+    } catch (e) {
+      return false;
+    }
+  }
+  function isOrdinaryArray(value) {
+    if (!ArrayIsArray(value)) {
+      return false;
+    }
+    if (value[SymbolIterator] === NativeArrayPrototypeSymbolIterator) {
+      return true;
+    }
+    const iterator = value[SymbolIterator]();
+    return iterator[SymbolToStringTag] === "Array Iterator";
+  }
+  function isOrdinaryNativeTypedArray(value) {
+    if (!isNativeTypedArray(value)) {
+      return false;
+    }
+    if (value[SymbolIterator] === NativeTypedArrayPrototypeSymbolIterator) {
+      return true;
+    }
+    const iterator = value[SymbolIterator]();
+    return iterator[SymbolToStringTag] === "Array Iterator";
+  }
+  function isCanonicalIntegerIndexString(value) {
+    if (typeof value !== "string") {
+      return false;
+    }
+    const number = NativeNumber(value);
+    if (value !== number + "") {
+      return false;
+    }
+    if (!NumberIsFinite(number)) {
+      return false;
+    }
+    return number === MathTrunc(number);
+  }
+
+  const brand = SymbolFor("__Float16Array__");
+  function hasFloat16ArrayBrand(target) {
+    if (!isObjectLike(target)) {
+      return false;
+    }
+    const prototype = ReflectGetPrototypeOf(target);
+    if (!isObjectLike(prototype)) {
+      return false;
+    }
+    const constructor = prototype.constructor;
+    if (constructor === undefined) {
+      return false;
+    }
+    if (!isObject(constructor)) {
+      throw NativeTypeError(THE_CONSTRUCTOR_PROPERTY_VALUE_IS_NOT_AN_OBJECT);
+    }
+    return ReflectHas(constructor, brand);
+  }
+
+  const buffer = new NativeArrayBuffer(4);
+  const floatView = new NativeFloat32Array(buffer);
+  const uint32View = new NativeUint32Array(buffer);
+  const baseTable = new NativeUint32Array(512);
+  const shiftTable = new NativeUint32Array(512);
+  for (let i = 0; i < 256; ++i) {
+    const e = i - 127;
+    if (e < -27) {
+      baseTable[i]         = 0x0000;
+      baseTable[i | 0x100] = 0x8000;
+      shiftTable[i]         = 24;
+      shiftTable[i | 0x100] = 24;
+    } else if (e < -14) {
+      baseTable[i]         =  0x0400 >> (-e - 14);
+      baseTable[i | 0x100] = (0x0400 >> (-e - 14)) | 0x8000;
+      shiftTable[i]         = -e - 1;
+      shiftTable[i | 0x100] = -e - 1;
+    } else if (e <= 15) {
+      baseTable[i]         =  (e + 15) << 10;
+      baseTable[i | 0x100] = ((e + 15) << 10) | 0x8000;
+      shiftTable[i]         = 13;
+      shiftTable[i | 0x100] = 13;
+    } else if (e < 128) {
+      baseTable[i]         = 0x7c00;
+      baseTable[i | 0x100] = 0xfc00;
+      shiftTable[i]         = 24;
+      shiftTable[i | 0x100] = 24;
+    } else {
+      baseTable[i]         = 0x7c00;
+      baseTable[i | 0x100] = 0xfc00;
+      shiftTable[i]         = 13;
+      shiftTable[i | 0x100] = 13;
+    }
+  }
+  function roundToFloat16Bits(num) {
+    floatView[0] =  (num);
+    const f = uint32View[0];
+    const e = (f >> 23) & 0x1ff;
+    return baseTable[e] + ((f & 0x007fffff) >> shiftTable[e]);
+  }
+  const mantissaTable = new NativeUint32Array(2048);
+  const exponentTable = new NativeUint32Array(64);
+  const offsetTable = new NativeUint32Array(64);
+  for (let i = 1; i < 1024; ++i) {
+    let m = i << 13;
+    let e = 0;
+    while((m & 0x00800000) === 0) {
+      m <<= 1;
+      e -= 0x00800000;
+    }
+    m &= ~0x00800000;
+    e += 0x38800000;
+    mantissaTable[i] = m | e;
+  }
+  for (let i = 1024; i < 2048; ++i) {
+    mantissaTable[i] = 0x38000000 + ((i - 1024) << 13);
+  }
+  for (let i = 1; i < 31; ++i) {
+    exponentTable[i] = i << 23;
+  }
+  exponentTable[31] = 0x47800000;
+  exponentTable[32] = 0x80000000;
+  for (let i = 33; i < 63; ++i) {
+    exponentTable[i] = 0x80000000 + ((i - 32) << 23);
+  }
+  exponentTable[63] = 0xc7800000;
+  for (let i = 1; i < 64; ++i) {
+    if (i !== 32) {
+      offsetTable[i] = 1024;
+    }
+  }
+  function convertToNumber(float16bits) {
+    const m = float16bits >> 10;
+    uint32View[0] = mantissaTable[offsetTable[m] + (float16bits & 0x3ff)] + exponentTable[m];
+    return floatView[0];
+  }
+
+  const MAX_SAFE_INTEGER = NativeNumber.MAX_SAFE_INTEGER;
+  function ToIntegerOrInfinity(target) {
+    if (typeof target === "bigint") {
+      throw NativeTypeError(CANNOT_CONVERT_A_BIGINT_VALUE_TO_A_NUMBER);
+    }
+    const number = NativeNumber(target);
+    if (NumberIsNaN(number) || number === 0) {
+      return 0;
+    }
+    return MathTrunc(number);
+  }
+  function ToLength(target) {
+    const length = ToIntegerOrInfinity(target);
+    if (length < 0) {
+      return 0;
+    }
+    return length < MAX_SAFE_INTEGER
+      ? length
+      : MAX_SAFE_INTEGER;
+  }
+  function SpeciesConstructor(target, defaultConstructor) {
+    if (!isObject(target)) {
+      throw NativeTypeError(THIS_IS_NOT_AN_OBJECT);
+    }
+    const constructor = target.constructor;
+    if (constructor === undefined) {
+      return defaultConstructor;
+    }
+    if (!isObject(constructor)) {
+      throw NativeTypeError(THE_CONSTRUCTOR_PROPERTY_VALUE_IS_NOT_AN_OBJECT);
+    }
+    const species = constructor[SymbolSpecies];
+    if (species == null) {
+      return defaultConstructor;
+    }
+    return species;
+  }
+  function IsDetachedBuffer(buffer) {
+    if (isSharedArrayBuffer(buffer)) {
+      return false;
+    }
+    try {
+      ArrayBufferPrototypeSlice(buffer, 0, 0);
+      return false;
+    } catch (e) {}
+    return true;
+  }
+  function defaultCompare(x, y) {
+    const isXNaN = NumberIsNaN(x);
+    const isYNaN = NumberIsNaN(y);
+    if (isXNaN && isYNaN) {
+      return 0;
+    }
+    if (isXNaN) {
+      return 1;
+    }
+    if (isYNaN) {
+      return -1;
+    }
+    if (x < y) {
+      return -1;
+    }
+    if (x > y) {
+      return 1;
+    }
+    if (x === 0 && y === 0) {
+      const isXPlusZero = ObjectIs(x, 0);
+      const isYPlusZero = ObjectIs(y, 0);
+      if (!isXPlusZero && isYPlusZero) {
+        return -1;
+      }
+      if (isXPlusZero && !isYPlusZero) {
+        return 1;
+      }
+    }
+    return 0;
+  }
+
+  const BYTES_PER_ELEMENT = 2;
+  const float16bitsArrays = new NativeWeakMap();
+  function isFloat16Array(target) {
+    return WeakMapPrototypeHas(float16bitsArrays, target) ||
+      (!ArrayBufferIsView(target) && hasFloat16ArrayBrand(target));
+  }
+  function assertFloat16Array(target) {
+    if (!isFloat16Array(target)) {
+      throw NativeTypeError(THIS_IS_NOT_A_FLOAT16ARRAY_OBJECT);
+    }
+  }
+  function assertSpeciesTypedArray(target, count) {
+    const isTargetFloat16Array = isFloat16Array(target);
+    const isTargetTypedArray = isNativeTypedArray(target);
+    if (!isTargetFloat16Array && !isTargetTypedArray) {
+      throw NativeTypeError(SPECIES_CONSTRUCTOR_DIDNT_RETURN_TYPEDARRAY_OBJECT);
+    }
+    if (typeof count === "number") {
+      let length;
+      if (isTargetFloat16Array) {
+        const float16bitsArray = getFloat16BitsArray(target);
+        length = TypedArrayPrototypeGetLength(float16bitsArray);
+      } else {
+        length = TypedArrayPrototypeGetLength(target);
+      }
+      if (length < count) {
+        throw NativeTypeError(
+          DERIVED_CONSTRUCTOR_CREATED_TYPEDARRAY_OBJECT_WHICH_WAS_TOO_SMALL_LENGTH
+        );
+      }
+    }
+    if (isNativeBigIntTypedArray(target)) {
+      throw NativeTypeError(CANNOT_MIX_BIGINT_AND_OTHER_TYPES);
+    }
+  }
+  function getFloat16BitsArray(float16) {
+    const float16bitsArray = WeakMapPrototypeGet(float16bitsArrays, float16);
+    if (float16bitsArray !== undefined) {
+      const buffer = TypedArrayPrototypeGetBuffer(float16bitsArray);
+      if (IsDetachedBuffer(buffer)) {
+        throw NativeTypeError(ATTEMPTING_TO_ACCESS_DETACHED_ARRAYBUFFER);
+      }
+      return float16bitsArray;
+    }
+    const buffer =  (float16).buffer;
+    if (IsDetachedBuffer(buffer)) {
+      throw NativeTypeError(ATTEMPTING_TO_ACCESS_DETACHED_ARRAYBUFFER);
+    }
+    const cloned = ReflectConstruct(Float16Array, [
+      buffer,
+       (float16).byteOffset,
+       (float16).length,
+    ], float16.constructor);
+    return WeakMapPrototypeGet(float16bitsArrays, cloned);
+  }
+  function copyToArray(float16bitsArray) {
+    const length = TypedArrayPrototypeGetLength(float16bitsArray);
+    const array = [];
+    for (let i = 0; i < length; ++i) {
+      array[i] = convertToNumber(float16bitsArray[i]);
+    }
+    return array;
+  }
+  const TypedArrayPrototypeGetters = new NativeWeakSet();
+  for (const key of ReflectOwnKeys(TypedArrayPrototype)) {
+    if (key === SymbolToStringTag) {
+      continue;
+    }
+    const descriptor = ReflectGetOwnPropertyDescriptor(TypedArrayPrototype, key);
+    if (ObjectHasOwn(descriptor, "get") && typeof descriptor.get === "function") {
+      WeakSetPrototypeAdd(TypedArrayPrototypeGetters, descriptor.get);
+    }
+  }
+  const handler = ObjectFreeze( ({
+    get(target, key, receiver) {
+      if (isCanonicalIntegerIndexString(key) && ObjectHasOwn(target, key)) {
+        return convertToNumber(ReflectGet(target, key));
+      }
+      if (WeakSetPrototypeHas(TypedArrayPrototypeGetters, ObjectPrototype__lookupGetter__(target, key))) {
+        return ReflectGet(target, key);
+      }
+      return ReflectGet(target, key, receiver);
+    },
+    set(target, key, value, receiver) {
+      if (isCanonicalIntegerIndexString(key) && ObjectHasOwn(target, key)) {
+        return ReflectSet(target, key, roundToFloat16Bits(value));
+      }
+      return ReflectSet(target, key, value, receiver);
+    },
+    getOwnPropertyDescriptor(target, key) {
+      if (isCanonicalIntegerIndexString(key) && ObjectHasOwn(target, key)) {
+        const descriptor = ReflectGetOwnPropertyDescriptor(target, key);
+        descriptor.value = convertToNumber(descriptor.value);
+        return descriptor;
+      }
+      return ReflectGetOwnPropertyDescriptor(target, key);
+    },
+    defineProperty(target, key, descriptor) {
+      if (
+        isCanonicalIntegerIndexString(key) &&
+        ObjectHasOwn(target, key) &&
+        ObjectHasOwn(descriptor, "value")
+      ) {
+        descriptor.value = roundToFloat16Bits(descriptor.value);
+        return ReflectDefineProperty(target, key, descriptor);
+      }
+      return ReflectDefineProperty(target, key, descriptor);
+    },
+  }));
+  class Float16Array {
+    constructor(input, _byteOffset, _length) {
+      let float16bitsArray;
+      if (isFloat16Array(input)) {
+        float16bitsArray = ReflectConstruct(NativeUint16Array, [getFloat16BitsArray(input)], new.target);
+      } else if (isObject(input) && !isArrayBuffer(input)) {
+        let list;
+        let length;
+        if (isNativeTypedArray(input)) {
+          list = input;
+          length = TypedArrayPrototypeGetLength(input);
+          const buffer = TypedArrayPrototypeGetBuffer(input);
+          const BufferConstructor = !isSharedArrayBuffer(buffer)
+            ?  (SpeciesConstructor(
+              buffer,
+              NativeArrayBuffer
+            ))
+            : NativeArrayBuffer;
+          if (IsDetachedBuffer(buffer)) {
+            throw NativeTypeError(ATTEMPTING_TO_ACCESS_DETACHED_ARRAYBUFFER);
+          }
+          if (isNativeBigIntTypedArray(input)) {
+            throw NativeTypeError(CANNOT_MIX_BIGINT_AND_OTHER_TYPES);
+          }
+          const data = new BufferConstructor(
+            length * BYTES_PER_ELEMENT
+          );
+          float16bitsArray = ReflectConstruct(NativeUint16Array, [data], new.target);
+        } else {
+          const iterator = input[SymbolIterator];
+          if (iterator != null && typeof iterator !== "function") {
+            throw NativeTypeError(ITERATOR_PROPERTY_IS_NOT_CALLABLE);
+          }
+          if (iterator != null) {
+            if (isOrdinaryArray(input)) {
+              list = input;
+              length = input.length;
+            } else {
+              list = [...  (input)];
+              length = list.length;
+            }
+          } else {
+            list =  (input);
+            length = ToLength(list.length);
+          }
+          float16bitsArray = ReflectConstruct(NativeUint16Array, [length], new.target);
+        }
+        for (let i = 0; i < length; ++i) {
+          float16bitsArray[i] = roundToFloat16Bits(list[i]);
+        }
+      } else {
+        float16bitsArray = ReflectConstruct(NativeUint16Array, arguments, new.target);
+      }
+      const proxy =  (new NativeProxy(float16bitsArray, handler));
+      WeakMapPrototypeSet(float16bitsArrays, proxy, float16bitsArray);
+      return proxy;
+    }
+    static from(src, ...opts) {
+      const Constructor = this;
+      if (!ReflectHas(Constructor, brand)) {
+        throw NativeTypeError(
+          THIS_CONSTRUCTOR_IS_NOT_A_SUBCLASS_OF_FLOAT16ARRAY
+        );
+      }
+      if (Constructor === Float16Array) {
+        if (isFloat16Array(src) && opts.length === 0) {
+          const float16bitsArray = getFloat16BitsArray(src);
+          const uint16 = new NativeUint16Array(
+            TypedArrayPrototypeGetBuffer(float16bitsArray),
+            TypedArrayPrototypeGetByteOffset(float16bitsArray),
+            TypedArrayPrototypeGetLength(float16bitsArray)
+          );
+          return new Float16Array(
+            TypedArrayPrototypeGetBuffer(TypedArrayPrototypeSlice(uint16))
+          );
+        }
+        if (opts.length === 0) {
+          return new Float16Array(
+            TypedArrayPrototypeGetBuffer(
+              Uint16ArrayFrom(src, roundToFloat16Bits)
+            )
+          );
+        }
+        const mapFunc = opts[0];
+        const thisArg = opts[1];
+        return new Float16Array(
+          TypedArrayPrototypeGetBuffer(
+            Uint16ArrayFrom(src, function (val, ...args) {
+              return roundToFloat16Bits(
+                ReflectApply(mapFunc, this, [val, ...safeIfNeeded(args)])
+              );
+            }, thisArg)
+          )
+        );
+      }
+      let list;
+      let length;
+      const iterator = src[SymbolIterator];
+      if (iterator != null && typeof iterator !== "function") {
+        throw NativeTypeError(ITERATOR_PROPERTY_IS_NOT_CALLABLE);
+      }
+      if (iterator != null) {
+        if (isOrdinaryArray(src)) {
+          list = src;
+          length = src.length;
+        } else if (isOrdinaryNativeTypedArray(src)) {
+          list = src;
+          length = TypedArrayPrototypeGetLength(src);
+        } else {
+          list = [...src];
+          length = list.length;
+        }
+      } else {
+        if (src == null) {
+          throw NativeTypeError(
+            CANNOT_CONVERT_UNDEFINED_OR_NULL_TO_OBJECT
+          );
+        }
+        list = NativeObject(src);
+        length = ToLength(list.length);
+      }
+      const array = new Constructor(length);
+      if (opts.length === 0) {
+        for (let i = 0; i < length; ++i) {
+          array[i] =  (list[i]);
+        }
+      } else {
+        const mapFunc = opts[0];
+        const thisArg = opts[1];
+        for (let i = 0; i < length; ++i) {
+          array[i] = ReflectApply(mapFunc, thisArg, [list[i], i]);
+        }
+      }
+      return array;
+    }
+    static of(...items) {
+      const Constructor = this;
+      if (!ReflectHas(Constructor, brand)) {
+        throw NativeTypeError(
+          THIS_CONSTRUCTOR_IS_NOT_A_SUBCLASS_OF_FLOAT16ARRAY
+        );
+      }
+      const length = items.length;
+      if (Constructor === Float16Array) {
+        const proxy = new Float16Array(length);
+        const float16bitsArray = getFloat16BitsArray(proxy);
+        for (let i = 0; i < length; ++i) {
+          float16bitsArray[i] = roundToFloat16Bits(items[i]);
+        }
+        return proxy;
+      }
+      const array = new Constructor(length);
+      for (let i = 0; i < length; ++i) {
+        array[i] = items[i];
+      }
+      return array;
+    }
+    keys() {
+      assertFloat16Array(this);
+      const float16bitsArray = getFloat16BitsArray(this);
+      return TypedArrayPrototypeKeys(float16bitsArray);
+    }
+    values() {
+      assertFloat16Array(this);
+      const float16bitsArray = getFloat16BitsArray(this);
+      return wrap((function* () {
+        for (const val of TypedArrayPrototypeValues(float16bitsArray)) {
+          yield convertToNumber(val);
+        }
+      })());
+    }
+    entries() {
+      assertFloat16Array(this);
+      const float16bitsArray = getFloat16BitsArray(this);
+      return wrap((function* () {
+        for (const [i, val] of TypedArrayPrototypeEntries(float16bitsArray)) {
+          yield  ([i, convertToNumber(val)]);
+        }
+      })());
+    }
+    at(index) {
+      assertFloat16Array(this);
+      const float16bitsArray = getFloat16BitsArray(this);
+      const length = TypedArrayPrototypeGetLength(float16bitsArray);
+      const relativeIndex = ToIntegerOrInfinity(index);
+      const k = relativeIndex >= 0 ? relativeIndex : length + relativeIndex;
+      if (k < 0 || k >= length) {
+        return;
+      }
+      return convertToNumber(float16bitsArray[k]);
+    }
+    map(callback, ...opts) {
+      assertFloat16Array(this);
+      const float16bitsArray = getFloat16BitsArray(this);
+      const length = TypedArrayPrototypeGetLength(float16bitsArray);
+      const thisArg = opts[0];
+      const Constructor = SpeciesConstructor(float16bitsArray, Float16Array);
+      if (Constructor === Float16Array) {
+        const proxy = new Float16Array(length);
+        const array = getFloat16BitsArray(proxy);
+        for (let i = 0; i < length; ++i) {
+          const val = convertToNumber(float16bitsArray[i]);
+          array[i] = roundToFloat16Bits(
+            ReflectApply(callback, thisArg, [val, i, this])
+          );
+        }
+        return proxy;
+      }
+      const array = new Constructor(length);
+      assertSpeciesTypedArray(array, length);
+      for (let i = 0; i < length; ++i) {
+        const val = convertToNumber(float16bitsArray[i]);
+        array[i] = ReflectApply(callback, thisArg, [val, i, this]);
+      }
+      return  (array);
+    }
+    filter(callback, ...opts) {
+      assertFloat16Array(this);
+      const float16bitsArray = getFloat16BitsArray(this);
+      const length = TypedArrayPrototypeGetLength(float16bitsArray);
+      const thisArg = opts[0];
+      const kept = [];
+      for (let i = 0; i < length; ++i) {
+        const val = convertToNumber(float16bitsArray[i]);
+        if (ReflectApply(callback, thisArg, [val, i, this])) {
+          ArrayPrototypePush(kept, val);
+        }
+      }
+      const Constructor = SpeciesConstructor(float16bitsArray, Float16Array);
+      const array = new Constructor(kept);
+      assertSpeciesTypedArray(array);
+      return  (array);
+    }
+    reduce(callback, ...opts) {
+      assertFloat16Array(this);
+      const float16bitsArray = getFloat16BitsArray(this);
+      const length = TypedArrayPrototypeGetLength(float16bitsArray);
+      if (length === 0 && opts.length === 0) {
+        throw NativeTypeError(REDUCE_OF_EMPTY_ARRAY_WITH_NO_INITIAL_VALUE);
+      }
+      let accumulator, start;
+      if (opts.length === 0) {
+        accumulator = convertToNumber(float16bitsArray[0]);
+        start = 1;
+      } else {
+        accumulator = opts[0];
+        start = 0;
+      }
+      for (let i = start; i < length; ++i) {
+        accumulator = callback(
+          accumulator,
+          convertToNumber(float16bitsArray[i]),
+          i,
+          this
+        );
+      }
+      return accumulator;
+    }
+    reduceRight(callback, ...opts) {
+      assertFloat16Array(this);
+      const float16bitsArray = getFloat16BitsArray(this);
+      const length = TypedArrayPrototypeGetLength(float16bitsArray);
+      if (length === 0 && opts.length === 0) {
+        throw NativeTypeError(REDUCE_OF_EMPTY_ARRAY_WITH_NO_INITIAL_VALUE);
+      }
+      let accumulator, start;
+      if (opts.length === 0) {
+        accumulator = convertToNumber(float16bitsArray[length - 1]);
+        start = length - 2;
+      } else {
+        accumulator = opts[0];
+        start = length - 1;
+      }
+      for (let i = start; i >= 0; --i) {
+        accumulator = callback(
+          accumulator,
+          convertToNumber(float16bitsArray[i]),
+          i,
+          this
+        );
+      }
+      return accumulator;
+    }
+    forEach(callback, ...opts) {
+      assertFloat16Array(this);
+      const float16bitsArray = getFloat16BitsArray(this);
+      const length = TypedArrayPrototypeGetLength(float16bitsArray);
+      const thisArg = opts[0];
+      for (let i = 0; i < length; ++i) {
+        ReflectApply(callback, thisArg, [
+          convertToNumber(float16bitsArray[i]),
+          i,
+          this,
+        ]);
+      }
+    }
+    find(callback, ...opts) {
+      assertFloat16Array(this);
+      const float16bitsArray = getFloat16BitsArray(this);
+      const length = TypedArrayPrototypeGetLength(float16bitsArray);
+      const thisArg = opts[0];
+      for (let i = 0; i < length; ++i) {
+        const value = convertToNumber(float16bitsArray[i]);
+        if (ReflectApply(callback, thisArg, [value, i, this])) {
+          return value;
+        }
+      }
+    }
+    findIndex(callback, ...opts) {
+      assertFloat16Array(this);
+      const float16bitsArray = getFloat16BitsArray(this);
+      const length = TypedArrayPrototypeGetLength(float16bitsArray);
+      const thisArg = opts[0];
+      for (let i = 0; i < length; ++i) {
+        const value = convertToNumber(float16bitsArray[i]);
+        if (ReflectApply(callback, thisArg, [value, i, this])) {
+          return i;
+        }
+      }
+      return -1;
+    }
+    findLast(callback, ...opts) {
+      assertFloat16Array(this);
+      const float16bitsArray = getFloat16BitsArray(this);
+      const length = TypedArrayPrototypeGetLength(float16bitsArray);
+      const thisArg = opts[0];
+      for (let i = length - 1; i >= 0; --i) {
+        const value = convertToNumber(float16bitsArray[i]);
+        if (ReflectApply(callback, thisArg, [value, i, this])) {
+          return value;
+        }
+      }
+    }
+    findLastIndex(callback, ...opts) {
+      assertFloat16Array(this);
+      const float16bitsArray = getFloat16BitsArray(this);
+      const length = TypedArrayPrototypeGetLength(float16bitsArray);
+      const thisArg = opts[0];
+      for (let i = length - 1; i >= 0; --i) {
+        const value = convertToNumber(float16bitsArray[i]);
+        if (ReflectApply(callback, thisArg, [value, i, this])) {
+          return i;
+        }
+      }
+      return -1;
+    }
+    every(callback, ...opts) {
+      assertFloat16Array(this);
+      const float16bitsArray = getFloat16BitsArray(this);
+      const length = TypedArrayPrototypeGetLength(float16bitsArray);
+      const thisArg = opts[0];
+      for (let i = 0; i < length; ++i) {
+        if (
+          !ReflectApply(callback, thisArg, [
+            convertToNumber(float16bitsArray[i]),
+            i,
+            this,
+          ])
+        ) {
+          return false;
+        }
+      }
+      return true;
+    }
+    some(callback, ...opts) {
+      assertFloat16Array(this);
+      const float16bitsArray = getFloat16BitsArray(this);
+      const length = TypedArrayPrototypeGetLength(float16bitsArray);
+      const thisArg = opts[0];
+      for (let i = 0; i < length; ++i) {
+        if (
+          ReflectApply(callback, thisArg, [
+            convertToNumber(float16bitsArray[i]),
+            i,
+            this,
+          ])
+        ) {
+          return true;
+        }
+      }
+      return false;
+    }
+    set(input, ...opts) {
+      assertFloat16Array(this);
+      const float16bitsArray = getFloat16BitsArray(this);
+      const targetOffset = ToIntegerOrInfinity(opts[0]);
+      if (targetOffset < 0) {
+        throw NativeRangeError(OFFSET_IS_OUT_OF_BOUNDS);
+      }
+      if (input == null) {
+        throw NativeTypeError(
+          CANNOT_CONVERT_UNDEFINED_OR_NULL_TO_OBJECT
+        );
+      }
+      if (isNativeBigIntTypedArray(input)) {
+        throw NativeTypeError(
+          CANNOT_MIX_BIGINT_AND_OTHER_TYPES
+        );
+      }
+      if (isFloat16Array(input)) {
+        return TypedArrayPrototypeSet(
+          getFloat16BitsArray(this),
+          getFloat16BitsArray(input),
+          targetOffset
+        );
+      }
+      if (isNativeTypedArray(input)) {
+        const buffer = TypedArrayPrototypeGetBuffer(input);
+        if (IsDetachedBuffer(buffer)) {
+          throw NativeTypeError(ATTEMPTING_TO_ACCESS_DETACHED_ARRAYBUFFER);
+        }
+      }
+      const targetLength = TypedArrayPrototypeGetLength(float16bitsArray);
+      const src = NativeObject(input);
+      const srcLength = ToLength(src.length);
+      if (targetOffset === Infinity || srcLength + targetOffset > targetLength) {
+        throw NativeRangeError(OFFSET_IS_OUT_OF_BOUNDS);
+      }
+      for (let i = 0; i < srcLength; ++i) {
+        float16bitsArray[i + targetOffset] = roundToFloat16Bits(src[i]);
+      }
+    }
+    reverse() {
+      assertFloat16Array(this);
+      const float16bitsArray = getFloat16BitsArray(this);
+      TypedArrayPrototypeReverse(float16bitsArray);
+      return this;
+    }
+    fill(value, ...opts) {
+      assertFloat16Array(this);
+      const float16bitsArray = getFloat16BitsArray(this);
+      TypedArrayPrototypeFill(
+        float16bitsArray,
+        roundToFloat16Bits(value),
+        ...safeIfNeeded(opts)
+      );
+      return this;
+    }
+    copyWithin(target, start, ...opts) {
+      assertFloat16Array(this);
+      const float16bitsArray = getFloat16BitsArray(this);
+      TypedArrayPrototypeCopyWithin(float16bitsArray, target, start, ...safeIfNeeded(opts));
+      return this;
+    }
+    sort(compareFn) {
+      assertFloat16Array(this);
+      const float16bitsArray = getFloat16BitsArray(this);
+      const sortCompare = compareFn !== undefined ? compareFn : defaultCompare;
+      TypedArrayPrototypeSort(float16bitsArray, (x, y) => {
+        return sortCompare(convertToNumber(x), convertToNumber(y));
+      });
+      return this;
+    }
+    slice(start, end) {
+      assertFloat16Array(this);
+      const float16bitsArray = getFloat16BitsArray(this);
+      const Constructor = SpeciesConstructor(float16bitsArray, Float16Array);
+      if (Constructor === Float16Array) {
+        const uint16 = new NativeUint16Array(
+          TypedArrayPrototypeGetBuffer(float16bitsArray),
+          TypedArrayPrototypeGetByteOffset(float16bitsArray),
+          TypedArrayPrototypeGetLength(float16bitsArray)
+        );
+        return new Float16Array(
+          TypedArrayPrototypeGetBuffer(
+            TypedArrayPrototypeSlice(uint16, start, end)
+          )
+        );
+      }
+      const length = TypedArrayPrototypeGetLength(float16bitsArray);
+      const relativeStart = ToIntegerOrInfinity(start);
+      const relativeEnd = end === undefined ? length : ToIntegerOrInfinity(end);
+      let k;
+      if (relativeStart === -Infinity) {
+        k = 0;
+      } else if (relativeStart < 0) {
+        k = length + relativeStart > 0 ? length + relativeStart : 0;
+      } else {
+        k = length < relativeStart ? length : relativeStart;
+      }
+      let final;
+      if (relativeEnd === -Infinity) {
+        final = 0;
+      } else if (relativeEnd < 0) {
+        final = length + relativeEnd > 0 ? length + relativeEnd : 0;
+      } else {
+        final = length < relativeEnd ? length : relativeEnd;
+      }
+      const count = final - k > 0 ? final - k : 0;
+      const array = new Constructor(count);
+      assertSpeciesTypedArray(array, count);
+      if (count === 0) {
+        return array;
+      }
+      const buffer = TypedArrayPrototypeGetBuffer(float16bitsArray);
+      if (IsDetachedBuffer(buffer)) {
+        throw NativeTypeError(ATTEMPTING_TO_ACCESS_DETACHED_ARRAYBUFFER);
+      }
+      let n = 0;
+      while (k < final) {
+        array[n] = convertToNumber(float16bitsArray[k]);
+        ++k;
+        ++n;
+      }
+      return  (array);
+    }
+    subarray(begin, end) {
+      assertFloat16Array(this);
+      const float16bitsArray = getFloat16BitsArray(this);
+      const Constructor = SpeciesConstructor(float16bitsArray, Float16Array);
+      const uint16 = new NativeUint16Array(
+        TypedArrayPrototypeGetBuffer(float16bitsArray),
+        TypedArrayPrototypeGetByteOffset(float16bitsArray),
+        TypedArrayPrototypeGetLength(float16bitsArray)
+      );
+      const uint16Subarray = TypedArrayPrototypeSubarray(uint16, begin, end);
+      const array = new Constructor(
+        TypedArrayPrototypeGetBuffer(uint16Subarray),
+        TypedArrayPrototypeGetByteOffset(uint16Subarray),
+        TypedArrayPrototypeGetLength(uint16Subarray)
+      );
+      assertSpeciesTypedArray(array);
+      return  (array);
+    }
+    indexOf(element, ...opts) {
+      assertFloat16Array(this);
+      const float16bitsArray = getFloat16BitsArray(this);
+      const length = TypedArrayPrototypeGetLength(float16bitsArray);
+      let from = ToIntegerOrInfinity(opts[0]);
+      if (from === Infinity) {
+        return -1;
+      }
+      if (from < 0) {
+        from += length;
+        if (from < 0) {
+          from = 0;
+        }
+      }
+      for (let i = from; i < length; ++i) {
+        if (
+          ObjectHasOwn(float16bitsArray, i) &&
+          convertToNumber(float16bitsArray[i]) === element
+        ) {
+          return i;
+        }
+      }
+      return -1;
+    }
+    lastIndexOf(element, ...opts) {
+      assertFloat16Array(this);
+      const float16bitsArray = getFloat16BitsArray(this);
+      const length = TypedArrayPrototypeGetLength(float16bitsArray);
+      let from = opts.length >= 1 ? ToIntegerOrInfinity(opts[0]) : length - 1;
+      if (from === -Infinity) {
+        return -1;
+      }
+      if (from >= 0) {
+        from = from < length - 1 ? from : length - 1;
+      } else {
+        from += length;
+      }
+      for (let i = from; i >= 0; --i) {
+        if (
+          ObjectHasOwn(float16bitsArray, i) &&
+          convertToNumber(float16bitsArray[i]) === element
+        ) {
+          return i;
+        }
+      }
+      return -1;
+    }
+    includes(element, ...opts) {
+      assertFloat16Array(this);
+      const float16bitsArray = getFloat16BitsArray(this);
+      const length = TypedArrayPrototypeGetLength(float16bitsArray);
+      let from = ToIntegerOrInfinity(opts[0]);
+      if (from === Infinity) {
+        return false;
+      }
+      if (from < 0) {
+        from += length;
+        if (from < 0) {
+          from = 0;
+        }
+      }
+      const isNaN = NumberIsNaN(element);
+      for (let i = from; i < length; ++i) {
+        const value = convertToNumber(float16bitsArray[i]);
+        if (isNaN && NumberIsNaN(value)) {
+          return true;
+        }
+        if (value === element) {
+          return true;
+        }
+      }
+      return false;
+    }
+    join(separator) {
+      assertFloat16Array(this);
+      const float16bitsArray = getFloat16BitsArray(this);
+      const array = copyToArray(float16bitsArray);
+      return ArrayPrototypeJoin(array, separator);
+    }
+    toLocaleString(...opts) {
+      assertFloat16Array(this);
+      const float16bitsArray = getFloat16BitsArray(this);
+      const array = copyToArray(float16bitsArray);
+      return ArrayPrototypeToLocaleString(array, ...safeIfNeeded(opts));
+    }
+    get [SymbolToStringTag]() {
+      if (isFloat16Array(this)) {
+        return  ("Float16Array");
+      }
+    }
+  }
+  ObjectDefineProperty(Float16Array, "BYTES_PER_ELEMENT", {
+    value: BYTES_PER_ELEMENT,
+  });
+  ObjectDefineProperty(Float16Array, brand, {});
+  ReflectSetPrototypeOf(Float16Array, TypedArray);
+  const Float16ArrayPrototype = Float16Array.prototype;
+  ObjectDefineProperty(Float16ArrayPrototype, "BYTES_PER_ELEMENT", {
+    value: BYTES_PER_ELEMENT,
+  });
+  ObjectDefineProperty(Float16ArrayPrototype, SymbolIterator, {
+    value: Float16ArrayPrototype.values,
+    writable: true,
+    configurable: true,
+  });
+  ReflectSetPrototypeOf(Float16ArrayPrototype, TypedArrayPrototype);
+
+  function isTypedArray(target) {
+    return isNativeTypedArray(target) || isFloat16Array(target);
+  }
+
+  function getFloat16(dataView, byteOffset, ...opts) {
+    return convertToNumber(
+      DataViewPrototypeGetUint16(dataView, byteOffset, ...safeIfNeeded(opts))
+    );
+  }
+  function setFloat16(dataView, byteOffset, value, ...opts) {
+    return DataViewPrototypeSetUint16(
+      dataView,
+      byteOffset,
+      roundToFloat16Bits(value),
+      ...safeIfNeeded(opts)
+    );
+  }
+
+  function hfround(num) {
+    if (typeof num === "bigint") {
+      throw NativeTypeError(CANNOT_CONVERT_A_BIGINT_VALUE_TO_A_NUMBER);
+    }
+    num = NativeNumber(num);
+    if (!NumberIsFinite(num) || num === 0) {
+      return num;
+    }
+    const x16 = roundToFloat16Bits(num);
+    return convertToNumber(x16);
+  }
+
+  exports.Float16Array = Float16Array;
+  exports.getFloat16 = getFloat16;
+  exports.hfround = hfround;
+  exports.isFloat16Array = isFloat16Array;
+  exports.isTypedArray = isTypedArray;
+  exports.setFloat16 = setFloat16;
+
+  Object.defineProperties(exports, { __esModule: { value: true }, [Symbol.toStringTag]: { value: 'Module' } });
+
+  return exports;
+
+})({});
+
+},{}],"node_modules/xml-utils/get-attribute.js":[function(require,module,exports) {
+function getAttribute(tag, attributeName, options) {
+  const debug = (options && options.debug) || false;
+  if (debug) console.log("getting " + attributeName + " in " + tag);
+
+  const xml = typeof tag === "object" ? tag.outer : tag;
+
+  const pattern = `${attributeName}\\="\([^"]*\)"`;
+  if (debug) console.log("pattern:", pattern);
+
+  const re = new RegExp(pattern);
+  const match = re.exec(xml);
+  if (debug) console.log("match:", match);
+  if (match) return match[1];
+}
+
+module.exports = getAttribute;
+
+},{}],"node_modules/xml-utils/index-of-match.js":[function(require,module,exports) {
+function indexOfMatch(xml, pattern, startIndex) {
+  const re = new RegExp(pattern);
+  const match = re.exec(xml.slice(startIndex));
+  if (match) return startIndex + match.index;
+  else return -1;
+}
+
+module.exports = indexOfMatch;
+
+},{}],"node_modules/xml-utils/index-of-match-end.js":[function(require,module,exports) {
+function indexOfMatchEnd(xml, pattern, startIndex) {
+  const re = new RegExp(pattern);
+  const match = re.exec(xml.slice(startIndex));
+  if (match) return startIndex + match.index + match[0].length - 1;
+  else return -1;
+}
+
+module.exports = indexOfMatchEnd;
+
+},{}],"node_modules/xml-utils/find-tag-by-name.js":[function(require,module,exports) {
+const indexOfMatch = require("./index-of-match.js");
+const indexOfMatchEnd = require("./index-of-match-end.js");
+
+function findTagByName(xml, tagName, options) {
+  const debug = (options && options.debug) || false;
+
+  const startIndex = (options && options.startIndex) || 0;
+
+  if (debug) console.log("[xml-utils] starting findTagByName with", tagName, " and ", options);
+
+  const start = indexOfMatch(xml, `\<${tagName}[ \>]`, startIndex);
+  if (debug) console.log("[xml-utils] start:", start);
+  if (start === -1) return undefined;
+
+  const afterStart = xml.slice(start + tagName.length);
+
+  let relativeEnd = indexOfMatchEnd(afterStart, "^[^<]*[ /]>", 0);
+
+  const selfClosing = relativeEnd !== -1 && afterStart[relativeEnd - 1] === "/";
+  if (debug) console.log("[xml-utils] selfClosing:", selfClosing);
+
+  if (selfClosing === false) {
+    relativeEnd = indexOfMatchEnd(afterStart, "[ /]" + tagName + ">", 0);
+  }
+
+  const end = start + tagName.length + relativeEnd + 1;
+  if (debug) console.log("[xml-utils] end:", end);
+  if (end === -1) return undefined;
+
+  const outer = xml.slice(start, end);
+  // tag is like <gml:identifier codeSpace="OGP">urn:ogc:def:crs:EPSG::32617</gml:identifier>
+
+  let inner;
+  if (selfClosing) {
+    inner = null;
+  } else {
+    inner = outer.slice(outer.indexOf(">") + 1, outer.lastIndexOf("<"));
+  }
+
+  return { inner, outer, start, end };
+}
+
+module.exports = findTagByName;
+
+},{"./index-of-match.js":"node_modules/xml-utils/index-of-match.js","./index-of-match-end.js":"node_modules/xml-utils/index-of-match-end.js"}],"node_modules/xml-utils/find-tags-by-name.js":[function(require,module,exports) {
+const findTagByName = require("./find-tag-by-name.js");
+
+function findTagsByName(xml, tagName, options) {
+  const tags = [];
+  const debug = (options && options.debug) || false;
+  let startIndex = (options && options.startIndex) || 0;
+  let tag;
+  while ((tag = findTagByName(xml, tagName, { debug, startIndex }))) {
+    startIndex = tag.end;
+    tags.push(tag);
+  }
+  if (debug) console.log("findTagsByName found", tags.length, "tags");
+  return tags;
+}
+
+module.exports = findTagsByName;
+
+},{"./find-tag-by-name.js":"node_modules/xml-utils/find-tag-by-name.js"}],"node_modules/geotiff/dist-module/globals.js":[function(require,module,exports) {
+"use strict";
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+exports.photometricInterpretations = exports.geoKeys = exports.geoKeyNames = exports.fieldTypes = exports.fieldTypeNames = exports.fieldTags = exports.fieldTagTypes = exports.fieldTagNames = exports.arrayFields = exports.LercParameters = exports.LercAddCompression = exports.ExtraSamplesValues = void 0;
+const fieldTagNames = {
+  // TIFF Baseline
+  0x013B: 'Artist',
+  0x0102: 'BitsPerSample',
+  0x0109: 'CellLength',
+  0x0108: 'CellWidth',
+  0x0140: 'ColorMap',
+  0x0103: 'Compression',
+  0x8298: 'Copyright',
+  0x0132: 'DateTime',
+  0x0152: 'ExtraSamples',
+  0x010A: 'FillOrder',
+  0x0121: 'FreeByteCounts',
+  0x0120: 'FreeOffsets',
+  0x0123: 'GrayResponseCurve',
+  0x0122: 'GrayResponseUnit',
+  0x013C: 'HostComputer',
+  0x010E: 'ImageDescription',
+  0x0101: 'ImageLength',
+  0x0100: 'ImageWidth',
+  0x010F: 'Make',
+  0x0119: 'MaxSampleValue',
+  0x0118: 'MinSampleValue',
+  0x0110: 'Model',
+  0x00FE: 'NewSubfileType',
+  0x0112: 'Orientation',
+  0x0106: 'PhotometricInterpretation',
+  0x011C: 'PlanarConfiguration',
+  0x0128: 'ResolutionUnit',
+  0x0116: 'RowsPerStrip',
+  0x0115: 'SamplesPerPixel',
+  0x0131: 'Software',
+  0x0117: 'StripByteCounts',
+  0x0111: 'StripOffsets',
+  0x00FF: 'SubfileType',
+  0x0107: 'Threshholding',
+  0x011A: 'XResolution',
+  0x011B: 'YResolution',
+  // TIFF Extended
+  0x0146: 'BadFaxLines',
+  0x0147: 'CleanFaxData',
+  0x0157: 'ClipPath',
+  0x0148: 'ConsecutiveBadFaxLines',
+  0x01B1: 'Decode',
+  0x01B2: 'DefaultImageColor',
+  0x010D: 'DocumentName',
+  0x0150: 'DotRange',
+  0x0141: 'HalftoneHints',
+  0x015A: 'Indexed',
+  0x015B: 'JPEGTables',
+  0x011D: 'PageName',
+  0x0129: 'PageNumber',
+  0x013D: 'Predictor',
+  0x013F: 'PrimaryChromaticities',
+  0x0214: 'ReferenceBlackWhite',
+  0x0153: 'SampleFormat',
+  0x0154: 'SMinSampleValue',
+  0x0155: 'SMaxSampleValue',
+  0x022F: 'StripRowCounts',
+  0x014A: 'SubIFDs',
+  0x0124: 'T4Options',
+  0x0125: 'T6Options',
+  0x0145: 'TileByteCounts',
+  0x0143: 'TileLength',
+  0x0144: 'TileOffsets',
+  0x0142: 'TileWidth',
+  0x012D: 'TransferFunction',
+  0x013E: 'WhitePoint',
+  0x0158: 'XClipPathUnits',
+  0x011E: 'XPosition',
+  0x0211: 'YCbCrCoefficients',
+  0x0213: 'YCbCrPositioning',
+  0x0212: 'YCbCrSubSampling',
+  0x0159: 'YClipPathUnits',
+  0x011F: 'YPosition',
+  // EXIF
+  0x9202: 'ApertureValue',
+  0xA001: 'ColorSpace',
+  0x9004: 'DateTimeDigitized',
+  0x9003: 'DateTimeOriginal',
+  0x8769: 'Exif IFD',
+  0x9000: 'ExifVersion',
+  0x829A: 'ExposureTime',
+  0xA300: 'FileSource',
+  0x9209: 'Flash',
+  0xA000: 'FlashpixVersion',
+  0x829D: 'FNumber',
+  0xA420: 'ImageUniqueID',
+  0x9208: 'LightSource',
+  0x927C: 'MakerNote',
+  0x9201: 'ShutterSpeedValue',
+  0x9286: 'UserComment',
+  // IPTC
+  0x83BB: 'IPTC',
+  // ICC
+  0x8773: 'ICC Profile',
+  // XMP
+  0x02BC: 'XMP',
+  // GDAL
+  0xA480: 'GDAL_METADATA',
+  0xA481: 'GDAL_NODATA',
+  // Photoshop
+  0x8649: 'Photoshop',
+  // GeoTiff
+  0x830E: 'ModelPixelScale',
+  0x8482: 'ModelTiepoint',
+  0x85D8: 'ModelTransformation',
+  0x87AF: 'GeoKeyDirectory',
+  0x87B0: 'GeoDoubleParams',
+  0x87B1: 'GeoAsciiParams',
+  // LERC
+  0xC5F2: 'LercParameters'
+};
+exports.fieldTagNames = fieldTagNames;
+const fieldTags = {};
+exports.fieldTags = fieldTags;
+
+for (const key in fieldTagNames) {
+  if (fieldTagNames.hasOwnProperty(key)) {
+    fieldTags[fieldTagNames[key]] = parseInt(key, 10);
+  }
+}
+
+const fieldTagTypes = {
+  256: 'SHORT',
+  257: 'SHORT',
+  258: 'SHORT',
+  259: 'SHORT',
+  262: 'SHORT',
+  273: 'LONG',
+  274: 'SHORT',
+  277: 'SHORT',
+  278: 'LONG',
+  279: 'LONG',
+  282: 'RATIONAL',
+  283: 'RATIONAL',
+  284: 'SHORT',
+  286: 'SHORT',
+  287: 'RATIONAL',
+  296: 'SHORT',
+  297: 'SHORT',
+  305: 'ASCII',
+  306: 'ASCII',
+  338: 'SHORT',
+  339: 'SHORT',
+  513: 'LONG',
+  514: 'LONG',
+  1024: 'SHORT',
+  1025: 'SHORT',
+  2048: 'SHORT',
+  2049: 'ASCII',
+  3072: 'SHORT',
+  3073: 'ASCII',
+  33550: 'DOUBLE',
+  33922: 'DOUBLE',
+  34665: 'LONG',
+  34735: 'SHORT',
+  34737: 'ASCII',
+  42113: 'ASCII'
+};
+exports.fieldTagTypes = fieldTagTypes;
+const arrayFields = [fieldTags.BitsPerSample, fieldTags.ExtraSamples, fieldTags.SampleFormat, fieldTags.StripByteCounts, fieldTags.StripOffsets, fieldTags.StripRowCounts, fieldTags.TileByteCounts, fieldTags.TileOffsets, fieldTags.SubIFDs];
+exports.arrayFields = arrayFields;
+const fieldTypeNames = {
+  0x0001: 'BYTE',
+  0x0002: 'ASCII',
+  0x0003: 'SHORT',
+  0x0004: 'LONG',
+  0x0005: 'RATIONAL',
+  0x0006: 'SBYTE',
+  0x0007: 'UNDEFINED',
+  0x0008: 'SSHORT',
+  0x0009: 'SLONG',
+  0x000A: 'SRATIONAL',
+  0x000B: 'FLOAT',
+  0x000C: 'DOUBLE',
+  // IFD offset, suggested by https://owl.phy.queensu.ca/~phil/exiftool/standards.html
+  0x000D: 'IFD',
+  // introduced by BigTIFF
+  0x0010: 'LONG8',
+  0x0011: 'SLONG8',
+  0x0012: 'IFD8'
+};
+exports.fieldTypeNames = fieldTypeNames;
+const fieldTypes = {};
+exports.fieldTypes = fieldTypes;
+
+for (const key in fieldTypeNames) {
+  if (fieldTypeNames.hasOwnProperty(key)) {
+    fieldTypes[fieldTypeNames[key]] = parseInt(key, 10);
+  }
+}
+
+const photometricInterpretations = {
+  WhiteIsZero: 0,
+  BlackIsZero: 1,
+  RGB: 2,
+  Palette: 3,
+  TransparencyMask: 4,
+  CMYK: 5,
+  YCbCr: 6,
+  CIELab: 8,
+  ICCLab: 9
+};
+exports.photometricInterpretations = photometricInterpretations;
+const ExtraSamplesValues = {
+  Unspecified: 0,
+  Assocalpha: 1,
+  Unassalpha: 2
+};
+exports.ExtraSamplesValues = ExtraSamplesValues;
+const LercParameters = {
+  Version: 0,
+  AddCompression: 1
+};
+exports.LercParameters = LercParameters;
+const LercAddCompression = {
+  None: 0,
+  Deflate: 1
+};
+exports.LercAddCompression = LercAddCompression;
+const geoKeyNames = {
+  1024: 'GTModelTypeGeoKey',
+  1025: 'GTRasterTypeGeoKey',
+  1026: 'GTCitationGeoKey',
+  2048: 'GeographicTypeGeoKey',
+  2049: 'GeogCitationGeoKey',
+  2050: 'GeogGeodeticDatumGeoKey',
+  2051: 'GeogPrimeMeridianGeoKey',
+  2052: 'GeogLinearUnitsGeoKey',
+  2053: 'GeogLinearUnitSizeGeoKey',
+  2054: 'GeogAngularUnitsGeoKey',
+  2055: 'GeogAngularUnitSizeGeoKey',
+  2056: 'GeogEllipsoidGeoKey',
+  2057: 'GeogSemiMajorAxisGeoKey',
+  2058: 'GeogSemiMinorAxisGeoKey',
+  2059: 'GeogInvFlatteningGeoKey',
+  2060: 'GeogAzimuthUnitsGeoKey',
+  2061: 'GeogPrimeMeridianLongGeoKey',
+  2062: 'GeogTOWGS84GeoKey',
+  3072: 'ProjectedCSTypeGeoKey',
+  3073: 'PCSCitationGeoKey',
+  3074: 'ProjectionGeoKey',
+  3075: 'ProjCoordTransGeoKey',
+  3076: 'ProjLinearUnitsGeoKey',
+  3077: 'ProjLinearUnitSizeGeoKey',
+  3078: 'ProjStdParallel1GeoKey',
+  3079: 'ProjStdParallel2GeoKey',
+  3080: 'ProjNatOriginLongGeoKey',
+  3081: 'ProjNatOriginLatGeoKey',
+  3082: 'ProjFalseEastingGeoKey',
+  3083: 'ProjFalseNorthingGeoKey',
+  3084: 'ProjFalseOriginLongGeoKey',
+  3085: 'ProjFalseOriginLatGeoKey',
+  3086: 'ProjFalseOriginEastingGeoKey',
+  3087: 'ProjFalseOriginNorthingGeoKey',
+  3088: 'ProjCenterLongGeoKey',
+  3089: 'ProjCenterLatGeoKey',
+  3090: 'ProjCenterEastingGeoKey',
+  3091: 'ProjCenterNorthingGeoKey',
+  3092: 'ProjScaleAtNatOriginGeoKey',
+  3093: 'ProjScaleAtCenterGeoKey',
+  3094: 'ProjAzimuthAngleGeoKey',
+  3095: 'ProjStraightVertPoleLongGeoKey',
+  3096: 'ProjRectifiedGridAngleGeoKey',
+  4096: 'VerticalCSTypeGeoKey',
+  4097: 'VerticalCitationGeoKey',
+  4098: 'VerticalDatumGeoKey',
+  4099: 'VerticalUnitsGeoKey'
+};
+exports.geoKeyNames = geoKeyNames;
+const geoKeys = {};
+exports.geoKeys = geoKeys;
+
+for (const key in geoKeyNames) {
+  if (geoKeyNames.hasOwnProperty(key)) {
+    geoKeys[geoKeyNames[key]] = parseInt(key, 10);
+  }
+}
+},{}],"node_modules/geotiff/dist-module/rgb.js":[function(require,module,exports) {
+"use strict";
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+exports.fromBlackIsZero = fromBlackIsZero;
+exports.fromCIELab = fromCIELab;
+exports.fromCMYK = fromCMYK;
+exports.fromPalette = fromPalette;
+exports.fromWhiteIsZero = fromWhiteIsZero;
+exports.fromYCbCr = fromYCbCr;
+
+function fromWhiteIsZero(raster, max) {
+  const {
+    width,
+    height
+  } = raster;
+  const rgbRaster = new Uint8Array(width * height * 3);
+  let value;
+
+  for (let i = 0, j = 0; i < raster.length; ++i, j += 3) {
+    value = 256 - raster[i] / max * 256;
+    rgbRaster[j] = value;
+    rgbRaster[j + 1] = value;
+    rgbRaster[j + 2] = value;
+  }
+
+  return rgbRaster;
+}
+
+function fromBlackIsZero(raster, max) {
+  const {
+    width,
+    height
+  } = raster;
+  const rgbRaster = new Uint8Array(width * height * 3);
+  let value;
+
+  for (let i = 0, j = 0; i < raster.length; ++i, j += 3) {
+    value = raster[i] / max * 256;
+    rgbRaster[j] = value;
+    rgbRaster[j + 1] = value;
+    rgbRaster[j + 2] = value;
+  }
+
+  return rgbRaster;
+}
+
+function fromPalette(raster, colorMap) {
+  const {
+    width,
+    height
+  } = raster;
+  const rgbRaster = new Uint8Array(width * height * 3);
+  const greenOffset = colorMap.length / 3;
+  const blueOffset = colorMap.length / 3 * 2;
+
+  for (let i = 0, j = 0; i < raster.length; ++i, j += 3) {
+    const mapIndex = raster[i];
+    rgbRaster[j] = colorMap[mapIndex] / 65536 * 256;
+    rgbRaster[j + 1] = colorMap[mapIndex + greenOffset] / 65536 * 256;
+    rgbRaster[j + 2] = colorMap[mapIndex + blueOffset] / 65536 * 256;
+  }
+
+  return rgbRaster;
+}
+
+function fromCMYK(cmykRaster) {
+  const {
+    width,
+    height
+  } = cmykRaster;
+  const rgbRaster = new Uint8Array(width * height * 3);
+
+  for (let i = 0, j = 0; i < cmykRaster.length; i += 4, j += 3) {
+    const c = cmykRaster[i];
+    const m = cmykRaster[i + 1];
+    const y = cmykRaster[i + 2];
+    const k = cmykRaster[i + 3];
+    rgbRaster[j] = 255 * ((255 - c) / 256) * ((255 - k) / 256);
+    rgbRaster[j + 1] = 255 * ((255 - m) / 256) * ((255 - k) / 256);
+    rgbRaster[j + 2] = 255 * ((255 - y) / 256) * ((255 - k) / 256);
+  }
+
+  return rgbRaster;
+}
+
+function fromYCbCr(yCbCrRaster) {
+  const {
+    width,
+    height
+  } = yCbCrRaster;
+  const rgbRaster = new Uint8ClampedArray(width * height * 3);
+
+  for (let i = 0, j = 0; i < yCbCrRaster.length; i += 3, j += 3) {
+    const y = yCbCrRaster[i];
+    const cb = yCbCrRaster[i + 1];
+    const cr = yCbCrRaster[i + 2];
+    rgbRaster[j] = y + 1.40200 * (cr - 0x80);
+    rgbRaster[j + 1] = y - 0.34414 * (cb - 0x80) - 0.71414 * (cr - 0x80);
+    rgbRaster[j + 2] = y + 1.77200 * (cb - 0x80);
+  }
+
+  return rgbRaster;
+}
+
+const Xn = 0.95047;
+const Yn = 1.00000;
+const Zn = 1.08883; // from https://github.com/antimatter15/rgb-lab/blob/master/color.js
+
+function fromCIELab(cieLabRaster) {
+  const {
+    width,
+    height
+  } = cieLabRaster;
+  const rgbRaster = new Uint8Array(width * height * 3);
+
+  for (let i = 0, j = 0; i < cieLabRaster.length; i += 3, j += 3) {
+    const L = cieLabRaster[i + 0];
+    const a_ = cieLabRaster[i + 1] << 24 >> 24; // conversion from uint8 to int8
+
+    const b_ = cieLabRaster[i + 2] << 24 >> 24; // same
+
+    let y = (L + 16) / 116;
+    let x = a_ / 500 + y;
+    let z = y - b_ / 200;
+    let r;
+    let g;
+    let b;
+    x = Xn * (x * x * x > 0.008856 ? x * x * x : (x - 16 / 116) / 7.787);
+    y = Yn * (y * y * y > 0.008856 ? y * y * y : (y - 16 / 116) / 7.787);
+    z = Zn * (z * z * z > 0.008856 ? z * z * z : (z - 16 / 116) / 7.787);
+    r = x * 3.2406 + y * -1.5372 + z * -0.4986;
+    g = x * -0.9689 + y * 1.8758 + z * 0.0415;
+    b = x * 0.0557 + y * -0.2040 + z * 1.0570;
+    r = r > 0.0031308 ? 1.055 * r ** (1 / 2.4) - 0.055 : 12.92 * r;
+    g = g > 0.0031308 ? 1.055 * g ** (1 / 2.4) - 0.055 : 12.92 * g;
+    b = b > 0.0031308 ? 1.055 * b ** (1 / 2.4) - 0.055 : 12.92 * b;
+    rgbRaster[j] = Math.max(0, Math.min(1, r)) * 255;
+    rgbRaster[j + 1] = Math.max(0, Math.min(1, g)) * 255;
+    rgbRaster[j + 2] = Math.max(0, Math.min(1, b)) * 255;
+  }
+
+  return rgbRaster;
+}
+},{}],"node_modules/parcel-bundler/src/builtins/bundle-loader.js":[function(require,module,exports) {
+var getBundleURL = require('./bundle-url').getBundleURL;
+
+function loadBundlesLazy(bundles) {
+  if (!Array.isArray(bundles)) {
+    bundles = [bundles];
+  }
+
+  var id = bundles[bundles.length - 1];
+
+  try {
+    return Promise.resolve(require(id));
+  } catch (err) {
+    if (err.code === 'MODULE_NOT_FOUND') {
+      return new LazyPromise(function (resolve, reject) {
+        loadBundles(bundles.slice(0, -1)).then(function () {
+          return require(id);
+        }).then(resolve, reject);
+      });
+    }
+
+    throw err;
+  }
+}
+
+function loadBundles(bundles) {
+  return Promise.all(bundles.map(loadBundle));
+}
+
+var bundleLoaders = {};
+
+function registerBundleLoader(type, loader) {
+  bundleLoaders[type] = loader;
+}
+
+module.exports = exports = loadBundlesLazy;
+exports.load = loadBundles;
+exports.register = registerBundleLoader;
+var bundles = {};
+
+function loadBundle(bundle) {
+  var id;
+
+  if (Array.isArray(bundle)) {
+    id = bundle[1];
+    bundle = bundle[0];
+  }
+
+  if (bundles[bundle]) {
+    return bundles[bundle];
+  }
+
+  var type = (bundle.substring(bundle.lastIndexOf('.') + 1, bundle.length) || bundle).toLowerCase();
+  var bundleLoader = bundleLoaders[type];
+
+  if (bundleLoader) {
+    return bundles[bundle] = bundleLoader(getBundleURL() + bundle).then(function (resolved) {
+      if (resolved) {
+        module.bundle.register(id, resolved);
+      }
+
+      return resolved;
+    }).catch(function (e) {
+      delete bundles[bundle];
+      throw e;
+    });
+  }
+}
+
+function LazyPromise(executor) {
+  this.executor = executor;
+  this.promise = null;
+}
+
+LazyPromise.prototype.then = function (onSuccess, onError) {
+  if (this.promise === null) this.promise = new Promise(this.executor);
+  return this.promise.then(onSuccess, onError);
+};
+
+LazyPromise.prototype.catch = function (onError) {
+  if (this.promise === null) this.promise = new Promise(this.executor);
+  return this.promise.catch(onError);
+};
+},{"./bundle-url":"node_modules/parcel-bundler/src/builtins/bundle-url.js"}],"node_modules/geotiff/dist-module/compression/index.js":[function(require,module,exports) {
+"use strict";
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+exports.addDecoder = addDecoder;
+exports.getDecoder = getDecoder;
+const registry = new Map();
+
+function addDecoder(cases, importFn) {
+  if (!Array.isArray(cases)) {
+    cases = [cases]; // eslint-disable-line no-param-reassign
+  }
+
+  cases.forEach(c => registry.set(c, importFn));
+}
+
+async function getDecoder(fileDirectory) {
+  const importFn = registry.get(fileDirectory.Compression);
+
+  if (!importFn) {
+    throw new Error(`Unknown compression method identifier: ${fileDirectory.Compression}`);
+  }
+
+  const Decoder = await importFn();
+  return new Decoder(fileDirectory);
+} // Add default decoders to registry (end-user may override with other implementations)
+
+
+addDecoder([undefined, 1], () => require("_bundle_loader")(require.resolve('./raw.js')).then(m => m.default));
+addDecoder(5, () => require("_bundle_loader")(require.resolve('./lzw.js')).then(m => m.default));
+addDecoder(6, () => {
+  throw new Error('old style JPEG compression is not supported.');
+});
+addDecoder(7, () => require("_bundle_loader")(require.resolve('./jpeg.js')).then(m => m.default));
+addDecoder([8, 32946], () => require("_bundle_loader")(require.resolve('./deflate.js')).then(m => m.default));
+addDecoder(32773, () => require("_bundle_loader")(require.resolve('./packbits.js')).then(m => m.default));
+addDecoder(34887, () => require("_bundle_loader")(require.resolve('./lerc.js')).then(m => m.default));
+addDecoder(50001, () => require("_bundle_loader")(require.resolve('./webimage.js')).then(m => m.default));
+},{"_bundle_loader":"node_modules/parcel-bundler/src/builtins/bundle-loader.js","./raw.js":[["raw.030b40f5.js","node_modules/geotiff/dist-module/compression/raw.js"],"raw.030b40f5.js.map","node_modules/geotiff/dist-module/compression/raw.js"],"./lzw.js":[["lzw.892aefeb.js","node_modules/geotiff/dist-module/compression/lzw.js"],"lzw.892aefeb.js.map","node_modules/geotiff/dist-module/compression/lzw.js"],"./jpeg.js":[["jpeg.0b660512.js","node_modules/geotiff/dist-module/compression/jpeg.js"],"jpeg.0b660512.js.map","node_modules/geotiff/dist-module/compression/jpeg.js"],"./deflate.js":[["deflate.3fbe1b41.js","node_modules/geotiff/dist-module/compression/deflate.js"],"deflate.3fbe1b41.js.map","node_modules/geotiff/dist-module/compression/deflate.js"],"./packbits.js":[["packbits.6ccb4ed8.js","node_modules/geotiff/dist-module/compression/packbits.js"],"packbits.6ccb4ed8.js.map","node_modules/geotiff/dist-module/compression/packbits.js"],"./lerc.js":[["lerc.98aced57.js","node_modules/geotiff/dist-module/compression/lerc.js"],"lerc.98aced57.js.map","node_modules/geotiff/dist-module/compression/lerc.js"],"./webimage.js":[["webimage.416015e3.js","node_modules/geotiff/dist-module/compression/webimage.js"],"webimage.416015e3.js.map","node_modules/geotiff/dist-module/compression/webimage.js"]}],"node_modules/geotiff/dist-module/resample.js":[function(require,module,exports) {
+"use strict";
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+exports.resample = resample;
+exports.resampleBilinear = resampleBilinear;
+exports.resampleBilinearInterleaved = resampleBilinearInterleaved;
+exports.resampleInterleaved = resampleInterleaved;
+exports.resampleNearest = resampleNearest;
+exports.resampleNearestInterleaved = resampleNearestInterleaved;
+
+/**
+ * @module resample
+ */
+function copyNewSize(array, width, height) {
+  let samplesPerPixel = arguments.length > 3 && arguments[3] !== undefined ? arguments[3] : 1;
+  return new (Object.getPrototypeOf(array).constructor)(width * height * samplesPerPixel);
+}
+/**
+ * Resample the input arrays using nearest neighbor value selection.
+ * @param {TypedArray[]} valueArrays The input arrays to resample
+ * @param {number} inWidth The width of the input rasters
+ * @param {number} inHeight The height of the input rasters
+ * @param {number} outWidth The desired width of the output rasters
+ * @param {number} outHeight The desired height of the output rasters
+ * @returns {TypedArray[]} The resampled rasters
+ */
+
+
+function resampleNearest(valueArrays, inWidth, inHeight, outWidth, outHeight) {
+  const relX = inWidth / outWidth;
+  const relY = inHeight / outHeight;
+  return valueArrays.map(array => {
+    const newArray = copyNewSize(array, outWidth, outHeight);
+
+    for (let y = 0; y < outHeight; ++y) {
+      const cy = Math.min(Math.round(relY * y), inHeight - 1);
+
+      for (let x = 0; x < outWidth; ++x) {
+        const cx = Math.min(Math.round(relX * x), inWidth - 1);
+        const value = array[cy * inWidth + cx];
+        newArray[y * outWidth + x] = value;
+      }
+    }
+
+    return newArray;
+  });
+} // simple linear interpolation, code from:
+// https://en.wikipedia.org/wiki/Linear_interpolation#Programming_language_support
+
+
+function lerp(v0, v1, t) {
+  return (1 - t) * v0 + t * v1;
+}
+/**
+ * Resample the input arrays using bilinear interpolation.
+ * @param {TypedArray[]} valueArrays The input arrays to resample
+ * @param {number} inWidth The width of the input rasters
+ * @param {number} inHeight The height of the input rasters
+ * @param {number} outWidth The desired width of the output rasters
+ * @param {number} outHeight The desired height of the output rasters
+ * @returns {TypedArray[]} The resampled rasters
+ */
+
+
+function resampleBilinear(valueArrays, inWidth, inHeight, outWidth, outHeight) {
+  const relX = inWidth / outWidth;
+  const relY = inHeight / outHeight;
+  return valueArrays.map(array => {
+    const newArray = copyNewSize(array, outWidth, outHeight);
+
+    for (let y = 0; y < outHeight; ++y) {
+      const rawY = relY * y;
+      const yl = Math.floor(rawY);
+      const yh = Math.min(Math.ceil(rawY), inHeight - 1);
+
+      for (let x = 0; x < outWidth; ++x) {
+        const rawX = relX * x;
+        const tx = rawX % 1;
+        const xl = Math.floor(rawX);
+        const xh = Math.min(Math.ceil(rawX), inWidth - 1);
+        const ll = array[yl * inWidth + xl];
+        const hl = array[yl * inWidth + xh];
+        const lh = array[yh * inWidth + xl];
+        const hh = array[yh * inWidth + xh];
+        const value = lerp(lerp(ll, hl, tx), lerp(lh, hh, tx), rawY % 1);
+        newArray[y * outWidth + x] = value;
+      }
+    }
+
+    return newArray;
+  });
+}
+/**
+ * Resample the input arrays using the selected resampling method.
+ * @param {TypedArray[]} valueArrays The input arrays to resample
+ * @param {number} inWidth The width of the input rasters
+ * @param {number} inHeight The height of the input rasters
+ * @param {number} outWidth The desired width of the output rasters
+ * @param {number} outHeight The desired height of the output rasters
+ * @param {string} [method = 'nearest'] The desired resampling method
+ * @returns {TypedArray[]} The resampled rasters
+ */
+
+
+function resample(valueArrays, inWidth, inHeight, outWidth, outHeight) {
+  let method = arguments.length > 5 && arguments[5] !== undefined ? arguments[5] : 'nearest';
+
+  switch (method.toLowerCase()) {
+    case 'nearest':
+      return resampleNearest(valueArrays, inWidth, inHeight, outWidth, outHeight);
+
+    case 'bilinear':
+    case 'linear':
+      return resampleBilinear(valueArrays, inWidth, inHeight, outWidth, outHeight);
+
+    default:
+      throw new Error(`Unsupported resampling method: '${method}'`);
+  }
+}
+/**
+ * Resample the pixel interleaved input array using nearest neighbor value selection.
+ * @param {TypedArray} valueArrays The input arrays to resample
+ * @param {number} inWidth The width of the input rasters
+ * @param {number} inHeight The height of the input rasters
+ * @param {number} outWidth The desired width of the output rasters
+ * @param {number} outHeight The desired height of the output rasters
+ * @param {number} samples The number of samples per pixel for pixel
+ *                         interleaved data
+ * @returns {TypedArray} The resampled raster
+ */
+
+
+function resampleNearestInterleaved(valueArray, inWidth, inHeight, outWidth, outHeight, samples) {
+  const relX = inWidth / outWidth;
+  const relY = inHeight / outHeight;
+  const newArray = copyNewSize(valueArray, outWidth, outHeight, samples);
+
+  for (let y = 0; y < outHeight; ++y) {
+    const cy = Math.min(Math.round(relY * y), inHeight - 1);
+
+    for (let x = 0; x < outWidth; ++x) {
+      const cx = Math.min(Math.round(relX * x), inWidth - 1);
+
+      for (let i = 0; i < samples; ++i) {
+        const value = valueArray[cy * inWidth * samples + cx * samples + i];
+        newArray[y * outWidth * samples + x * samples + i] = value;
+      }
+    }
+  }
+
+  return newArray;
+}
+/**
+ * Resample the pixel interleaved input array using bilinear interpolation.
+ * @param {TypedArray} valueArrays The input arrays to resample
+ * @param {number} inWidth The width of the input rasters
+ * @param {number} inHeight The height of the input rasters
+ * @param {number} outWidth The desired width of the output rasters
+ * @param {number} outHeight The desired height of the output rasters
+ * @param {number} samples The number of samples per pixel for pixel
+ *                         interleaved data
+ * @returns {TypedArray} The resampled raster
+ */
+
+
+function resampleBilinearInterleaved(valueArray, inWidth, inHeight, outWidth, outHeight, samples) {
+  const relX = inWidth / outWidth;
+  const relY = inHeight / outHeight;
+  const newArray = copyNewSize(valueArray, outWidth, outHeight, samples);
+
+  for (let y = 0; y < outHeight; ++y) {
+    const rawY = relY * y;
+    const yl = Math.floor(rawY);
+    const yh = Math.min(Math.ceil(rawY), inHeight - 1);
+
+    for (let x = 0; x < outWidth; ++x) {
+      const rawX = relX * x;
+      const tx = rawX % 1;
+      const xl = Math.floor(rawX);
+      const xh = Math.min(Math.ceil(rawX), inWidth - 1);
+
+      for (let i = 0; i < samples; ++i) {
+        const ll = valueArray[yl * inWidth * samples + xl * samples + i];
+        const hl = valueArray[yl * inWidth * samples + xh * samples + i];
+        const lh = valueArray[yh * inWidth * samples + xl * samples + i];
+        const hh = valueArray[yh * inWidth * samples + xh * samples + i];
+        const value = lerp(lerp(ll, hl, tx), lerp(lh, hh, tx), rawY % 1);
+        newArray[y * outWidth * samples + x * samples + i] = value;
+      }
+    }
+  }
+
+  return newArray;
+}
+/**
+ * Resample the pixel interleaved input array using the selected resampling method.
+ * @param {TypedArray} valueArray The input array to resample
+ * @param {number} inWidth The width of the input rasters
+ * @param {number} inHeight The height of the input rasters
+ * @param {number} outWidth The desired width of the output rasters
+ * @param {number} outHeight The desired height of the output rasters
+ * @param {number} samples The number of samples per pixel for pixel
+ *                                 interleaved data
+ * @param {string} [method = 'nearest'] The desired resampling method
+ * @returns {TypedArray} The resampled rasters
+ */
+
+
+function resampleInterleaved(valueArray, inWidth, inHeight, outWidth, outHeight, samples) {
+  let method = arguments.length > 6 && arguments[6] !== undefined ? arguments[6] : 'nearest';
+
+  switch (method.toLowerCase()) {
+    case 'nearest':
+      return resampleNearestInterleaved(valueArray, inWidth, inHeight, outWidth, outHeight, samples);
+
+    case 'bilinear':
+    case 'linear':
+      return resampleBilinearInterleaved(valueArray, inWidth, inHeight, outWidth, outHeight, samples);
+
+    default:
+      throw new Error(`Unsupported resampling method: '${method}'`);
+  }
+}
+},{}],"node_modules/geotiff/dist-module/geotiffimage.js":[function(require,module,exports) {
+"use strict";
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+exports.default = void 0;
+
+var _float = require("@petamoriken/float16");
+
+var _getAttribute = _interopRequireDefault(require("xml-utils/get-attribute.js"));
+
+var _findTagsByName = _interopRequireDefault(require("xml-utils/find-tags-by-name.js"));
+
+var _globals = require("./globals.js");
+
+var _rgb = require("./rgb.js");
+
+var _index = require("./compression/index.js");
+
+var _resample = require("./resample.js");
+
+function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
+
+/** @module geotiffimage */
+
+/**
+ * @typedef {Object} ReadRasterOptions
+ * @property {Array<number>} [window=whole window] the subset to read data from in pixels.
+ * @property {Array<number>} [bbox=whole image] the subset to read data from in
+ *                                           geographical coordinates.
+ * @property {Array<number>} [samples=all samples] the selection of samples to read from. Default is all samples.
+ * @property {boolean} [interleave=false] whether the data shall be read
+ *                                             in one single array or separate
+ *                                             arrays.
+ * @property {Pool} [pool=null] The optional decoder pool to use.
+ * @property {number} [width] The desired width of the output. When the width is not the
+ *                                 same as the images, resampling will be performed.
+ * @property {number} [height] The desired height of the output. When the width is not the
+ *                                  same as the images, resampling will be performed.
+ * @property {string} [resampleMethod='nearest'] The desired resampling method.
+ * @property {AbortSignal} [signal] An AbortSignal that may be signalled if the request is
+ *                                       to be aborted
+ * @property {number|number[]} [fillValue] The value to use for parts of the image
+ *                                              outside of the images extent. When multiple
+ *                                              samples are requested, an array of fill values
+ *                                              can be passed.
+ */
+
+/** @typedef {import("./geotiff.js").TypedArray} TypedArray */
+function sum(array, start, end) {
+  let s = 0;
+
+  for (let i = start; i < end; ++i) {
+    s += array[i];
+  }
+
+  return s;
+}
+
+function arrayForType(format, bitsPerSample, size) {
+  switch (format) {
+    case 1:
+      // unsigned integer data
+      if (bitsPerSample <= 8) {
+        return new Uint8Array(size);
+      } else if (bitsPerSample <= 16) {
+        return new Uint16Array(size);
+      } else if (bitsPerSample <= 32) {
+        return new Uint32Array(size);
+      }
+
+      break;
+
+    case 2:
+      // twos complement signed integer data
+      if (bitsPerSample === 8) {
+        return new Int8Array(size);
+      } else if (bitsPerSample === 16) {
+        return new Int16Array(size);
+      } else if (bitsPerSample === 32) {
+        return new Int32Array(size);
+      }
+
+      break;
+
+    case 3:
+      // floating point data
+      switch (bitsPerSample) {
+        case 16:
+        case 32:
+          return new Float32Array(size);
+
+        case 64:
+          return new Float64Array(size);
+
+        default:
+          break;
+      }
+
+      break;
+
+    default:
+      break;
+  }
+
+  throw Error('Unsupported data format/bitsPerSample');
+}
+
+function needsNormalization(format, bitsPerSample) {
+  if ((format === 1 || format === 2) && bitsPerSample <= 32 && bitsPerSample % 8 === 0) {
+    return false;
+  } else if (format === 3 && (bitsPerSample === 16 || bitsPerSample === 32 || bitsPerSample === 64)) {
+    return false;
+  }
+
+  return true;
+}
+
+function normalizeArray(inBuffer, format, planarConfiguration, samplesPerPixel, bitsPerSample, tileWidth, tileHeight) {
+  // const inByteArray = new Uint8Array(inBuffer);
+  const view = new DataView(inBuffer);
+  const outSize = planarConfiguration === 2 ? tileHeight * tileWidth : tileHeight * tileWidth * samplesPerPixel;
+  const samplesToTransfer = planarConfiguration === 2 ? 1 : samplesPerPixel;
+  const outArray = arrayForType(format, bitsPerSample, outSize); // let pixel = 0;
+
+  const bitMask = parseInt('1'.repeat(bitsPerSample), 2);
+
+  if (format === 1) {
+    // unsigned integer
+    // translation of https://github.com/OSGeo/gdal/blob/master/gdal/frmts/gtiff/geotiff.cpp#L7337
+    let pixelBitSkip; // let sampleBitOffset = 0;
+
+    if (planarConfiguration === 1) {
+      pixelBitSkip = samplesPerPixel * bitsPerSample; // sampleBitOffset = (samplesPerPixel - 1) * bitsPerSample;
+    } else {
+      pixelBitSkip = bitsPerSample;
+    } // Bits per line rounds up to next byte boundary.
+
+
+    let bitsPerLine = tileWidth * pixelBitSkip;
+
+    if ((bitsPerLine & 7) !== 0) {
+      bitsPerLine = bitsPerLine + 7 & ~7;
+    }
+
+    for (let y = 0; y < tileHeight; ++y) {
+      const lineBitOffset = y * bitsPerLine;
+
+      for (let x = 0; x < tileWidth; ++x) {
+        const pixelBitOffset = lineBitOffset + x * samplesToTransfer * bitsPerSample;
+
+        for (let i = 0; i < samplesToTransfer; ++i) {
+          const bitOffset = pixelBitOffset + i * bitsPerSample;
+          const outIndex = (y * tileWidth + x) * samplesToTransfer + i;
+          const byteOffset = Math.floor(bitOffset / 8);
+          const innerBitOffset = bitOffset % 8;
+
+          if (innerBitOffset + bitsPerSample <= 8) {
+            outArray[outIndex] = view.getUint8(byteOffset) >> 8 - bitsPerSample - innerBitOffset & bitMask;
+          } else if (innerBitOffset + bitsPerSample <= 16) {
+            outArray[outIndex] = view.getUint16(byteOffset) >> 16 - bitsPerSample - innerBitOffset & bitMask;
+          } else if (innerBitOffset + bitsPerSample <= 24) {
+            const raw = view.getUint16(byteOffset) << 8 | view.getUint8(byteOffset + 2);
+            outArray[outIndex] = raw >> 24 - bitsPerSample - innerBitOffset & bitMask;
+          } else {
+            outArray[outIndex] = view.getUint32(byteOffset) >> 32 - bitsPerSample - innerBitOffset & bitMask;
+          } // let outWord = 0;
+          // for (let bit = 0; bit < bitsPerSample; ++bit) {
+          //   if (inByteArray[bitOffset >> 3]
+          //     & (0x80 >> (bitOffset & 7))) {
+          //     outWord |= (1 << (bitsPerSample - 1 - bit));
+          //   }
+          //   ++bitOffset;
+          // }
+          // outArray[outIndex] = outWord;
+          // outArray[pixel] = outWord;
+          // pixel += 1;
+
+        } // bitOffset = bitOffset + pixelBitSkip - bitsPerSample;
+
+      }
+    }
+  } else if (format === 3) {// floating point
+    // Float16 is handled elsewhere
+    // normalize 16/24 bit floats to 32 bit floats in the array
+    // console.time();
+    // if (bitsPerSample === 16) {
+    //   for (let byte = 0, outIndex = 0; byte < inBuffer.byteLength; byte += 2, ++outIndex) {
+    //     outArray[outIndex] = getFloat16(view, byte);
+    //   }
+    // }
+    // console.timeEnd()
+  }
+
+  return outArray.buffer;
+}
+/**
+ * GeoTIFF sub-file image.
+ */
+
+
+class GeoTIFFImage {
+  /**
+   * @constructor
+   * @param {Object} fileDirectory The parsed file directory
+   * @param {Object} geoKeys The parsed geo-keys
+   * @param {DataView} dataView The DataView for the underlying file.
+   * @param {Boolean} littleEndian Whether the file is encoded in little or big endian
+   * @param {Boolean} cache Whether or not decoded tiles shall be cached
+   * @param {Source} source The datasource to read from
+   */
+  constructor(fileDirectory, geoKeys, dataView, littleEndian, cache, source) {
+    this.fileDirectory = fileDirectory;
+    this.geoKeys = geoKeys;
+    this.dataView = dataView;
+    this.littleEndian = littleEndian;
+    this.tiles = cache ? {} : null;
+    this.isTiled = !fileDirectory.StripOffsets;
+    const planarConfiguration = fileDirectory.PlanarConfiguration;
+    this.planarConfiguration = typeof planarConfiguration === 'undefined' ? 1 : planarConfiguration;
+
+    if (this.planarConfiguration !== 1 && this.planarConfiguration !== 2) {
+      throw new Error('Invalid planar configuration.');
+    }
+
+    this.source = source;
+  }
+  /**
+   * Returns the associated parsed file directory.
+   * @returns {Object} the parsed file directory
+   */
+
+
+  getFileDirectory() {
+    return this.fileDirectory;
+  }
+  /**
+   * Returns the associated parsed geo keys.
+   * @returns {Object} the parsed geo keys
+   */
+
+
+  getGeoKeys() {
+    return this.geoKeys;
+  }
+  /**
+   * Returns the width of the image.
+   * @returns {Number} the width of the image
+   */
+
+
+  getWidth() {
+    return this.fileDirectory.ImageWidth;
+  }
+  /**
+   * Returns the height of the image.
+   * @returns {Number} the height of the image
+   */
+
+
+  getHeight() {
+    return this.fileDirectory.ImageLength;
+  }
+  /**
+   * Returns the number of samples per pixel.
+   * @returns {Number} the number of samples per pixel
+   */
+
+
+  getSamplesPerPixel() {
+    return typeof this.fileDirectory.SamplesPerPixel !== 'undefined' ? this.fileDirectory.SamplesPerPixel : 1;
+  }
+  /**
+   * Returns the width of each tile.
+   * @returns {Number} the width of each tile
+   */
+
+
+  getTileWidth() {
+    return this.isTiled ? this.fileDirectory.TileWidth : this.getWidth();
+  }
+  /**
+   * Returns the height of each tile.
+   * @returns {Number} the height of each tile
+   */
+
+
+  getTileHeight() {
+    if (this.isTiled) {
+      return this.fileDirectory.TileLength;
+    }
+
+    if (typeof this.fileDirectory.RowsPerStrip !== 'undefined') {
+      return Math.min(this.fileDirectory.RowsPerStrip, this.getHeight());
+    }
+
+    return this.getHeight();
+  }
+
+  getBlockWidth() {
+    return this.getTileWidth();
+  }
+
+  getBlockHeight(y) {
+    if (this.isTiled || (y + 1) * this.getTileHeight() <= this.getHeight()) {
+      return this.getTileHeight();
+    } else {
+      return this.getHeight() - y * this.getTileHeight();
+    }
+  }
+  /**
+   * Calculates the number of bytes for each pixel across all samples. Only full
+   * bytes are supported, an exception is thrown when this is not the case.
+   * @returns {Number} the bytes per pixel
+   */
+
+
+  getBytesPerPixel() {
+    let bytes = 0;
+
+    for (let i = 0; i < this.fileDirectory.BitsPerSample.length; ++i) {
+      bytes += this.getSampleByteSize(i);
+    }
+
+    return bytes;
+  }
+
+  getSampleByteSize(i) {
+    if (i >= this.fileDirectory.BitsPerSample.length) {
+      throw new RangeError(`Sample index ${i} is out of range.`);
+    }
+
+    return Math.ceil(this.fileDirectory.BitsPerSample[i] / 8);
+  }
+
+  getReaderForSample(sampleIndex) {
+    const format = this.fileDirectory.SampleFormat ? this.fileDirectory.SampleFormat[sampleIndex] : 1;
+    const bitsPerSample = this.fileDirectory.BitsPerSample[sampleIndex];
+
+    switch (format) {
+      case 1:
+        // unsigned integer data
+        if (bitsPerSample <= 8) {
+          return DataView.prototype.getUint8;
+        } else if (bitsPerSample <= 16) {
+          return DataView.prototype.getUint16;
+        } else if (bitsPerSample <= 32) {
+          return DataView.prototype.getUint32;
+        }
+
+        break;
+
+      case 2:
+        // twos complement signed integer data
+        if (bitsPerSample <= 8) {
+          return DataView.prototype.getInt8;
+        } else if (bitsPerSample <= 16) {
+          return DataView.prototype.getInt16;
+        } else if (bitsPerSample <= 32) {
+          return DataView.prototype.getInt32;
+        }
+
+        break;
+
+      case 3:
+        switch (bitsPerSample) {
+          case 16:
+            return function (offset, littleEndian) {
+              return (0, _float.getFloat16)(this, offset, littleEndian);
+            };
+
+          case 32:
+            return DataView.prototype.getFloat32;
+
+          case 64:
+            return DataView.prototype.getFloat64;
+
+          default:
+            break;
+        }
+
+        break;
+
+      default:
+        break;
+    }
+
+    throw Error('Unsupported data format/bitsPerSample');
+  }
+
+  getSampleFormat() {
+    let sampleIndex = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : 0;
+    return this.fileDirectory.SampleFormat ? this.fileDirectory.SampleFormat[sampleIndex] : 1;
+  }
+
+  getBitsPerSample() {
+    let sampleIndex = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : 0;
+    return this.fileDirectory.BitsPerSample[sampleIndex];
+  }
+
+  getArrayForSample(sampleIndex, size) {
+    const format = this.getSampleFormat(sampleIndex);
+    const bitsPerSample = this.getBitsPerSample(sampleIndex);
+    return arrayForType(format, bitsPerSample, size);
+  }
+  /**
+   * Returns the decoded strip or tile.
+   * @param {Number} x the strip or tile x-offset
+   * @param {Number} y the tile y-offset (0 for stripped images)
+   * @param {Number} sample the sample to get for separated samples
+   * @param {import("./geotiff").Pool|AbstractDecoder} poolOrDecoder the decoder or decoder pool
+   * @param {AbortSignal} [signal] An AbortSignal that may be signalled if the request is
+   *                               to be aborted
+   * @returns {Promise.<ArrayBuffer>}
+   */
+
+
+  async getTileOrStrip(x, y, sample, poolOrDecoder, signal) {
+    const numTilesPerRow = Math.ceil(this.getWidth() / this.getTileWidth());
+    const numTilesPerCol = Math.ceil(this.getHeight() / this.getTileHeight());
+    let index;
+    const {
+      tiles
+    } = this;
+
+    if (this.planarConfiguration === 1) {
+      index = y * numTilesPerRow + x;
+    } else if (this.planarConfiguration === 2) {
+      index = sample * numTilesPerRow * numTilesPerCol + y * numTilesPerRow + x;
+    }
+
+    let offset;
+    let byteCount;
+
+    if (this.isTiled) {
+      offset = this.fileDirectory.TileOffsets[index];
+      byteCount = this.fileDirectory.TileByteCounts[index];
+    } else {
+      offset = this.fileDirectory.StripOffsets[index];
+      byteCount = this.fileDirectory.StripByteCounts[index];
+    }
+
+    const slice = (await this.source.fetch([{
+      offset,
+      length: byteCount
+    }], signal))[0];
+    let request;
+
+    if (tiles === null || !tiles[index]) {
+      // resolve each request by potentially applying array normalization
+      request = (async () => {
+        let data = await poolOrDecoder.decode(this.fileDirectory, slice);
+        const sampleFormat = this.getSampleFormat();
+        const bitsPerSample = this.getBitsPerSample();
+
+        if (needsNormalization(sampleFormat, bitsPerSample)) {
+          data = normalizeArray(data, sampleFormat, this.planarConfiguration, this.getSamplesPerPixel(), bitsPerSample, this.getTileWidth(), this.getBlockHeight(y));
+        }
+
+        return data;
+      })(); // set the cache
+
+
+      if (tiles !== null) {
+        tiles[index] = request;
+      }
+    } else {
+      // get from the cache
+      request = tiles[index];
+    } // cache the tile request
+
+
+    return {
+      x,
+      y,
+      sample,
+      data: await request
+    };
+  }
+  /**
+   * Internal read function.
+   * @private
+   * @param {Array} imageWindow The image window in pixel coordinates
+   * @param {Array} samples The selected samples (0-based indices)
+   * @param {TypedArray[]|TypedArray} valueArrays The array(s) to write into
+   * @param {Boolean} interleave Whether or not to write in an interleaved manner
+   * @param {import("./geotiff").Pool|AbstractDecoder} poolOrDecoder the decoder or decoder pool
+   * @param {number} width the width of window to be read into
+   * @param {number} height the height of window to be read into
+   * @param {number} resampleMethod the resampling method to be used when interpolating
+   * @param {AbortSignal} [signal] An AbortSignal that may be signalled if the request is
+   *                               to be aborted
+   * @returns {Promise<TypedArray[]>|Promise<TypedArray>}
+   */
+
+
+  async _readRaster(imageWindow, samples, valueArrays, interleave, poolOrDecoder, width, height, resampleMethod, signal) {
+    const tileWidth = this.getTileWidth();
+    const tileHeight = this.getTileHeight();
+    const imageWidth = this.getWidth();
+    const imageHeight = this.getHeight();
+    const minXTile = Math.max(Math.floor(imageWindow[0] / tileWidth), 0);
+    const maxXTile = Math.min(Math.ceil(imageWindow[2] / tileWidth), Math.ceil(imageWidth / tileWidth));
+    const minYTile = Math.max(Math.floor(imageWindow[1] / tileHeight), 0);
+    const maxYTile = Math.min(Math.ceil(imageWindow[3] / tileHeight), Math.ceil(imageHeight / tileHeight));
+    const windowWidth = imageWindow[2] - imageWindow[0];
+    let bytesPerPixel = this.getBytesPerPixel();
+    const srcSampleOffsets = [];
+    const sampleReaders = [];
+
+    for (let i = 0; i < samples.length; ++i) {
+      if (this.planarConfiguration === 1) {
+        srcSampleOffsets.push(sum(this.fileDirectory.BitsPerSample, 0, samples[i]) / 8);
+      } else {
+        srcSampleOffsets.push(0);
+      }
+
+      sampleReaders.push(this.getReaderForSample(samples[i]));
+    }
+
+    const promises = [];
+    const {
+      littleEndian
+    } = this;
+
+    for (let yTile = minYTile; yTile < maxYTile; ++yTile) {
+      for (let xTile = minXTile; xTile < maxXTile; ++xTile) {
+        for (let sampleIndex = 0; sampleIndex < samples.length; ++sampleIndex) {
+          const si = sampleIndex;
+          const sample = samples[sampleIndex];
+
+          if (this.planarConfiguration === 2) {
+            bytesPerPixel = this.getSampleByteSize(sampleIndex);
+          }
+
+          const promise = this.getTileOrStrip(xTile, yTile, sample, poolOrDecoder, signal).then(tile => {
+            const buffer = tile.data;
+            const dataView = new DataView(buffer);
+            const blockHeight = this.getBlockHeight(tile.y);
+            const firstLine = tile.y * tileHeight;
+            const firstCol = tile.x * tileWidth;
+            const lastLine = firstLine + blockHeight;
+            const lastCol = (tile.x + 1) * tileWidth;
+            const reader = sampleReaders[si];
+            const ymax = Math.min(blockHeight, blockHeight - (lastLine - imageWindow[3]), imageHeight - firstLine);
+            const xmax = Math.min(tileWidth, tileWidth - (lastCol - imageWindow[2]), imageWidth - firstCol);
+
+            for (let y = Math.max(0, imageWindow[1] - firstLine); y < ymax; ++y) {
+              for (let x = Math.max(0, imageWindow[0] - firstCol); x < xmax; ++x) {
+                const pixelOffset = (y * tileWidth + x) * bytesPerPixel;
+                const value = reader.call(dataView, pixelOffset + srcSampleOffsets[si], littleEndian);
+                let windowCoordinate;
+
+                if (interleave) {
+                  windowCoordinate = (y + firstLine - imageWindow[1]) * windowWidth * samples.length + (x + firstCol - imageWindow[0]) * samples.length + si;
+                  valueArrays[windowCoordinate] = value;
+                } else {
+                  windowCoordinate = (y + firstLine - imageWindow[1]) * windowWidth + x + firstCol - imageWindow[0];
+                  valueArrays[si][windowCoordinate] = value;
+                }
+              }
+            }
+          });
+          promises.push(promise);
+        }
+      }
+    }
+
+    await Promise.all(promises);
+
+    if (width && imageWindow[2] - imageWindow[0] !== width || height && imageWindow[3] - imageWindow[1] !== height) {
+      let resampled;
+
+      if (interleave) {
+        resampled = (0, _resample.resampleInterleaved)(valueArrays, imageWindow[2] - imageWindow[0], imageWindow[3] - imageWindow[1], width, height, samples.length, resampleMethod);
+      } else {
+        resampled = (0, _resample.resample)(valueArrays, imageWindow[2] - imageWindow[0], imageWindow[3] - imageWindow[1], width, height, resampleMethod);
+      }
+
+      resampled.width = width;
+      resampled.height = height;
+      return resampled;
+    }
+
+    valueArrays.width = width || imageWindow[2] - imageWindow[0];
+    valueArrays.height = height || imageWindow[3] - imageWindow[1];
+    return valueArrays;
+  }
+  /**
+   * Reads raster data from the image. This function reads all selected samples
+   * into separate arrays of the correct type for that sample or into a single
+   * combined array when `interleave` is set. When provided, only a subset
+   * of the raster is read for each sample.
+   *
+   * @param {ReadRasterOptions} [options={}] optional parameters
+   * @returns {Promise.<(TypedArray|TypedArray[])>} the decoded arrays as a promise
+   */
+
+
+  async readRasters() {
+    let {
+      window: wnd,
+      samples = [],
+      interleave,
+      pool = null,
+      width,
+      height,
+      resampleMethod,
+      fillValue,
+      signal
+    } = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : {};
+    const imageWindow = wnd || [0, 0, this.getWidth(), this.getHeight()]; // check parameters
+
+    if (imageWindow[0] > imageWindow[2] || imageWindow[1] > imageWindow[3]) {
+      throw new Error('Invalid subsets');
+    }
+
+    const imageWindowWidth = imageWindow[2] - imageWindow[0];
+    const imageWindowHeight = imageWindow[3] - imageWindow[1];
+    const numPixels = imageWindowWidth * imageWindowHeight;
+    const samplesPerPixel = this.getSamplesPerPixel();
+
+    if (!samples || !samples.length) {
+      for (let i = 0; i < samplesPerPixel; ++i) {
+        samples.push(i);
+      }
+    } else {
+      for (let i = 0; i < samples.length; ++i) {
+        if (samples[i] >= samplesPerPixel) {
+          return Promise.reject(new RangeError(`Invalid sample index '${samples[i]}'.`));
+        }
+      }
+    }
+
+    let valueArrays;
+
+    if (interleave) {
+      const format = this.fileDirectory.SampleFormat ? Math.max.apply(null, this.fileDirectory.SampleFormat) : 1;
+      const bitsPerSample = Math.max.apply(null, this.fileDirectory.BitsPerSample);
+      valueArrays = arrayForType(format, bitsPerSample, numPixels * samples.length);
+
+      if (fillValue) {
+        valueArrays.fill(fillValue);
+      }
+    } else {
+      valueArrays = [];
+
+      for (let i = 0; i < samples.length; ++i) {
+        const valueArray = this.getArrayForSample(samples[i], numPixels);
+
+        if (Array.isArray(fillValue) && i < fillValue.length) {
+          valueArray.fill(fillValue[i]);
+        } else if (fillValue && !Array.isArray(fillValue)) {
+          valueArray.fill(fillValue);
+        }
+
+        valueArrays.push(valueArray);
+      }
+    }
+
+    const poolOrDecoder = pool || (await (0, _index.getDecoder)(this.fileDirectory));
+    const result = await this._readRaster(imageWindow, samples, valueArrays, interleave, poolOrDecoder, width, height, resampleMethod, signal);
+    return result;
+  }
+  /**
+   * Reads raster data from the image as RGB. The result is always an
+   * interleaved typed array.
+   * Colorspaces other than RGB will be transformed to RGB, color maps expanded.
+   * When no other method is applicable, the first sample is used to produce a
+   * greayscale image.
+   * When provided, only a subset of the raster is read for each sample.
+   *
+   * @param {Object} [options] optional parameters
+   * @param {Array<number>} [options.window] the subset to read data from in pixels.
+   * @param {boolean} [options.interleave=true] whether the data shall be read
+   *                                             in one single array or separate
+   *                                             arrays.
+   * @param {import("./geotiff").Pool} [options.pool=null] The optional decoder pool to use.
+   * @param {number} [options.width] The desired width of the output. When the width is no the
+   *                                 same as the images, resampling will be performed.
+   * @param {number} [options.height] The desired height of the output. When the width is no the
+   *                                  same as the images, resampling will be performed.
+   * @param {string} [options.resampleMethod='nearest'] The desired resampling method.
+   * @param {boolean} [options.enableAlpha=false] Enable reading alpha channel if present.
+   * @param {AbortSignal} [options.signal] An AbortSignal that may be signalled if the request is
+   *                                       to be aborted
+   * @returns {Promise<TypedArray|TypedArray[]>} the RGB array as a Promise
+   */
+
+
+  async readRGB() {
+    let {
+      window,
+      interleave = true,
+      pool = null,
+      width,
+      height,
+      resampleMethod,
+      enableAlpha = false,
+      signal
+    } = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : {};
+    const imageWindow = window || [0, 0, this.getWidth(), this.getHeight()]; // check parameters
+
+    if (imageWindow[0] > imageWindow[2] || imageWindow[1] > imageWindow[3]) {
+      throw new Error('Invalid subsets');
+    }
+
+    const pi = this.fileDirectory.PhotometricInterpretation;
+
+    if (pi === _globals.photometricInterpretations.RGB) {
+      let s = [0, 1, 2];
+
+      if (!(this.fileDirectory.ExtraSamples === _globals.ExtraSamplesValues.Unspecified) && enableAlpha) {
+        s = [];
+
+        for (let i = 0; i < this.fileDirectory.BitsPerSample.length; i += 1) {
+          s.push(i);
+        }
+      }
+
+      return this.readRasters({
+        window,
+        interleave,
+        samples: s,
+        pool,
+        width,
+        height,
+        resampleMethod,
+        signal
+      });
+    }
+
+    let samples;
+
+    switch (pi) {
+      case _globals.photometricInterpretations.WhiteIsZero:
+      case _globals.photometricInterpretations.BlackIsZero:
+      case _globals.photometricInterpretations.Palette:
+        samples = [0];
+        break;
+
+      case _globals.photometricInterpretations.CMYK:
+        samples = [0, 1, 2, 3];
+        break;
+
+      case _globals.photometricInterpretations.YCbCr:
+      case _globals.photometricInterpretations.CIELab:
+        samples = [0, 1, 2];
+        break;
+
+      default:
+        throw new Error('Invalid or unsupported photometric interpretation.');
+    }
+
+    const subOptions = {
+      window: imageWindow,
+      interleave: true,
+      samples,
+      pool,
+      width,
+      height,
+      resampleMethod,
+      signal
+    };
+    const {
+      fileDirectory
+    } = this;
+    const raster = await this.readRasters(subOptions);
+    const max = 2 ** this.fileDirectory.BitsPerSample[0];
+    let data;
+
+    switch (pi) {
+      case _globals.photometricInterpretations.WhiteIsZero:
+        data = (0, _rgb.fromWhiteIsZero)(raster, max);
+        break;
+
+      case _globals.photometricInterpretations.BlackIsZero:
+        data = (0, _rgb.fromBlackIsZero)(raster, max);
+        break;
+
+      case _globals.photometricInterpretations.Palette:
+        data = (0, _rgb.fromPalette)(raster, fileDirectory.ColorMap);
+        break;
+
+      case _globals.photometricInterpretations.CMYK:
+        data = (0, _rgb.fromCMYK)(raster);
+        break;
+
+      case _globals.photometricInterpretations.YCbCr:
+        data = (0, _rgb.fromYCbCr)(raster);
+        break;
+
+      case _globals.photometricInterpretations.CIELab:
+        data = (0, _rgb.fromCIELab)(raster);
+        break;
+
+      default:
+        throw new Error('Unsupported photometric interpretation.');
+    } // if non-interleaved data is requested, we must split the channels
+    // into their respective arrays
+
+
+    if (!interleave) {
+      const red = new Uint8Array(data.length / 3);
+      const green = new Uint8Array(data.length / 3);
+      const blue = new Uint8Array(data.length / 3);
+
+      for (let i = 0, j = 0; i < data.length; i += 3, ++j) {
+        red[j] = data[i];
+        green[j] = data[i + 1];
+        blue[j] = data[i + 2];
+      }
+
+      data = [red, green, blue];
+    }
+
+    data.width = raster.width;
+    data.height = raster.height;
+    return data;
+  }
+  /**
+   * Returns an array of tiepoints.
+   * @returns {Object[]}
+   */
+
+
+  getTiePoints() {
+    if (!this.fileDirectory.ModelTiepoint) {
+      return [];
+    }
+
+    const tiePoints = [];
+
+    for (let i = 0; i < this.fileDirectory.ModelTiepoint.length; i += 6) {
+      tiePoints.push({
+        i: this.fileDirectory.ModelTiepoint[i],
+        j: this.fileDirectory.ModelTiepoint[i + 1],
+        k: this.fileDirectory.ModelTiepoint[i + 2],
+        x: this.fileDirectory.ModelTiepoint[i + 3],
+        y: this.fileDirectory.ModelTiepoint[i + 4],
+        z: this.fileDirectory.ModelTiepoint[i + 5]
+      });
+    }
+
+    return tiePoints;
+  }
+  /**
+   * Returns the parsed GDAL metadata items.
+   *
+   * If sample is passed to null, dataset-level metadata will be returned.
+   * Otherwise only metadata specific to the provided sample will be returned.
+   *
+   * @param {number} [sample=null] The sample index.
+   * @returns {Object}
+   */
+
+
+  getGDALMetadata() {
+    let sample = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : null;
+    const metadata = {};
+
+    if (!this.fileDirectory.GDAL_METADATA) {
+      return null;
+    }
+
+    const string = this.fileDirectory.GDAL_METADATA;
+    let items = (0, _findTagsByName.default)(string, 'Item');
+
+    if (sample === null) {
+      items = items.filter(item => (0, _getAttribute.default)(item, 'sample') === undefined);
+    } else {
+      items = items.filter(item => Number((0, _getAttribute.default)(item, 'sample')) === sample);
+    }
+
+    for (let i = 0; i < items.length; ++i) {
+      const item = items[i];
+      metadata[(0, _getAttribute.default)(item, 'name')] = item.inner;
+    }
+
+    return metadata;
+  }
+  /**
+   * Returns the GDAL nodata value
+   * @returns {number|null}
+   */
+
+
+  getGDALNoData() {
+    if (!this.fileDirectory.GDAL_NODATA) {
+      return null;
+    }
+
+    const string = this.fileDirectory.GDAL_NODATA;
+    return Number(string.substring(0, string.length - 1));
+  }
+  /**
+   * Returns the image origin as a XYZ-vector. When the image has no affine
+   * transformation, then an exception is thrown.
+   * @returns {Array<number>} The origin as a vector
+   */
+
+
+  getOrigin() {
+    const tiePoints = this.fileDirectory.ModelTiepoint;
+    const modelTransformation = this.fileDirectory.ModelTransformation;
+
+    if (tiePoints && tiePoints.length === 6) {
+      return [tiePoints[3], tiePoints[4], tiePoints[5]];
+    }
+
+    if (modelTransformation) {
+      return [modelTransformation[3], modelTransformation[7], modelTransformation[11]];
+    }
+
+    throw new Error('The image does not have an affine transformation.');
+  }
+  /**
+   * Returns the image resolution as a XYZ-vector. When the image has no affine
+   * transformation, then an exception is thrown.
+   * @param {GeoTIFFImage} [referenceImage=null] A reference image to calculate the resolution from
+   *                                             in cases when the current image does not have the
+   *                                             required tags on its own.
+   * @returns {Array<number>} The resolution as a vector
+   */
+
+
+  getResolution() {
+    let referenceImage = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : null;
+    const modelPixelScale = this.fileDirectory.ModelPixelScale;
+    const modelTransformation = this.fileDirectory.ModelTransformation;
+
+    if (modelPixelScale) {
+      return [modelPixelScale[0], -modelPixelScale[1], modelPixelScale[2]];
+    }
+
+    if (modelTransformation) {
+      return [modelTransformation[0], modelTransformation[5], modelTransformation[10]];
+    }
+
+    if (referenceImage) {
+      const [refResX, refResY, refResZ] = referenceImage.getResolution();
+      return [refResX * referenceImage.getWidth() / this.getWidth(), refResY * referenceImage.getHeight() / this.getHeight(), refResZ * referenceImage.getWidth() / this.getWidth()];
+    }
+
+    throw new Error('The image does not have an affine transformation.');
+  }
+  /**
+   * Returns whether or not the pixels of the image depict an area (or point).
+   * @returns {Boolean} Whether the pixels are a point
+   */
+
+
+  pixelIsArea() {
+    return this.geoKeys.GTRasterTypeGeoKey === 1;
+  }
+  /**
+   * Returns the image bounding box as an array of 4 values: min-x, min-y,
+   * max-x and max-y. When the image has no affine transformation, then an
+   * exception is thrown.
+   * @returns {Array<number>} The bounding box
+   */
+
+
+  getBoundingBox() {
+    const origin = this.getOrigin();
+    const resolution = this.getResolution();
+    const x1 = origin[0];
+    const y1 = origin[1];
+    const x2 = x1 + resolution[0] * this.getWidth();
+    const y2 = y1 + resolution[1] * this.getHeight();
+    return [Math.min(x1, x2), Math.min(y1, y2), Math.max(x1, x2), Math.max(y1, y2)];
+  }
+
+}
+
+var _default = GeoTIFFImage;
+exports.default = _default;
+},{"@petamoriken/float16":"node_modules/@petamoriken/float16/browser/float16.js","xml-utils/get-attribute.js":"node_modules/xml-utils/get-attribute.js","xml-utils/find-tags-by-name.js":"node_modules/xml-utils/find-tags-by-name.js","./globals.js":"node_modules/geotiff/dist-module/globals.js","./rgb.js":"node_modules/geotiff/dist-module/rgb.js","./compression/index.js":"node_modules/geotiff/dist-module/compression/index.js","./resample.js":"node_modules/geotiff/dist-module/resample.js"}],"node_modules/geotiff/dist-module/dataview64.js":[function(require,module,exports) {
+"use strict";
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+exports.default = void 0;
+
+var _float = require("@petamoriken/float16");
+
+class DataView64 {
+  constructor(arrayBuffer) {
+    this._dataView = new DataView(arrayBuffer);
+  }
+
+  get buffer() {
+    return this._dataView.buffer;
+  }
+
+  getUint64(offset, littleEndian) {
+    const left = this.getUint32(offset, littleEndian);
+    const right = this.getUint32(offset + 4, littleEndian);
+    let combined;
+
+    if (littleEndian) {
+      combined = left + 2 ** 32 * right;
+
+      if (!Number.isSafeInteger(combined)) {
+        throw new Error(`${combined} exceeds MAX_SAFE_INTEGER. ` + 'Precision may be lost. Please report if you get this message to https://github.com/geotiffjs/geotiff.js/issues');
+      }
+
+      return combined;
+    }
+
+    combined = 2 ** 32 * left + right;
+
+    if (!Number.isSafeInteger(combined)) {
+      throw new Error(`${combined} exceeds MAX_SAFE_INTEGER. ` + 'Precision may be lost. Please report if you get this message to https://github.com/geotiffjs/geotiff.js/issues');
+    }
+
+    return combined;
+  } // adapted from https://stackoverflow.com/a/55338384/8060591
+
+
+  getInt64(offset, littleEndian) {
+    let value = 0;
+    const isNegative = (this._dataView.getUint8(offset + (littleEndian ? 7 : 0)) & 0x80) > 0;
+    let carrying = true;
+
+    for (let i = 0; i < 8; i++) {
+      let byte = this._dataView.getUint8(offset + (littleEndian ? i : 7 - i));
+
+      if (isNegative) {
+        if (carrying) {
+          if (byte !== 0x00) {
+            byte = ~(byte - 1) & 0xff;
+            carrying = false;
+          }
+        } else {
+          byte = ~byte & 0xff;
+        }
+      }
+
+      value += byte * 256 ** i;
+    }
+
+    if (isNegative) {
+      value = -value;
+    }
+
+    return value;
+  }
+
+  getUint8(offset, littleEndian) {
+    return this._dataView.getUint8(offset, littleEndian);
+  }
+
+  getInt8(offset, littleEndian) {
+    return this._dataView.getInt8(offset, littleEndian);
+  }
+
+  getUint16(offset, littleEndian) {
+    return this._dataView.getUint16(offset, littleEndian);
+  }
+
+  getInt16(offset, littleEndian) {
+    return this._dataView.getInt16(offset, littleEndian);
+  }
+
+  getUint32(offset, littleEndian) {
+    return this._dataView.getUint32(offset, littleEndian);
+  }
+
+  getInt32(offset, littleEndian) {
+    return this._dataView.getInt32(offset, littleEndian);
+  }
+
+  getFloat16(offset, littleEndian) {
+    return (0, _float.getFloat16)(this._dataView, offset, littleEndian);
+  }
+
+  getFloat32(offset, littleEndian) {
+    return this._dataView.getFloat32(offset, littleEndian);
+  }
+
+  getFloat64(offset, littleEndian) {
+    return this._dataView.getFloat64(offset, littleEndian);
+  }
+
+}
+
+exports.default = DataView64;
+},{"@petamoriken/float16":"node_modules/@petamoriken/float16/browser/float16.js"}],"node_modules/geotiff/dist-module/dataslice.js":[function(require,module,exports) {
+"use strict";
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+exports.default = void 0;
+
+class DataSlice {
+  constructor(arrayBuffer, sliceOffset, littleEndian, bigTiff) {
+    this._dataView = new DataView(arrayBuffer);
+    this._sliceOffset = sliceOffset;
+    this._littleEndian = littleEndian;
+    this._bigTiff = bigTiff;
+  }
+
+  get sliceOffset() {
+    return this._sliceOffset;
+  }
+
+  get sliceTop() {
+    return this._sliceOffset + this.buffer.byteLength;
+  }
+
+  get littleEndian() {
+    return this._littleEndian;
+  }
+
+  get bigTiff() {
+    return this._bigTiff;
+  }
+
+  get buffer() {
+    return this._dataView.buffer;
+  }
+
+  covers(offset, length) {
+    return this.sliceOffset <= offset && this.sliceTop >= offset + length;
+  }
+
+  readUint8(offset) {
+    return this._dataView.getUint8(offset - this._sliceOffset, this._littleEndian);
+  }
+
+  readInt8(offset) {
+    return this._dataView.getInt8(offset - this._sliceOffset, this._littleEndian);
+  }
+
+  readUint16(offset) {
+    return this._dataView.getUint16(offset - this._sliceOffset, this._littleEndian);
+  }
+
+  readInt16(offset) {
+    return this._dataView.getInt16(offset - this._sliceOffset, this._littleEndian);
+  }
+
+  readUint32(offset) {
+    return this._dataView.getUint32(offset - this._sliceOffset, this._littleEndian);
+  }
+
+  readInt32(offset) {
+    return this._dataView.getInt32(offset - this._sliceOffset, this._littleEndian);
+  }
+
+  readFloat32(offset) {
+    return this._dataView.getFloat32(offset - this._sliceOffset, this._littleEndian);
+  }
+
+  readFloat64(offset) {
+    return this._dataView.getFloat64(offset - this._sliceOffset, this._littleEndian);
+  }
+
+  readUint64(offset) {
+    const left = this.readUint32(offset);
+    const right = this.readUint32(offset + 4);
+    let combined;
+
+    if (this._littleEndian) {
+      combined = left + 2 ** 32 * right;
+
+      if (!Number.isSafeInteger(combined)) {
+        throw new Error(`${combined} exceeds MAX_SAFE_INTEGER. ` + 'Precision may be lost. Please report if you get this message to https://github.com/geotiffjs/geotiff.js/issues');
+      }
+
+      return combined;
+    }
+
+    combined = 2 ** 32 * left + right;
+
+    if (!Number.isSafeInteger(combined)) {
+      throw new Error(`${combined} exceeds MAX_SAFE_INTEGER. ` + 'Precision may be lost. Please report if you get this message to https://github.com/geotiffjs/geotiff.js/issues');
+    }
+
+    return combined;
+  } // adapted from https://stackoverflow.com/a/55338384/8060591
+
+
+  readInt64(offset) {
+    let value = 0;
+    const isNegative = (this._dataView.getUint8(offset + (this._littleEndian ? 7 : 0)) & 0x80) > 0;
+    let carrying = true;
+
+    for (let i = 0; i < 8; i++) {
+      let byte = this._dataView.getUint8(offset + (this._littleEndian ? i : 7 - i));
+
+      if (isNegative) {
+        if (carrying) {
+          if (byte !== 0x00) {
+            byte = ~(byte - 1) & 0xff;
+            carrying = false;
+          }
+        } else {
+          byte = ~byte & 0xff;
+        }
+      }
+
+      value += byte * 256 ** i;
+    }
+
+    if (isNegative) {
+      value = -value;
+    }
+
+    return value;
+  }
+
+  readOffset(offset) {
+    if (this._bigTiff) {
+      return this.readUint64(offset);
+    }
+
+    return this.readUint32(offset);
+  }
+
+}
+
+exports.default = DataSlice;
+},{}],"node_modules/geotiff/dist-module/pool.js":[function(require,module,exports) {
+"use strict";
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+exports.default = void 0;
+
+var _index = require("./compression/index.js");
+
+const defaultPoolSize = typeof navigator !== 'undefined' ? navigator.hardwareConcurrency || 2 : 2;
+/**
+ * @module pool
+ */
+
+/**
+ * Pool for workers to decode chunks of the images.
+ */
+
+class Pool {
+  /**
+   * @constructor
+   * @param {Number} [size] The size of the pool. Defaults to the number of CPUs
+   *                      available. When this parameter is `null` or 0, then the
+   *                      decoding will be done in the main thread.
+   * @param {function(): Worker} [createWorker] A function that creates the decoder worker.
+   * Defaults to a worker with all decoders that ship with geotiff.js. The `createWorker()`
+   * function is expected to return a `Worker` compatible with Web Workers. For code that
+   * runs in Node, [web-worker](https://www.npmjs.com/package/web-worker) is a good choice.
+   *
+   * A worker that uses a custom lzw decoder would look like this `my-custom-worker.js` file:
+   * ```js
+   * import { addDecoder, getDecoder } from 'geotiff';
+   * addDecoder(5, () => import ('./my-custom-lzw').then((m) => m.default));
+   * self.addEventListener('message', async (e) => {
+   *   const { id, fileDirectory, buffer } = e.data;
+   *   const decoder = await getDecoder(fileDirectory);
+   *   const decoded = await decoder.decode(fileDirectory, buffer);
+   *   self.postMessage({ decoded, id }, [decoded]);
+   * });
+   * ```
+   * The way the above code is built into a worker by the `createWorker()` function
+   * depends on the used bundler. For most bundlers, something like this will work:
+   * ```js
+   * function createWorker() {
+   *   return new Worker(new URL('./my-custom-worker.js', import.meta.url));
+   * }
+   * ```
+   */
+  constructor() {
+    let size = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : defaultPoolSize;
+    let createWorker = arguments.length > 1 ? arguments[1] : undefined;
+    this.workers = null;
+    this._awaitingDecoder = null;
+    this.size = size;
+    this.messageId = 0;
+
+    if (size) {
+      this._awaitingDecoder = createWorker ? Promise.resolve(createWorker) : new Promise(resolve => {
+        require("_bundle_loader")(require.resolve('./worker/decoder.js')).then(module => {
+          resolve(module.create);
+        });
+      });
+
+      this._awaitingDecoder.then(create => {
+        this._awaitingDecoder = null;
+        this.workers = [];
+
+        for (let i = 0; i < size; i++) {
+          this.workers.push({
+            worker: create(),
+            idle: true
+          });
+        }
+      });
+    }
+  }
+  /**
+   * Decode the given block of bytes with the set compression method.
+   * @param {ArrayBuffer} buffer the array buffer of bytes to decode.
+   * @returns {Promise<ArrayBuffer>} the decoded result as a `Promise`
+   */
+
+
+  async decode(fileDirectory, buffer) {
+    if (this._awaitingDecoder) {
+      await this._awaitingDecoder;
+    }
+
+    return this.size === 0 ? (0, _index.getDecoder)(fileDirectory).then(decoder => decoder.decode(fileDirectory, buffer)) : new Promise(resolve => {
+      const worker = this.workers.find(candidate => candidate.idle) || this.workers[Math.floor(Math.random() * this.size)];
+      worker.idle = false;
+      const id = this.messageId++;
+
+      const onMessage = e => {
+        if (e.data.id === id) {
+          worker.idle = true;
+          resolve(e.data.decoded);
+          worker.worker.removeEventListener('message', onMessage);
+        }
+      };
+
+      worker.worker.addEventListener('message', onMessage);
+      worker.worker.postMessage({
+        fileDirectory,
+        buffer,
+        id
+      }, [buffer]);
+    });
+  }
+
+  destroy() {
+    if (this.workers) {
+      this.workers.forEach(worker => {
+        worker.worker.terminate();
+      });
+      this.workers = null;
+    }
+  }
+
+}
+
+var _default = Pool;
+exports.default = _default;
+},{"./compression/index.js":"node_modules/geotiff/dist-module/compression/index.js","_bundle_loader":"node_modules/parcel-bundler/src/builtins/bundle-loader.js","./worker/decoder.js":[["decoder.9c21909f.js","node_modules/geotiff/dist-module/worker/decoder.js"],"decoder.9c21909f.js.map","node_modules/geotiff/dist-module/worker/decoder.js"]}],"node_modules/geotiff/dist-module/source/httputils.js":[function(require,module,exports) {
+"use strict";
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+exports.parseByteRanges = parseByteRanges;
+exports.parseContentRange = parseContentRange;
+exports.parseContentType = parseContentType;
+const CRLFCRLF = '\r\n\r\n';
+/*
+ * Shim for 'Object.fromEntries'
+ */
+
+function itemsToObject(items) {
+  if (typeof Object.fromEntries !== 'undefined') {
+    return Object.fromEntries(items);
+  }
+
+  const obj = {};
+
+  for (const [key, value] of items) {
+    obj[key.toLowerCase()] = value;
+  }
+
+  return obj;
+}
+/**
+ * Parse HTTP headers from a given string.
+ * @param {String} text the text to parse the headers from
+ * @returns {Object} the parsed headers with lowercase keys
+ */
+
+
+function parseHeaders(text) {
+  const items = text.split('\r\n').map(line => {
+    const kv = line.split(':').map(str => str.trim());
+    kv[0] = kv[0].toLowerCase();
+    return kv;
+  });
+  return itemsToObject(items);
+}
+/**
+ * Parse a 'Content-Type' header value to the content-type and parameters
+ * @param {String} rawContentType the raw string to parse from
+ * @returns {Object} the parsed content type with the fields: type and params
+ */
+
+
+function parseContentType(rawContentType) {
+  const [type, ...rawParams] = rawContentType.split(';').map(s => s.trim());
+  const paramsItems = rawParams.map(param => param.split('='));
+  return {
+    type,
+    params: itemsToObject(paramsItems)
+  };
+}
+/**
+ * Parse a 'Content-Range' header value to its start, end, and total parts
+ * @param {String} rawContentRange the raw string to parse from
+ * @returns {Object} the parsed parts
+ */
+
+
+function parseContentRange(rawContentRange) {
+  let start;
+  let end;
+  let total;
+
+  if (rawContentRange) {
+    [, start, end, total] = rawContentRange.match(/bytes (\d+)-(\d+)\/(\d+)/);
+    start = parseInt(start, 10);
+    end = parseInt(end, 10);
+    total = parseInt(total, 10);
+  }
+
+  return {
+    start,
+    end,
+    total
+  };
+}
+/**
+ * Parses a list of byteranges from the given 'multipart/byteranges' HTTP response.
+ * Each item in the list has the following properties:
+ * - headers: the HTTP headers
+ * - data: the sliced ArrayBuffer for that specific part
+ * - offset: the offset of the byterange within its originating file
+ * - length: the length of the byterange
+ * @param {ArrayBuffer} responseArrayBuffer the response to be parsed and split
+ * @param {String} boundary the boundary string used to split the sections
+ * @returns {Object[]} the parsed byteranges
+ */
+
+
+function parseByteRanges(responseArrayBuffer, boundary) {
+  let offset = null;
+  const decoder = new TextDecoder('ascii');
+  const out = [];
+  const startBoundary = `--${boundary}`;
+  const endBoundary = `${startBoundary}--`; // search for the initial boundary, may be offset by some bytes
+  // TODO: more efficient to check for `--` in bytes directly
+
+  for (let i = 0; i < 10; ++i) {
+    const text = decoder.decode(new Uint8Array(responseArrayBuffer, i, startBoundary.length));
+
+    if (text === startBoundary) {
+      offset = i;
+    }
+  }
+
+  if (offset === null) {
+    throw new Error('Could not find initial boundary');
+  }
+
+  while (offset < responseArrayBuffer.byteLength) {
+    const text = decoder.decode(new Uint8Array(responseArrayBuffer, offset, Math.min(startBoundary.length + 1024, responseArrayBuffer.byteLength - offset))); // break if we arrived at the end
+
+    if (text.length === 0 || text.startsWith(endBoundary)) {
+      break;
+    } // assert that we are actually dealing with a byterange and are at the correct offset
+
+
+    if (!text.startsWith(startBoundary)) {
+      throw new Error('Part does not start with boundary');
+    } // get a substring from where we read the headers
+
+
+    const innerText = text.substr(startBoundary.length + 2);
+
+    if (innerText.length === 0) {
+      break;
+    } // find the double linebreak that denotes the end of the headers
+
+
+    const endOfHeaders = innerText.indexOf(CRLFCRLF); // parse the headers to get the content range size
+
+    const headers = parseHeaders(innerText.substr(0, endOfHeaders));
+    const {
+      start,
+      end,
+      total
+    } = parseContentRange(headers['content-range']); // calculate the length of the slice and the next offset
+
+    const startOfData = offset + startBoundary.length + endOfHeaders + CRLFCRLF.length;
+    const length = parseInt(end, 10) + 1 - parseInt(start, 10);
+    out.push({
+      headers,
+      data: responseArrayBuffer.slice(startOfData, startOfData + length),
+      offset: start,
+      length,
+      fileSize: total
+    });
+    offset = startOfData + length + 4;
+  }
+
+  return out;
+}
+},{}],"node_modules/geotiff/dist-module/source/basesource.js":[function(require,module,exports) {
+"use strict";
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+exports.BaseSource = void 0;
+
+/**
+ * @typedef Slice
+ * @property {number} offset
+ * @property {number} length
+ */
+class BaseSource {
+  /**
+   *
+   * @param {Slice[]} slices
+   * @returns {ArrayBuffer[]}
+   */
+  async fetch(slices) {
+    let signal = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : undefined;
+    return Promise.all(slices.map(slice => this.fetchSlice(slice, signal)));
+  }
+  /**
+   *
+   * @param {Slice} slice
+   * @returns {ArrayBuffer}
+   */
+
+
+  async fetchSlice(slice) {
+    throw new Error(`fetching of slice ${slice} not possible, not implemented`);
+  }
+  /**
+   * Returns the filesize if already determined and null otherwise
+   */
+
+
+  get fileSize() {
+    return null;
+  }
+
+  async close() {// no-op by default
+  }
+
+}
+
+exports.BaseSource = BaseSource;
+},{}],"node_modules/quick-lru/index.js":[function(require,module,exports) {
+"use strict";
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+exports.default = void 0;
+
+class QuickLRU extends Map {
+  constructor() {
+    let options = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : {};
+    super();
+
+    if (!(options.maxSize && options.maxSize > 0)) {
+      throw new TypeError('`maxSize` must be a number greater than 0');
+    }
+
+    if (typeof options.maxAge === 'number' && options.maxAge === 0) {
+      throw new TypeError('`maxAge` must be a number greater than 0');
+    } // TODO: Use private class fields when ESLint supports them.
+
+
+    this.maxSize = options.maxSize;
+    this.maxAge = options.maxAge || Number.POSITIVE_INFINITY;
+    this.onEviction = options.onEviction;
+    this.cache = new Map();
+    this.oldCache = new Map();
+    this._size = 0;
+  } // TODO: Use private class methods when targeting Node.js 16.
+
+
+  _emitEvictions(cache) {
+    if (typeof this.onEviction !== 'function') {
+      return;
+    }
+
+    for (const [key, item] of cache) {
+      this.onEviction(key, item.value);
+    }
+  }
+
+  _deleteIfExpired(key, item) {
+    if (typeof item.expiry === 'number' && item.expiry <= Date.now()) {
+      if (typeof this.onEviction === 'function') {
+        this.onEviction(key, item.value);
+      }
+
+      return this.delete(key);
+    }
+
+    return false;
+  }
+
+  _getOrDeleteIfExpired(key, item) {
+    const deleted = this._deleteIfExpired(key, item);
+
+    if (deleted === false) {
+      return item.value;
+    }
+  }
+
+  _getItemValue(key, item) {
+    return item.expiry ? this._getOrDeleteIfExpired(key, item) : item.value;
+  }
+
+  _peek(key, cache) {
+    const item = cache.get(key);
+    return this._getItemValue(key, item);
+  }
+
+  _set(key, value) {
+    this.cache.set(key, value);
+    this._size++;
+
+    if (this._size >= this.maxSize) {
+      this._size = 0;
+
+      this._emitEvictions(this.oldCache);
+
+      this.oldCache = this.cache;
+      this.cache = new Map();
+    }
+  }
+
+  _moveToRecent(key, item) {
+    this.oldCache.delete(key);
+
+    this._set(key, item);
+  }
+
+  *_entriesAscending() {
+    for (const item of this.oldCache) {
+      const [key, value] = item;
+
+      if (!this.cache.has(key)) {
+        const deleted = this._deleteIfExpired(key, value);
+
+        if (deleted === false) {
+          yield item;
+        }
+      }
+    }
+
+    for (const item of this.cache) {
+      const [key, value] = item;
+
+      const deleted = this._deleteIfExpired(key, value);
+
+      if (deleted === false) {
+        yield item;
+      }
+    }
+  }
+
+  get(key) {
+    if (this.cache.has(key)) {
+      const item = this.cache.get(key);
+      return this._getItemValue(key, item);
+    }
+
+    if (this.oldCache.has(key)) {
+      const item = this.oldCache.get(key);
+
+      if (this._deleteIfExpired(key, item) === false) {
+        this._moveToRecent(key, item);
+
+        return item.value;
+      }
+    }
+  }
+
+  set(key, value) {
+    let {
+      maxAge = this.maxAge
+    } = arguments.length > 2 && arguments[2] !== undefined ? arguments[2] : {};
+    const expiry = typeof maxAge === 'number' && maxAge !== Number.POSITIVE_INFINITY ? Date.now() + maxAge : undefined;
+
+    if (this.cache.has(key)) {
+      this.cache.set(key, {
+        value,
+        expiry
+      });
+    } else {
+      this._set(key, {
+        value,
+        expiry
+      });
+    }
+  }
+
+  has(key) {
+    if (this.cache.has(key)) {
+      return !this._deleteIfExpired(key, this.cache.get(key));
+    }
+
+    if (this.oldCache.has(key)) {
+      return !this._deleteIfExpired(key, this.oldCache.get(key));
+    }
+
+    return false;
+  }
+
+  peek(key) {
+    if (this.cache.has(key)) {
+      return this._peek(key, this.cache);
+    }
+
+    if (this.oldCache.has(key)) {
+      return this._peek(key, this.oldCache);
+    }
+  }
+
+  delete(key) {
+    const deleted = this.cache.delete(key);
+
+    if (deleted) {
+      this._size--;
+    }
+
+    return this.oldCache.delete(key) || deleted;
+  }
+
+  clear() {
+    this.cache.clear();
+    this.oldCache.clear();
+    this._size = 0;
+  }
+
+  resize(newSize) {
+    if (!(newSize && newSize > 0)) {
+      throw new TypeError('`maxSize` must be a number greater than 0');
+    }
+
+    const items = [...this._entriesAscending()];
+    const removeCount = items.length - newSize;
+
+    if (removeCount < 0) {
+      this.cache = new Map(items);
+      this.oldCache = new Map();
+      this._size = items.length;
+    } else {
+      if (removeCount > 0) {
+        this._emitEvictions(items.slice(0, removeCount));
+      }
+
+      this.oldCache = new Map(items.slice(removeCount));
+      this.cache = new Map();
+      this._size = 0;
+    }
+
+    this.maxSize = newSize;
+  }
+
+  *keys() {
+    for (const [key] of this) {
+      yield key;
+    }
+  }
+
+  *values() {
+    for (const [, value] of this) {
+      yield value;
+    }
+  }
+
+  *[Symbol.iterator]() {
+    for (const item of this.cache) {
+      const [key, value] = item;
+
+      const deleted = this._deleteIfExpired(key, value);
+
+      if (deleted === false) {
+        yield [key, value.value];
+      }
+    }
+
+    for (const item of this.oldCache) {
+      const [key, value] = item;
+
+      if (!this.cache.has(key)) {
+        const deleted = this._deleteIfExpired(key, value);
+
+        if (deleted === false) {
+          yield [key, value.value];
+        }
+      }
+    }
+  }
+
+  *entriesDescending() {
+    let items = [...this.cache];
+
+    for (let i = items.length - 1; i >= 0; --i) {
+      const item = items[i];
+      const [key, value] = item;
+
+      const deleted = this._deleteIfExpired(key, value);
+
+      if (deleted === false) {
+        yield [key, value.value];
+      }
+    }
+
+    items = [...this.oldCache];
+
+    for (let i = items.length - 1; i >= 0; --i) {
+      const item = items[i];
+      const [key, value] = item;
+
+      if (!this.cache.has(key)) {
+        const deleted = this._deleteIfExpired(key, value);
+
+        if (deleted === false) {
+          yield [key, value.value];
+        }
+      }
+    }
+  }
+
+  *entriesAscending() {
+    for (const [key, value] of this._entriesAscending()) {
+      yield [key, value.value];
+    }
+  }
+
+  get size() {
+    if (!this._size) {
+      return this.oldCache.size;
+    }
+
+    let oldCacheSize = 0;
+
+    for (const key of this.oldCache.keys()) {
+      if (!this.cache.has(key)) {
+        oldCacheSize++;
+      }
+    }
+
+    return Math.min(this._size + oldCacheSize, this.maxSize);
+  }
+
+  entries() {
+    return this.entriesAscending();
+  }
+
+  forEach(callbackFunction) {
+    let thisArgument = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : this;
+
+    for (const [key, value] of this.entriesAscending()) {
+      callbackFunction.call(thisArgument, value, key, this);
+    }
+  }
+
+  get [Symbol.toStringTag]() {
+    return JSON.stringify([...this.entriesAscending()]);
+  }
+
+}
+
+exports.default = QuickLRU;
+},{}],"node_modules/geotiff/dist-module/utils.js":[function(require,module,exports) {
+"use strict";
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+exports.CustomAggregateError = exports.AggregateError = exports.AbortError = void 0;
+exports.assign = assign;
+exports.chunk = chunk;
+exports.endsWith = endsWith;
+exports.forEach = forEach;
+exports.invert = invert;
+exports.parseContentRange = parseContentRange;
+exports.range = range;
+exports.times = times;
+exports.toArray = toArray;
+exports.toArrayRecursively = toArrayRecursively;
+exports.wait = wait;
+exports.zip = zip;
+
+function assign(target, source) {
+  for (const key in source) {
+    if (source.hasOwnProperty(key)) {
+      target[key] = source[key];
+    }
+  }
+}
+
+function chunk(iterable, length) {
+  const results = [];
+  const lengthOfIterable = iterable.length;
+
+  for (let i = 0; i < lengthOfIterable; i += length) {
+    const chunked = [];
+
+    for (let ci = i; ci < i + length; ci++) {
+      chunked.push(iterable[ci]);
+    }
+
+    results.push(chunked);
+  }
+
+  return results;
+}
+
+function endsWith(string, expectedEnding) {
+  if (string.length < expectedEnding.length) {
+    return false;
+  }
+
+  const actualEnding = string.substr(string.length - expectedEnding.length);
+  return actualEnding === expectedEnding;
+}
+
+function forEach(iterable, func) {
+  const {
+    length
+  } = iterable;
+
+  for (let i = 0; i < length; i++) {
+    func(iterable[i], i);
+  }
+}
+
+function invert(oldObj) {
+  const newObj = {};
+
+  for (const key in oldObj) {
+    if (oldObj.hasOwnProperty(key)) {
+      const value = oldObj[key];
+      newObj[value] = key;
+    }
+  }
+
+  return newObj;
+}
+
+function range(n) {
+  const results = [];
+
+  for (let i = 0; i < n; i++) {
+    results.push(i);
+  }
+
+  return results;
+}
+
+function times(numTimes, func) {
+  const results = [];
+
+  for (let i = 0; i < numTimes; i++) {
+    results.push(func(i));
+  }
+
+  return results;
+}
+
+function toArray(iterable) {
+  const results = [];
+  const {
+    length
+  } = iterable;
+
+  for (let i = 0; i < length; i++) {
+    results.push(iterable[i]);
+  }
+
+  return results;
+}
+
+function toArrayRecursively(input) {
+  if (input.length) {
+    return toArray(input).map(toArrayRecursively);
+  }
+
+  return input;
+} // copied from https://github.com/academia-de-codigo/parse-content-range-header/blob/master/index.js
+
+
+function parseContentRange(headerValue) {
+  if (!headerValue) {
+    return null;
+  }
+
+  if (typeof headerValue !== 'string') {
+    throw new Error('invalid argument');
+  }
+
+  const parseInt = number => Number.parseInt(number, 10); // Check for presence of unit
+
+
+  let matches = headerValue.match(/^(\w*) /);
+  const unit = matches && matches[1]; // check for start-end/size header format
+
+  matches = headerValue.match(/(\d+)-(\d+)\/(\d+|\*)/);
+
+  if (matches) {
+    return {
+      unit,
+      first: parseInt(matches[1]),
+      last: parseInt(matches[2]),
+      length: matches[3] === '*' ? null : parseInt(matches[3])
+    };
+  } // check for size header format
+
+
+  matches = headerValue.match(/(\d+|\*)/);
+
+  if (matches) {
+    return {
+      unit,
+      first: null,
+      last: null,
+      length: matches[1] === '*' ? null : parseInt(matches[1])
+    };
+  }
+
+  return null;
+}
+/*
+ * Promisified wrapper around 'setTimeout' to allow 'await'
+ */
+
+
+async function wait(milliseconds) {
+  return new Promise(resolve => setTimeout(resolve, milliseconds));
+}
+
+function zip(a, b) {
+  const A = Array.isArray(a) ? a : Array.from(a);
+  const B = Array.isArray(b) ? b : Array.from(b);
+  return A.map((k, i) => [k, B[i]]);
+} // Based on https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Error
+
+
+class AbortError extends Error {
+  constructor(params) {
+    // Pass remaining arguments (including vendor specific ones) to parent constructor
+    super(params); // Maintains proper stack trace for where our error was thrown (only available on V8)
+
+    if (Error.captureStackTrace) {
+      Error.captureStackTrace(this, AbortError);
+    }
+
+    this.name = 'AbortError';
+  }
+
+}
+
+exports.AbortError = AbortError;
+
+class CustomAggregateError extends Error {
+  constructor(errors, message) {
+    super(message);
+    this.errors = errors;
+    this.message = message;
+    this.name = 'AggregateError';
+  }
+
+}
+
+exports.CustomAggregateError = CustomAggregateError;
+const AggregateError = CustomAggregateError;
+exports.AggregateError = AggregateError;
+},{}],"node_modules/geotiff/dist-module/source/blockedsource.js":[function(require,module,exports) {
+"use strict";
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+exports.BlockedSource = void 0;
+
+var _quickLru = _interopRequireDefault(require("quick-lru"));
+
+var _basesource = require("./basesource.js");
+
+var _utils = require("../utils.js");
+
+function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
+
+class Block {
+  /**
+   *
+   * @param {number} offset
+   * @param {number} length
+   * @param {ArrayBuffer} [data]
+   */
+  constructor(offset, length) {
+    let data = arguments.length > 2 && arguments[2] !== undefined ? arguments[2] : null;
+    this.offset = offset;
+    this.length = length;
+    this.data = data;
+  }
+  /**
+   * @returns {number} the top byte border
+   */
+
+
+  get top() {
+    return this.offset + this.length;
+  }
+
+}
+
+class BlockGroup {
+  /**
+   *
+   * @param {number} offset
+   * @param {number} length
+   * @param {number[]} blockIds
+   */
+  constructor(offset, length, blockIds) {
+    this.offset = offset;
+    this.length = length;
+    this.blockIds = blockIds;
+  }
+
+}
+
+class BlockedSource extends _basesource.BaseSource {
+  /**
+   *
+   * @param {Source} source The underlying source that shall be blocked and cached
+   * @param {object} options
+   */
+  constructor(source) {
+    let {
+      blockSize = 65536,
+      cacheSize = 100
+    } = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : {};
+    super();
+    this.source = source;
+    this.blockSize = blockSize;
+    this.blockCache = new _quickLru.default({
+      maxSize: cacheSize
+    }); // mapping blockId -> Block instance
+
+    this.blockRequests = new Map(); // set of blockIds missing for the current requests
+
+    this.blockIdsToFetch = new Set();
+    this.abortedBlockIds = new Set();
+  }
+
+  get fileSize() {
+    return this.source.fileSize;
+  }
+  /**
+   *
+   * @param {basesource/Slice[]} slices
+   */
+
+
+  async fetch(slices, signal) {
+    const blockRequests = [];
+    const missingBlockIds = [];
+    const allBlockIds = [];
+
+    for (const {
+      offset,
+      length
+    } of slices) {
+      let top = offset + length;
+      const {
+        fileSize
+      } = this;
+
+      if (fileSize !== null) {
+        top = Math.min(top, fileSize);
+      }
+
+      const firstBlockOffset = Math.floor(offset / this.blockSize) * this.blockSize;
+
+      for (let current = firstBlockOffset; current < top; current += this.blockSize) {
+        const blockId = Math.floor(current / this.blockSize);
+
+        if (!this.blockCache.has(blockId) && !this.blockRequests.has(blockId)) {
+          this.blockIdsToFetch.add(blockId);
+          missingBlockIds.push(blockId);
+        }
+
+        if (this.blockRequests.has(blockId)) {
+          blockRequests.push(this.blockRequests.get(blockId));
+        }
+
+        allBlockIds.push(blockId);
+      }
+    } // allow additional block requests to accumulate
+
+
+    await (0, _utils.wait)();
+    this.fetchBlocks(signal); // Gather all of the new requests that this fetch call is contributing to `fetch`.
+
+    const missingRequests = [];
+
+    for (const blockId of missingBlockIds) {
+      // The requested missing block could already be in the cache
+      // instead of having its request still be outstanding.
+      if (this.blockRequests.has(blockId)) {
+        missingRequests.push(this.blockRequests.get(blockId));
+      }
+    } // Actually await all pending requests that are needed for this `fetch`.
+
+
+    await Promise.allSettled(blockRequests);
+    await Promise.allSettled(missingRequests); // Perform retries if a block was interrupted by a previous signal
+
+    const abortedBlockRequests = [];
+    const abortedBlockIds = allBlockIds.filter(id => this.abortedBlockIds.has(id) || !this.blockCache.has(id));
+    abortedBlockIds.forEach(id => this.blockIdsToFetch.add(id)); // start the retry of some blocks if required
+
+    if (abortedBlockIds.length > 0 && signal && !signal.aborted) {
+      this.fetchBlocks(null);
+
+      for (const blockId of abortedBlockIds) {
+        const block = this.blockRequests.get(blockId);
+
+        if (!block) {
+          throw new Error(`Block ${blockId} is not in the block requests`);
+        }
+
+        abortedBlockRequests.push(block);
+      }
+
+      await Promise.allSettled(abortedBlockRequests);
+    } // throw an  abort error
+
+
+    if (signal && signal.aborted) {
+      throw new _utils.AbortError('Request was aborted');
+    }
+
+    const blocks = allBlockIds.map(id => this.blockCache.get(id));
+    const failedBlocks = blocks.filter(i => !i);
+
+    if (failedBlocks.length) {
+      throw new _utils.AggregateError(failedBlocks, 'Request failed');
+    } // create a final Map, with all required blocks for this request to satisfy
+
+
+    const requiredBlocks = new Map((0, _utils.zip)(allBlockIds, blocks)); // TODO: satisfy each slice
+
+    return this.readSliceData(slices, requiredBlocks);
+  }
+  /**
+   *
+   * @param {AbortSignal} signal
+   */
+
+
+  fetchBlocks(signal) {
+    // check if we still need to
+    if (this.blockIdsToFetch.size > 0) {
+      const groups = this.groupBlocks(this.blockIdsToFetch); // start requesting slices of data
+
+      const groupRequests = this.source.fetch(groups, signal);
+
+      for (let groupIndex = 0; groupIndex < groups.length; ++groupIndex) {
+        const group = groups[groupIndex];
+
+        for (const blockId of group.blockIds) {
+          // make an async IIFE for each block
+          this.blockRequests.set(blockId, (async () => {
+            try {
+              const response = (await groupRequests)[groupIndex];
+              const blockOffset = blockId * this.blockSize;
+              const o = blockOffset - response.offset;
+              const t = Math.min(o + this.blockSize, response.data.byteLength);
+              const data = response.data.slice(o, t);
+              const block = new Block(blockOffset, data.byteLength, data, blockId);
+              this.blockCache.set(blockId, block);
+              this.abortedBlockIds.delete(blockId);
+            } catch (err) {
+              if (err.name === 'AbortError') {
+                // store the signal here, we need it to determine later if an
+                // error was caused by this signal
+                err.signal = signal;
+                this.blockCache.delete(blockId);
+                this.abortedBlockIds.add(blockId);
+              } else {
+                throw err;
+              }
+            } finally {
+              this.blockRequests.delete(blockId);
+            }
+          })());
+        }
+      }
+
+      this.blockIdsToFetch.clear();
+    }
+  }
+  /**
+   *
+   * @param {Set} blockIds
+   * @returns {BlockGroup[]}
+   */
+
+
+  groupBlocks(blockIds) {
+    const sortedBlockIds = Array.from(blockIds).sort((a, b) => a - b);
+
+    if (sortedBlockIds.length === 0) {
+      return [];
+    }
+
+    let current = [];
+    let lastBlockId = null;
+    const groups = [];
+
+    for (const blockId of sortedBlockIds) {
+      if (lastBlockId === null || lastBlockId + 1 === blockId) {
+        current.push(blockId);
+        lastBlockId = blockId;
+      } else {
+        groups.push(new BlockGroup(current[0] * this.blockSize, current.length * this.blockSize, current));
+        current = [blockId];
+        lastBlockId = blockId;
+      }
+    }
+
+    groups.push(new BlockGroup(current[0] * this.blockSize, current.length * this.blockSize, current));
+    return groups;
+  }
+  /**
+   *
+   * @param {Slice[]} slices
+   * @param {Map} blocks
+   */
+
+
+  readSliceData(slices, blocks) {
+    return slices.map(slice => {
+      let top = slice.offset + slice.length;
+
+      if (this.fileSize !== null) {
+        top = Math.min(this.fileSize, top);
+      }
+
+      const blockIdLow = Math.floor(slice.offset / this.blockSize);
+      const blockIdHigh = Math.floor(top / this.blockSize);
+      const sliceData = new ArrayBuffer(slice.length);
+      const sliceView = new Uint8Array(sliceData);
+
+      for (let blockId = blockIdLow; blockId <= blockIdHigh; ++blockId) {
+        const block = blocks.get(blockId);
+        const delta = block.offset - slice.offset;
+        const topDelta = block.top - top;
+        let blockInnerOffset = 0;
+        let rangeInnerOffset = 0;
+        let usedBlockLength;
+
+        if (delta < 0) {
+          blockInnerOffset = -delta;
+        } else if (delta > 0) {
+          rangeInnerOffset = delta;
+        }
+
+        if (topDelta < 0) {
+          usedBlockLength = block.length - blockInnerOffset;
+        } else {
+          usedBlockLength = top - block.offset - blockInnerOffset;
+        }
+
+        const blockView = new Uint8Array(block.data, blockInnerOffset, usedBlockLength);
+        sliceView.set(blockView, rangeInnerOffset);
+      }
+
+      return sliceData;
+    });
+  }
+
+}
+
+exports.BlockedSource = BlockedSource;
+},{"quick-lru":"node_modules/quick-lru/index.js","./basesource.js":"node_modules/geotiff/dist-module/source/basesource.js","../utils.js":"node_modules/geotiff/dist-module/utils.js"}],"node_modules/geotiff/dist-module/source/client/base.js":[function(require,module,exports) {
+"use strict";
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+exports.BaseResponse = exports.BaseClient = void 0;
+
+class BaseResponse {
+  /**
+   * Returns whether the response has an ok'ish status code
+   */
+  get ok() {
+    return this.status >= 200 && this.status <= 299;
+  }
+  /**
+   * Returns the status code of the response
+   */
+
+
+  get status() {
+    throw new Error('not implemented');
+  }
+  /**
+   * Returns the value of the specified header
+   * @param {string} headerName the header name
+   * @returns {string} the header value
+   */
+
+
+  getHeader(headerName) {
+    // eslint-disable-line no-unused-vars
+    throw new Error('not implemented');
+  }
+  /**
+   * @returns {ArrayBuffer} the response data of the request
+   */
+
+
+  async getData() {
+    throw new Error('not implemented');
+  }
+
+}
+
+exports.BaseResponse = BaseResponse;
+
+class BaseClient {
+  constructor(url) {
+    this.url = url;
+  }
+  /**
+   * Send a request with the options
+   * @param {object} [options]
+   */
+
+
+  async request() {
+    let {
+      headers,
+      credentials,
+      signal
+    } = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : {};
+    // eslint-disable-line no-unused-vars
+    throw new Error('request is not implemented');
+  }
+
+}
+
+exports.BaseClient = BaseClient;
+},{}],"node_modules/geotiff/dist-module/source/client/fetch.js":[function(require,module,exports) {
+"use strict";
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+exports.FetchClient = void 0;
+
+var _base = require("./base.js");
+
+class FetchResponse extends _base.BaseResponse {
+  /**
+   * BaseResponse facade for fetch API Response
+   * @param {Response} response
+   */
+  constructor(response) {
+    super();
+    this.response = response;
+  }
+
+  get status() {
+    return this.response.status;
+  }
+
+  getHeader(name) {
+    return this.response.headers.get(name);
+  }
+
+  async getData() {
+    const data = this.response.arrayBuffer ? await this.response.arrayBuffer() : (await this.response.buffer()).buffer;
+    return data;
+  }
+
+}
+
+class FetchClient extends _base.BaseClient {
+  constructor(url, credentials) {
+    super(url);
+    this.credentials = credentials;
+  }
+
+  async request() {
+    let {
+      headers,
+      credentials,
+      signal
+    } = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : {};
+    const response = await fetch(this.url, {
+      headers,
+      credentials,
+      signal
+    });
+    return new FetchResponse(response);
+  }
+
+}
+
+exports.FetchClient = FetchClient;
+},{"./base.js":"node_modules/geotiff/dist-module/source/client/base.js"}],"node_modules/geotiff/dist-module/source/client/xhr.js":[function(require,module,exports) {
+"use strict";
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+exports.XHRClient = void 0;
+
+var _base = require("./base.js");
+
+var _utils = require("../../utils.js");
+
+class XHRResponse extends _base.BaseResponse {
+  /**
+   * BaseResponse facade for XMLHttpRequest
+   * @param {XMLHttpRequest} xhr
+   * @param {ArrayBuffer} data
+   */
+  constructor(xhr, data) {
+    super();
+    this.xhr = xhr;
+    this.data = data;
+  }
+
+  get status() {
+    return this.xhr.status;
+  }
+
+  getHeader(name) {
+    return this.xhr.getResponseHeader(name);
+  }
+
+  async getData() {
+    return this.data;
+  }
+
+}
+
+class XHRClient extends _base.BaseClient {
+  constructRequest(headers, signal) {
+    return new Promise((resolve, reject) => {
+      const xhr = new XMLHttpRequest();
+      xhr.open('GET', this.url);
+      xhr.responseType = 'arraybuffer';
+
+      for (const [key, value] of Object.entries(headers)) {
+        xhr.setRequestHeader(key, value);
+      } // hook signals
+
+
+      xhr.onload = () => {
+        const data = xhr.response;
+        resolve(new XHRResponse(xhr, data));
+      };
+
+      xhr.onerror = reject;
+
+      xhr.onabort = () => reject(new _utils.AbortError('Request aborted'));
+
+      xhr.send();
+
+      if (signal) {
+        if (signal.aborted) {
+          xhr.abort();
+        }
+
+        signal.addEventListener('abort', () => xhr.abort());
+      }
+    });
+  }
+
+  async request() {
+    let {
+      headers,
+      signal
+    } = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : {};
+    const response = await this.constructRequest(headers, signal);
+    return response;
+  }
+
+}
+
+exports.XHRClient = XHRClient;
+},{"./base.js":"node_modules/geotiff/dist-module/source/client/base.js","../../utils.js":"node_modules/geotiff/dist-module/utils.js"}],"node_modules/parcel-bundler/src/builtins/_empty.js":[function(require,module,exports) {
+
+},{}],"node_modules/geotiff/dist-module/source/client/http.js":[function(require,module,exports) {
+var Buffer = require("buffer").Buffer;
+"use strict";
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+exports.HttpClient = void 0;
+
+var _http = _interopRequireDefault(require("http"));
+
+var _https = _interopRequireDefault(require("https"));
+
+var _url = _interopRequireDefault(require("url"));
+
+var _base = require("./base.js");
+
+var _utils = require("../../utils.js");
+
+function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
+
+class HttpResponse extends _base.BaseResponse {
+  /**
+   * BaseResponse facade for node HTTP/HTTPS API Response
+   * @param {http.ServerResponse} response
+   */
+  constructor(response, dataPromise) {
+    super();
+    this.response = response;
+    this.dataPromise = dataPromise;
+  }
+
+  get status() {
+    return this.response.statusCode;
+  }
+
+  getHeader(name) {
+    return this.response.headers[name];
+  }
+
+  async getData() {
+    const data = await this.dataPromise;
+    return data;
+  }
+
+}
+
+class HttpClient extends _base.BaseClient {
+  constructor(url) {
+    super(url);
+    this.parsedUrl = _url.default.parse(this.url);
+    this.httpApi = this.parsedUrl.protocol === 'http:' ? _http.default : _https.default;
+  }
+
+  constructRequest(headers, signal) {
+    return new Promise((resolve, reject) => {
+      const request = this.httpApi.get({ ...this.parsedUrl,
+        headers
+      }, response => {
+        const dataPromise = new Promise(resolveData => {
+          const chunks = []; // collect chunks
+
+          response.on('data', chunk => {
+            chunks.push(chunk);
+          }); // concatenate all chunks and resolve the promise with the resulting buffer
+
+          response.on('end', () => {
+            const data = Buffer.concat(chunks).buffer;
+            resolveData(data);
+          });
+          response.on('error', reject);
+        });
+        resolve(new HttpResponse(response, dataPromise));
+      });
+      request.on('error', reject);
+
+      if (signal) {
+        if (signal.aborted) {
+          request.destroy(new _utils.AbortError('Request aborted'));
+        }
+
+        signal.addEventListener('abort', () => request.destroy(new _utils.AbortError('Request aborted')));
+      }
+    });
+  }
+
+  async request() {
+    let {
+      headers,
+      signal
+    } = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : {};
+    const response = await this.constructRequest(headers, signal);
+    return response;
+  }
+
+}
+
+exports.HttpClient = HttpClient;
+},{"http":"node_modules/parcel-bundler/src/builtins/_empty.js","https":"node_modules/parcel-bundler/src/builtins/_empty.js","url":"node_modules/parcel-bundler/src/builtins/_empty.js","./base.js":"node_modules/geotiff/dist-module/source/client/base.js","../../utils.js":"node_modules/geotiff/dist-module/utils.js","buffer":"node_modules/buffer/index.js"}],"node_modules/geotiff/dist-module/source/remote.js":[function(require,module,exports) {
+"use strict";
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+exports.makeFetchSource = makeFetchSource;
+exports.makeHttpSource = makeHttpSource;
+exports.makeRemoteSource = makeRemoteSource;
+exports.makeXHRSource = makeXHRSource;
+
+var _httputils = require("./httputils.js");
+
+var _basesource = require("./basesource.js");
+
+var _blockedsource = require("./blockedsource.js");
+
+var _fetch = require("./client/fetch.js");
+
+var _xhr = require("./client/xhr.js");
+
+var _http = require("./client/http.js");
+
+class RemoteSource extends _basesource.BaseSource {
+  /**
+   *
+   * @param {BaseClient} client
+   * @param {object} headers
+   * @param {numbers} maxRanges
+   * @param {boolean} allowFullFile
+   */
+  constructor(client, headers, maxRanges, allowFullFile) {
+    super();
+    this.client = client;
+    this.headers = headers;
+    this.maxRanges = maxRanges;
+    this.allowFullFile = allowFullFile;
+    this._fileSize = null;
+  }
+  /**
+   *
+   * @param {Slice[]} slices
+   */
+
+
+  async fetch(slices, signal) {
+    // if we allow multi-ranges, split the incoming request into that many sub-requests
+    // and join them afterwards
+    if (this.maxRanges >= slices.length) {
+      return this.fetchSlices(slices, signal);
+    } else if (this.maxRanges > 0 && slices.length > 1) {// TODO: split into multiple multi-range requests
+      // const subSlicesRequests = [];
+      // for (let i = 0; i < slices.length; i += this.maxRanges) {
+      //   subSlicesRequests.push(
+      //     this.fetchSlices(slices.slice(i, i + this.maxRanges), signal),
+      //   );
+      // }
+      // return (await Promise.all(subSlicesRequests)).flat();
+    } // otherwise make a single request for each slice
+
+
+    return Promise.all(slices.map(slice => this.fetchSlice(slice, signal)));
+  }
+
+  async fetchSlices(slices, signal) {
+    const response = await this.client.request({
+      headers: { ...this.headers,
+        Range: `bytes=${slices.map(_ref => {
+          let {
+            offset,
+            length
+          } = _ref;
+          return `${offset}-${offset + length}`;
+        }).join(',')}`
+      },
+      signal
+    });
+
+    if (!response.ok) {
+      throw new Error('Error fetching data.');
+    } else if (response.status === 206) {
+      const {
+        type,
+        params
+      } = (0, _httputils.parseContentType)(response.getHeader('content-type'));
+
+      if (type === 'multipart/byteranges') {
+        const byteRanges = (0, _httputils.parseByteRanges)(await response.getData(), params.boundary);
+        this._fileSize = byteRanges[0].fileSize || null;
+        return byteRanges;
+      }
+
+      const data = await response.getData();
+      const {
+        start,
+        end,
+        total
+      } = (0, _httputils.parseContentRange)(response.getHeader('content-range'));
+      this._fileSize = total || null;
+      const first = [{
+        data,
+        offset: start,
+        length: end - start
+      }];
+
+      if (slices.length > 1) {
+        // we requested more than one slice, but got only the first
+        // unfortunately, some HTTP Servers don't support multi-ranges
+        // and return onyl the first
+        // get the rest of the slices and fetch them iteratetively
+        const others = await Promise.all(slices.slice(1).map(slice => this.fetchSlice(slice, signal)));
+        return first.concat(others);
+      }
+
+      return first;
+    } else {
+      if (!this.allowFullFile) {
+        throw new Error('Server responded with full file');
+      }
+
+      const data = await response.getData();
+      this._fileSize = data.byteLength;
+      return [{
+        data,
+        offset: 0,
+        length: data.byteLength
+      }];
+    }
+  }
+
+  async fetchSlice(slice, signal) {
+    const {
+      offset,
+      length
+    } = slice;
+    const response = await this.client.request({
+      headers: { ...this.headers,
+        Range: `bytes=${offset}-${offset + length}`
+      },
+      signal
+    }); // check the response was okay and if the server actually understands range requests
+
+    if (!response.ok) {
+      throw new Error('Error fetching data.');
+    } else if (response.status === 206) {
+      const data = await response.getData();
+      const {
+        total
+      } = (0, _httputils.parseContentRange)(response.getHeader('content-range'));
+      this._fileSize = total || null;
+      return {
+        data,
+        offset,
+        length
+      };
+    } else {
+      if (!this.allowFullFile) {
+        throw new Error('Server responded with full file');
+      }
+
+      const data = await response.getData();
+      this._fileSize = data.byteLength;
+      return {
+        data,
+        offset: 0,
+        length: data.byteLength
+      };
+    }
+  }
+
+  get fileSize() {
+    return this._fileSize;
+  }
+
+}
+
+function maybeWrapInBlockedSource(source, _ref2) {
+  let {
+    blockSize,
+    cacheSize
+  } = _ref2;
+
+  if (blockSize === null) {
+    return source;
+  }
+
+  return new _blockedsource.BlockedSource(source, {
+    blockSize,
+    cacheSize
+  });
+}
+
+function makeFetchSource(url) {
+  let {
+    headers = {},
+    credentials,
+    maxRanges = 0,
+    allowFullFile = false,
+    ...blockOptions
+  } = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : {};
+  const client = new _fetch.FetchClient(url, credentials);
+  const source = new RemoteSource(client, headers, maxRanges, allowFullFile);
+  return maybeWrapInBlockedSource(source, blockOptions);
+}
+
+function makeXHRSource(url) {
+  let {
+    headers = {},
+    maxRanges = 0,
+    allowFullFile = false,
+    ...blockOptions
+  } = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : {};
+  const client = new _xhr.XHRClient(url);
+  const source = new RemoteSource(client, headers, maxRanges, allowFullFile);
+  return maybeWrapInBlockedSource(source, blockOptions);
+}
+
+function makeHttpSource(url) {
+  let {
+    headers = {},
+    maxRanges = 0,
+    allowFullFile = false,
+    ...blockOptions
+  } = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : {};
+  const client = new _http.HttpClient(url);
+  const source = new RemoteSource(client, headers, maxRanges, allowFullFile);
+  return maybeWrapInBlockedSource(source, blockOptions);
+}
+/**
+ *
+ * @param {string} url
+ * @param {object} options
+ */
+
+
+function makeRemoteSource(url) {
+  let {
+    forceXHR = false,
+    ...clientOptions
+  } = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : {};
+
+  if (typeof fetch === 'function' && !forceXHR) {
+    return makeFetchSource(url, clientOptions);
+  }
+
+  if (typeof XMLHttpRequest !== 'undefined') {
+    return makeXHRSource(url, clientOptions);
+  }
+
+  return makeHttpSource(url, clientOptions);
+}
+},{"./httputils.js":"node_modules/geotiff/dist-module/source/httputils.js","./basesource.js":"node_modules/geotiff/dist-module/source/basesource.js","./blockedsource.js":"node_modules/geotiff/dist-module/source/blockedsource.js","./client/fetch.js":"node_modules/geotiff/dist-module/source/client/fetch.js","./client/xhr.js":"node_modules/geotiff/dist-module/source/client/xhr.js","./client/http.js":"node_modules/geotiff/dist-module/source/client/http.js"}],"node_modules/geotiff/dist-module/source/arraybuffer.js":[function(require,module,exports) {
+"use strict";
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+exports.makeBufferSource = makeBufferSource;
+
+var _basesource = require("./basesource.js");
+
+var _utils = require("../utils.js");
+
+class ArrayBufferSource extends _basesource.BaseSource {
+  constructor(arrayBuffer) {
+    super();
+    this.arrayBuffer = arrayBuffer;
+  }
+
+  fetchSlice(slice, signal) {
+    if (signal && signal.aborted) {
+      throw new _utils.AbortError('Request aborted');
+    }
+
+    return this.arrayBuffer.slice(slice.offset, slice.offset + slice.length);
+  }
+
+}
+
+function makeBufferSource(arrayBuffer) {
+  return new ArrayBufferSource(arrayBuffer);
+}
+},{"./basesource.js":"node_modules/geotiff/dist-module/source/basesource.js","../utils.js":"node_modules/geotiff/dist-module/utils.js"}],"node_modules/geotiff/dist-module/source/filereader.js":[function(require,module,exports) {
+"use strict";
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+exports.makeFileReaderSource = makeFileReaderSource;
+
+var _basesource = require("./basesource.js");
+
+class FileReaderSource extends _basesource.BaseSource {
+  constructor(file) {
+    super();
+    this.file = file;
+  }
+
+  async fetchSlice(slice, signal) {
+    return new Promise((resolve, reject) => {
+      const blob = this.file.slice(slice.offset, slice.offset + slice.length);
+      const reader = new FileReader();
+
+      reader.onload = event => resolve(event.target.result);
+
+      reader.onerror = reject;
+      reader.onabort = reject;
+      reader.readAsArrayBuffer(blob);
+
+      if (signal) {
+        signal.addEventListener('abort', () => reader.abort());
+      }
+    });
+  }
+
+}
+/**
+ * Create a new source from a given file/blob.
+ * @param {Blob} file The file or blob to read from.
+ * @returns The constructed source
+ */
+
+
+function makeFileReaderSource(file) {
+  return new FileReaderSource(file);
+}
+},{"./basesource.js":"node_modules/geotiff/dist-module/source/basesource.js"}],"node_modules/geotiff/dist-module/source/file.js":[function(require,module,exports) {
+var Buffer = require("buffer").Buffer;
+"use strict";
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+exports.makeFileSource = makeFileSource;
+
+var _fs = _interopRequireDefault(require("fs"));
+
+var _basesource = require("./basesource.js");
+
+function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
+
+function closeAsync(fd) {
+  return new Promise((resolve, reject) => {
+    _fs.default.close(fd, err => {
+      if (err) {
+        reject(err);
+      } else {
+        resolve();
+      }
+    });
+  });
+}
+
+function openAsync(path, flags) {
+  let mode = arguments.length > 2 && arguments[2] !== undefined ? arguments[2] : undefined;
+  return new Promise((resolve, reject) => {
+    _fs.default.open(path, flags, mode, (err, fd) => {
+      if (err) {
+        reject(err);
+      } else {
+        resolve(fd);
+      }
+    });
+  });
+}
+
+function readAsync() {
+  for (var _len = arguments.length, args = new Array(_len), _key = 0; _key < _len; _key++) {
+    args[_key] = arguments[_key];
+  }
+
+  return new Promise((resolve, reject) => {
+    _fs.default.read(...args, (err, bytesRead, buffer) => {
+      if (err) {
+        reject(err);
+      } else {
+        resolve({
+          bytesRead,
+          buffer
+        });
+      }
+    });
+  });
+}
+
+class FileSource extends _basesource.BaseSource {
+  constructor(path) {
+    super();
+    this.path = path;
+    this.openRequest = openAsync(path, 'r');
+  }
+
+  async fetchSlice(slice) {
+    // TODO: use `signal`
+    const fd = await this.openRequest;
+    const {
+      buffer
+    } = await readAsync(fd, Buffer.alloc(slice.length), 0, slice.length, slice.offset);
+    return buffer.buffer;
+  }
+
+  async close() {
+    const fd = await this.openRequest;
+    await closeAsync(fd);
+  }
+
+}
+
+function makeFileSource(path) {
+  return new FileSource(path);
+}
+},{"fs":"node_modules/parcel-bundler/src/builtins/_empty.js","./basesource.js":"node_modules/geotiff/dist-module/source/basesource.js","buffer":"node_modules/buffer/index.js"}],"node_modules/geotiff/dist-module/geotiffwriter.js":[function(require,module,exports) {
+"use strict";
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+exports.writeGeotiff = writeGeotiff;
+
+var _globals = require("./globals.js");
+
+var _utils = require("./utils.js");
+
+/*
+  Some parts of this file are based on UTIF.js,
+  which was released under the MIT License.
+  You can view that here:
+  https://github.com/photopea/UTIF.js/blob/master/LICENSE
+*/
+const tagName2Code = (0, _utils.invert)(_globals.fieldTagNames);
+const geoKeyName2Code = (0, _utils.invert)(_globals.geoKeyNames);
+const name2code = {};
+(0, _utils.assign)(name2code, tagName2Code);
+(0, _utils.assign)(name2code, geoKeyName2Code);
+const typeName2byte = (0, _utils.invert)(_globals.fieldTypeNames); // config variables
+
+const numBytesInIfd = 1000;
+const _binBE = {
+  nextZero: (data, o) => {
+    let oincr = o;
+
+    while (data[oincr] !== 0) {
+      oincr++;
+    }
+
+    return oincr;
+  },
+  readUshort: (buff, p) => {
+    return buff[p] << 8 | buff[p + 1];
+  },
+  readShort: (buff, p) => {
+    const a = _binBE.ui8;
+    a[0] = buff[p + 1];
+    a[1] = buff[p + 0];
+    return _binBE.i16[0];
+  },
+  readInt: (buff, p) => {
+    const a = _binBE.ui8;
+    a[0] = buff[p + 3];
+    a[1] = buff[p + 2];
+    a[2] = buff[p + 1];
+    a[3] = buff[p + 0];
+    return _binBE.i32[0];
+  },
+  readUint: (buff, p) => {
+    const a = _binBE.ui8;
+    a[0] = buff[p + 3];
+    a[1] = buff[p + 2];
+    a[2] = buff[p + 1];
+    a[3] = buff[p + 0];
+    return _binBE.ui32[0];
+  },
+  readASCII: (buff, p, l) => {
+    return l.map(i => String.fromCharCode(buff[p + i])).join('');
+  },
+  readFloat: (buff, p) => {
+    const a = _binBE.ui8;
+    (0, _utils.times)(4, i => {
+      a[i] = buff[p + 3 - i];
+    });
+    return _binBE.fl32[0];
+  },
+  readDouble: (buff, p) => {
+    const a = _binBE.ui8;
+    (0, _utils.times)(8, i => {
+      a[i] = buff[p + 7 - i];
+    });
+    return _binBE.fl64[0];
+  },
+  writeUshort: (buff, p, n) => {
+    buff[p] = n >> 8 & 255;
+    buff[p + 1] = n & 255;
+  },
+  writeUint: (buff, p, n) => {
+    buff[p] = n >> 24 & 255;
+    buff[p + 1] = n >> 16 & 255;
+    buff[p + 2] = n >> 8 & 255;
+    buff[p + 3] = n >> 0 & 255;
+  },
+  writeASCII: (buff, p, s) => {
+    (0, _utils.times)(s.length, i => {
+      buff[p + i] = s.charCodeAt(i);
+    });
+  },
+  ui8: new Uint8Array(8)
+};
+_binBE.fl64 = new Float64Array(_binBE.ui8.buffer);
+
+_binBE.writeDouble = (buff, p, n) => {
+  _binBE.fl64[0] = n;
+  (0, _utils.times)(8, i => {
+    buff[p + i] = _binBE.ui8[7 - i];
+  });
+};
+
+const _writeIFD = (bin, data, _offset, ifd) => {
+  let offset = _offset;
+  const keys = Object.keys(ifd).filter(key => {
+    return key !== undefined && key !== null && key !== 'undefined';
+  });
+  bin.writeUshort(data, offset, keys.length);
+  offset += 2;
+  let eoff = offset + 12 * keys.length + 4;
+
+  for (const key of keys) {
+    let tag = null;
+
+    if (typeof key === 'number') {
+      tag = key;
+    } else if (typeof key === 'string') {
+      tag = parseInt(key, 10);
+    }
+
+    const typeName = _globals.fieldTagTypes[tag];
+    const typeNum = typeName2byte[typeName];
+
+    if (typeName == null || typeName === undefined || typeof typeName === 'undefined') {
+      throw new Error(`unknown type of tag: ${tag}`);
+    }
+
+    let val = ifd[key];
+
+    if (val === undefined) {
+      throw new Error(`failed to get value for key ${key}`);
+    } // ASCIIZ format with trailing 0 character
+    // http://www.fileformat.info/format/tiff/corion.htm
+    // https://stackoverflow.com/questions/7783044/whats-the-difference-between-asciiz-vs-ascii
+
+
+    if (typeName === 'ASCII' && typeof val === 'string' && (0, _utils.endsWith)(val, '\u0000') === false) {
+      val += '\u0000';
+    }
+
+    const num = val.length;
+    bin.writeUshort(data, offset, tag);
+    offset += 2;
+    bin.writeUshort(data, offset, typeNum);
+    offset += 2;
+    bin.writeUint(data, offset, num);
+    offset += 4;
+    let dlen = [-1, 1, 1, 2, 4, 8, 0, 0, 0, 0, 0, 0, 8][typeNum] * num;
+    let toff = offset;
+
+    if (dlen > 4) {
+      bin.writeUint(data, offset, eoff);
+      toff = eoff;
+    }
+
+    if (typeName === 'ASCII') {
+      bin.writeASCII(data, toff, val);
+    } else if (typeName === 'SHORT') {
+      (0, _utils.times)(num, i => {
+        bin.writeUshort(data, toff + 2 * i, val[i]);
+      });
+    } else if (typeName === 'LONG') {
+      (0, _utils.times)(num, i => {
+        bin.writeUint(data, toff + 4 * i, val[i]);
+      });
+    } else if (typeName === 'RATIONAL') {
+      (0, _utils.times)(num, i => {
+        bin.writeUint(data, toff + 8 * i, Math.round(val[i] * 10000));
+        bin.writeUint(data, toff + 8 * i + 4, 10000);
+      });
+    } else if (typeName === 'DOUBLE') {
+      (0, _utils.times)(num, i => {
+        bin.writeDouble(data, toff + 8 * i, val[i]);
+      });
+    }
+
+    if (dlen > 4) {
+      dlen += dlen & 1;
+      eoff += dlen;
+    }
+
+    offset += 4;
+  }
+
+  return [offset, eoff];
+};
+
+const encodeIfds = ifds => {
+  const data = new Uint8Array(numBytesInIfd);
+  let offset = 4;
+  const bin = _binBE; // set big-endian byte-order
+  // https://en.wikipedia.org/wiki/TIFF#Byte_order
+
+  data[0] = 77;
+  data[1] = 77; // set format-version number
+  // https://en.wikipedia.org/wiki/TIFF#Byte_order
+
+  data[3] = 42;
+  let ifdo = 8;
+  bin.writeUint(data, offset, ifdo);
+  offset += 4;
+  ifds.forEach((ifd, i) => {
+    const noffs = _writeIFD(bin, data, ifdo, ifd);
+
+    ifdo = noffs[1];
+
+    if (i < ifds.length - 1) {
+      bin.writeUint(data, noffs[0], ifdo);
+    }
+  });
+
+  if (data.slice) {
+    return data.slice(0, ifdo).buffer;
+  } // node hasn't implemented slice on Uint8Array yet
+
+
+  const result = new Uint8Array(ifdo);
+
+  for (let i = 0; i < ifdo; i++) {
+    result[i] = data[i];
+  }
+
+  return result.buffer;
+};
+
+const encodeImage = (values, width, height, metadata) => {
+  if (height === undefined || height === null) {
+    throw new Error(`you passed into encodeImage a width of type ${height}`);
+  }
+
+  if (width === undefined || width === null) {
+    throw new Error(`you passed into encodeImage a width of type ${width}`);
+  }
+
+  const ifd = {
+    256: [width],
+    // ImageWidth
+    257: [height],
+    // ImageLength
+    273: [numBytesInIfd],
+    // strips offset
+    278: [height],
+    // RowsPerStrip
+    305: 'geotiff.js' // no array for ASCII(Z)
+
+  };
+
+  if (metadata) {
+    for (const i in metadata) {
+      if (metadata.hasOwnProperty(i)) {
+        ifd[i] = metadata[i];
+      }
+    }
+  }
+
+  const prfx = new Uint8Array(encodeIfds([ifd]));
+  const img = new Uint8Array(values);
+  const samplesPerPixel = ifd[277];
+  const data = new Uint8Array(numBytesInIfd + width * height * samplesPerPixel);
+  (0, _utils.times)(prfx.length, i => {
+    data[i] = prfx[i];
+  });
+  (0, _utils.forEach)(img, (value, i) => {
+    data[numBytesInIfd + i] = value;
+  });
+  return data.buffer;
+};
+
+const convertToTids = input => {
+  const result = {};
+
+  for (const key in input) {
+    if (key !== 'StripOffsets') {
+      if (!name2code[key]) {
+        console.error(key, 'not in name2code:', Object.keys(name2code));
+      }
+
+      result[name2code[key]] = input[key];
+    }
+  }
+
+  return result;
+};
+
+const toArray = input => {
+  if (Array.isArray(input)) {
+    return input;
+  }
+
+  return [input];
+};
+
+const metadataDefaults = [['Compression', 1], // no compression
+['PlanarConfiguration', 1], ['ExtraSamples', 0]];
+
+function writeGeotiff(data, metadata) {
+  const isFlattened = typeof data[0] === 'number';
+  let height;
+  let numBands;
+  let width;
+  let flattenedValues;
+
+  if (isFlattened) {
+    height = metadata.height || metadata.ImageLength;
+    width = metadata.width || metadata.ImageWidth;
+    numBands = data.length / (height * width);
+    flattenedValues = data;
+  } else {
+    numBands = data.length;
+    height = data[0].length;
+    width = data[0][0].length;
+    flattenedValues = [];
+    (0, _utils.times)(height, rowIndex => {
+      (0, _utils.times)(width, columnIndex => {
+        (0, _utils.times)(numBands, bandIndex => {
+          flattenedValues.push(data[bandIndex][rowIndex][columnIndex]);
+        });
+      });
+    });
+  }
+
+  metadata.ImageLength = height;
+  delete metadata.height;
+  metadata.ImageWidth = width;
+  delete metadata.width; // consult https://www.loc.gov/preservation/digital/formats/content/tiff_tags.shtml
+
+  if (!metadata.BitsPerSample) {
+    metadata.BitsPerSample = (0, _utils.times)(numBands, () => 8);
+  }
+
+  metadataDefaults.forEach(tag => {
+    const key = tag[0];
+
+    if (!metadata[key]) {
+      const value = tag[1];
+      metadata[key] = value;
+    }
+  }); // The color space of the image data.
+  // 1=black is zero and 2=RGB.
+
+  if (!metadata.PhotometricInterpretation) {
+    metadata.PhotometricInterpretation = metadata.BitsPerSample.length === 3 ? 2 : 1;
+  } // The number of components per pixel.
+
+
+  if (!metadata.SamplesPerPixel) {
+    metadata.SamplesPerPixel = [numBands];
+  }
+
+  if (!metadata.StripByteCounts) {
+    // we are only writing one strip
+    metadata.StripByteCounts = [numBands * height * width];
+  }
+
+  if (!metadata.ModelPixelScale) {
+    // assumes raster takes up exactly the whole globe
+    metadata.ModelPixelScale = [360 / width, 180 / height, 0];
+  }
+
+  if (!metadata.SampleFormat) {
+    metadata.SampleFormat = (0, _utils.times)(numBands, () => 1);
+  } // if didn't pass in projection information, assume the popular 4326 "geographic projection"
+
+
+  if (!metadata.hasOwnProperty('GeographicTypeGeoKey') && !metadata.hasOwnProperty('ProjectedCSTypeGeoKey')) {
+    metadata.GeographicTypeGeoKey = 4326;
+    metadata.ModelTiepoint = [0, 0, 0, -180, 90, 0]; // raster fits whole globe
+
+    metadata.GeogCitationGeoKey = 'WGS 84';
+    metadata.GTModelTypeGeoKey = 2;
+  }
+
+  const geoKeys = Object.keys(metadata).filter(key => (0, _utils.endsWith)(key, 'GeoKey')).sort((a, b) => name2code[a] - name2code[b]);
+
+  if (!metadata.GeoAsciiParams) {
+    let geoAsciiParams = '';
+    geoKeys.forEach(name => {
+      const code = Number(name2code[name]);
+      const tagType = _globals.fieldTagTypes[code];
+
+      if (tagType === 'ASCII') {
+        geoAsciiParams += `${metadata[name].toString()}\u0000`;
+      }
+    });
+
+    if (geoAsciiParams.length > 0) {
+      metadata.GeoAsciiParams = geoAsciiParams;
+    }
+  }
+
+  if (!metadata.GeoKeyDirectory) {
+    const NumberOfKeys = geoKeys.length;
+    const GeoKeyDirectory = [1, 1, 0, NumberOfKeys];
+    geoKeys.forEach(geoKey => {
+      const KeyID = Number(name2code[geoKey]);
+      GeoKeyDirectory.push(KeyID);
+      let Count;
+      let TIFFTagLocation;
+      let valueOffset;
+
+      if (_globals.fieldTagTypes[KeyID] === 'SHORT') {
+        Count = 1;
+        TIFFTagLocation = 0;
+        valueOffset = metadata[geoKey];
+      } else if (geoKey === 'GeogCitationGeoKey') {
+        Count = metadata.GeoAsciiParams.length;
+        TIFFTagLocation = Number(name2code.GeoAsciiParams);
+        valueOffset = 0;
+      } else {
+        console.log(`[geotiff.js] couldn't get TIFFTagLocation for ${geoKey}`);
+      }
+
+      GeoKeyDirectory.push(TIFFTagLocation);
+      GeoKeyDirectory.push(Count);
+      GeoKeyDirectory.push(valueOffset);
+    });
+    metadata.GeoKeyDirectory = GeoKeyDirectory;
+  } // delete GeoKeys from metadata, because stored in GeoKeyDirectory tag
+
+
+  for (const geoKey in geoKeys) {
+    if (geoKeys.hasOwnProperty(geoKey)) {
+      delete metadata[geoKey];
+    }
+  }
+
+  ['Compression', 'ExtraSamples', 'GeographicTypeGeoKey', 'GTModelTypeGeoKey', 'GTRasterTypeGeoKey', 'ImageLength', // synonym of ImageHeight
+  'ImageWidth', 'Orientation', 'PhotometricInterpretation', 'ProjectedCSTypeGeoKey', 'PlanarConfiguration', 'ResolutionUnit', 'SamplesPerPixel', 'XPosition', 'YPosition'].forEach(name => {
+    if (metadata[name]) {
+      metadata[name] = toArray(metadata[name]);
+    }
+  });
+  const encodedMetadata = convertToTids(metadata);
+  const outputImage = encodeImage(flattenedValues, width, height, encodedMetadata);
+  return outputImage;
+}
+},{"./globals.js":"node_modules/geotiff/dist-module/globals.js","./utils.js":"node_modules/geotiff/dist-module/utils.js"}],"node_modules/geotiff/dist-module/logging.js":[function(require,module,exports) {
+"use strict";
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+exports.debug = debug;
+exports.error = error;
+exports.info = info;
+exports.log = log;
+exports.setLogger = setLogger;
+exports.time = time;
+exports.timeEnd = timeEnd;
+exports.warn = warn;
+
+/**
+ * A no-op logger
+ */
+class DummyLogger {
+  log() {}
+
+  debug() {}
+
+  info() {}
+
+  warn() {}
+
+  error() {}
+
+  time() {}
+
+  timeEnd() {}
+
+}
+
+let LOGGER = new DummyLogger();
+/**
+ *
+ * @param {object} logger the new logger. e.g `console`
+ */
+
+function setLogger() {
+  let logger = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : new DummyLogger();
+  LOGGER = logger;
+}
+
+function debug() {
+  return LOGGER.debug(...arguments);
+}
+
+function log() {
+  return LOGGER.log(...arguments);
+}
+
+function info() {
+  return LOGGER.info(...arguments);
+}
+
+function warn() {
+  return LOGGER.warn(...arguments);
+}
+
+function error() {
+  return LOGGER.error(...arguments);
+}
+
+function time() {
+  return LOGGER.time(...arguments);
+}
+
+function timeEnd() {
+  return LOGGER.timeEnd(...arguments);
+}
+},{}],"node_modules/geotiff/dist-module/predictor.js":[function(require,module,exports) {
+"use strict";
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+exports.applyPredictor = applyPredictor;
+
+function decodeRowAcc(row, stride) {
+  let length = row.length - stride;
+  let offset = 0;
+
+  do {
+    for (let i = stride; i > 0; i--) {
+      row[offset + stride] += row[offset];
+      offset++;
+    }
+
+    length -= stride;
+  } while (length > 0);
+}
+
+function decodeRowFloatingPoint(row, stride, bytesPerSample) {
+  let index = 0;
+  let count = row.length;
+  const wc = count / bytesPerSample;
+
+  while (count > stride) {
+    for (let i = stride; i > 0; --i) {
+      row[index + stride] += row[index];
+      ++index;
+    }
+
+    count -= stride;
+  }
+
+  const copy = row.slice();
+
+  for (let i = 0; i < wc; ++i) {
+    for (let b = 0; b < bytesPerSample; ++b) {
+      row[bytesPerSample * i + b] = copy[(bytesPerSample - b - 1) * wc + i];
+    }
+  }
+}
+
+function applyPredictor(block, predictor, width, height, bitsPerSample, planarConfiguration) {
+  if (!predictor || predictor === 1) {
+    return block;
+  }
+
+  for (let i = 0; i < bitsPerSample.length; ++i) {
+    if (bitsPerSample[i] % 8 !== 0) {
+      throw new Error('When decoding with predictor, only multiple of 8 bits are supported.');
+    }
+
+    if (bitsPerSample[i] !== bitsPerSample[0]) {
+      throw new Error('When decoding with predictor, all samples must have the same size.');
+    }
+  }
+
+  const bytesPerSample = bitsPerSample[0] / 8;
+  const stride = planarConfiguration === 2 ? 1 : bitsPerSample.length;
+
+  for (let i = 0; i < height; ++i) {
+    // Last strip will be truncated if height % stripHeight != 0
+    if (i * stride * width * bytesPerSample >= block.byteLength) {
+      break;
+    }
+
+    let row;
+
+    if (predictor === 2) {
+      // horizontal prediction
+      switch (bitsPerSample[0]) {
+        case 8:
+          row = new Uint8Array(block, i * stride * width * bytesPerSample, stride * width * bytesPerSample);
+          break;
+
+        case 16:
+          row = new Uint16Array(block, i * stride * width * bytesPerSample, stride * width * bytesPerSample / 2);
+          break;
+
+        case 32:
+          row = new Uint32Array(block, i * stride * width * bytesPerSample, stride * width * bytesPerSample / 4);
+          break;
+
+        default:
+          throw new Error(`Predictor 2 not allowed with ${bitsPerSample[0]} bits per sample.`);
+      }
+
+      decodeRowAcc(row, stride, bytesPerSample);
+    } else if (predictor === 3) {
+      // horizontal floating point
+      row = new Uint8Array(block, i * stride * width * bytesPerSample, stride * width * bytesPerSample);
+      decodeRowFloatingPoint(row, stride, bytesPerSample);
+    }
+  }
+
+  return block;
+}
+},{}],"node_modules/geotiff/dist-module/compression/basedecoder.js":[function(require,module,exports) {
+"use strict";
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+exports.default = void 0;
+
+var _predictor = require("../predictor.js");
+
+class BaseDecoder {
+  async decode(fileDirectory, buffer) {
+    const decoded = await this.decodeBlock(buffer);
+    const predictor = fileDirectory.Predictor || 1;
+
+    if (predictor !== 1) {
+      const isTiled = !fileDirectory.StripOffsets;
+      const tileWidth = isTiled ? fileDirectory.TileWidth : fileDirectory.ImageWidth;
+      const tileHeight = isTiled ? fileDirectory.TileLength : fileDirectory.RowsPerStrip || fileDirectory.ImageLength;
+      return (0, _predictor.applyPredictor)(decoded, predictor, tileWidth, tileHeight, fileDirectory.BitsPerSample, fileDirectory.PlanarConfiguration);
+    }
+
+    return decoded;
+  }
+
+}
+
+exports.default = BaseDecoder;
+},{"../predictor.js":"node_modules/geotiff/dist-module/predictor.js"}],"node_modules/geotiff/dist-module/geotiff.js":[function(require,module,exports) {
+"use strict";
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+Object.defineProperty(exports, "BaseDecoder", {
+  enumerable: true,
+  get: function () {
+    return _basedecoder.default;
+  }
+});
+exports.GeoTIFF = void 0;
+Object.defineProperty(exports, "GeoTIFFImage", {
+  enumerable: true,
+  get: function () {
+    return _geotiffimage.default;
+  }
+});
+exports.MultiGeoTIFF = void 0;
+Object.defineProperty(exports, "Pool", {
+  enumerable: true,
+  get: function () {
+    return _pool.default;
+  }
+});
+Object.defineProperty(exports, "addDecoder", {
+  enumerable: true,
+  get: function () {
+    return _index.addDecoder;
+  }
+});
+exports.default = void 0;
+exports.fromArrayBuffer = fromArrayBuffer;
+exports.fromBlob = fromBlob;
+exports.fromFile = fromFile;
+exports.fromUrl = fromUrl;
+exports.fromUrls = fromUrls;
+Object.defineProperty(exports, "getDecoder", {
+  enumerable: true,
+  get: function () {
+    return _index.getDecoder;
+  }
+});
+exports.rgb = exports.globals = void 0;
+Object.defineProperty(exports, "setLogger", {
+  enumerable: true,
+  get: function () {
+    return _logging.setLogger;
+  }
+});
+exports.writeArrayBuffer = writeArrayBuffer;
+
+var _geotiffimage = _interopRequireDefault(require("./geotiffimage.js"));
+
+var _dataview = _interopRequireDefault(require("./dataview64.js"));
+
+var _dataslice = _interopRequireDefault(require("./dataslice.js"));
+
+var _pool = _interopRequireDefault(require("./pool.js"));
+
+var _remote = require("./source/remote.js");
+
+var _arraybuffer = require("./source/arraybuffer.js");
+
+var _filereader = require("./source/filereader.js");
+
+var _file = require("./source/file.js");
+
+var globals = _interopRequireWildcard(require("./globals.js"));
+
+exports.globals = globals;
+
+var _geotiffwriter = require("./geotiffwriter.js");
+
+var rgb = _interopRequireWildcard(require("./rgb.js"));
+
+exports.rgb = rgb;
+
+var _index = require("./compression/index.js");
+
+var _logging = require("./logging.js");
+
+var _basedecoder = _interopRequireDefault(require("./compression/basedecoder.js"));
+
+function _getRequireWildcardCache(nodeInterop) { if (typeof WeakMap !== "function") return null; var cacheBabelInterop = new WeakMap(); var cacheNodeInterop = new WeakMap(); return (_getRequireWildcardCache = function (nodeInterop) { return nodeInterop ? cacheNodeInterop : cacheBabelInterop; })(nodeInterop); }
+
+function _interopRequireWildcard(obj, nodeInterop) { if (!nodeInterop && obj && obj.__esModule) { return obj; } if (obj === null || typeof obj !== "object" && typeof obj !== "function") { return { default: obj }; } var cache = _getRequireWildcardCache(nodeInterop); if (cache && cache.has(obj)) { return cache.get(obj); } var newObj = {}; var hasPropertyDescriptor = Object.defineProperty && Object.getOwnPropertyDescriptor; for (var key in obj) { if (key !== "default" && Object.prototype.hasOwnProperty.call(obj, key)) { var desc = hasPropertyDescriptor ? Object.getOwnPropertyDescriptor(obj, key) : null; if (desc && (desc.get || desc.set)) { Object.defineProperty(newObj, key, desc); } else { newObj[key] = obj[key]; } } } newObj.default = obj; if (cache) { cache.set(obj, newObj); } return newObj; }
+
+function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
+
+/** @module geotiff */
+
+/**
+ * @typedef {Uint8Array | Int8Array | Uint16Array | Int16Array | Uint32Array | Int32Array | Float32Array | Float64Array}
+ * TypedArray
+ */
+function getFieldTypeLength(fieldType) {
+  switch (fieldType) {
+    case globals.fieldTypes.BYTE:
+    case globals.fieldTypes.ASCII:
+    case globals.fieldTypes.SBYTE:
+    case globals.fieldTypes.UNDEFINED:
+      return 1;
+
+    case globals.fieldTypes.SHORT:
+    case globals.fieldTypes.SSHORT:
+      return 2;
+
+    case globals.fieldTypes.LONG:
+    case globals.fieldTypes.SLONG:
+    case globals.fieldTypes.FLOAT:
+    case globals.fieldTypes.IFD:
+      return 4;
+
+    case globals.fieldTypes.RATIONAL:
+    case globals.fieldTypes.SRATIONAL:
+    case globals.fieldTypes.DOUBLE:
+    case globals.fieldTypes.LONG8:
+    case globals.fieldTypes.SLONG8:
+    case globals.fieldTypes.IFD8:
+      return 8;
+
+    default:
+      throw new RangeError(`Invalid field type: ${fieldType}`);
+  }
+}
+
+function parseGeoKeyDirectory(fileDirectory) {
+  const rawGeoKeyDirectory = fileDirectory.GeoKeyDirectory;
+
+  if (!rawGeoKeyDirectory) {
+    return null;
+  }
+
+  const geoKeyDirectory = {};
+
+  for (let i = 4; i <= rawGeoKeyDirectory[3] * 4; i += 4) {
+    const key = globals.geoKeyNames[rawGeoKeyDirectory[i]];
+    const location = rawGeoKeyDirectory[i + 1] ? globals.fieldTagNames[rawGeoKeyDirectory[i + 1]] : null;
+    const count = rawGeoKeyDirectory[i + 2];
+    const offset = rawGeoKeyDirectory[i + 3];
+    let value = null;
+
+    if (!location) {
+      value = offset;
+    } else {
+      value = fileDirectory[location];
+
+      if (typeof value === 'undefined' || value === null) {
+        throw new Error(`Could not get value of geoKey '${key}'.`);
+      } else if (typeof value === 'string') {
+        value = value.substring(offset, offset + count - 1);
+      } else if (value.subarray) {
+        value = value.subarray(offset, offset + count);
+
+        if (count === 1) {
+          value = value[0];
+        }
+      }
+    }
+
+    geoKeyDirectory[key] = value;
+  }
+
+  return geoKeyDirectory;
+}
+
+function getValues(dataSlice, fieldType, count, offset) {
+  let values = null;
+  let readMethod = null;
+  const fieldTypeLength = getFieldTypeLength(fieldType);
+
+  switch (fieldType) {
+    case globals.fieldTypes.BYTE:
+    case globals.fieldTypes.ASCII:
+    case globals.fieldTypes.UNDEFINED:
+      values = new Uint8Array(count);
+      readMethod = dataSlice.readUint8;
+      break;
+
+    case globals.fieldTypes.SBYTE:
+      values = new Int8Array(count);
+      readMethod = dataSlice.readInt8;
+      break;
+
+    case globals.fieldTypes.SHORT:
+      values = new Uint16Array(count);
+      readMethod = dataSlice.readUint16;
+      break;
+
+    case globals.fieldTypes.SSHORT:
+      values = new Int16Array(count);
+      readMethod = dataSlice.readInt16;
+      break;
+
+    case globals.fieldTypes.LONG:
+    case globals.fieldTypes.IFD:
+      values = new Uint32Array(count);
+      readMethod = dataSlice.readUint32;
+      break;
+
+    case globals.fieldTypes.SLONG:
+      values = new Int32Array(count);
+      readMethod = dataSlice.readInt32;
+      break;
+
+    case globals.fieldTypes.LONG8:
+    case globals.fieldTypes.IFD8:
+      values = new Array(count);
+      readMethod = dataSlice.readUint64;
+      break;
+
+    case globals.fieldTypes.SLONG8:
+      values = new Array(count);
+      readMethod = dataSlice.readInt64;
+      break;
+
+    case globals.fieldTypes.RATIONAL:
+      values = new Uint32Array(count * 2);
+      readMethod = dataSlice.readUint32;
+      break;
+
+    case globals.fieldTypes.SRATIONAL:
+      values = new Int32Array(count * 2);
+      readMethod = dataSlice.readInt32;
+      break;
+
+    case globals.fieldTypes.FLOAT:
+      values = new Float32Array(count);
+      readMethod = dataSlice.readFloat32;
+      break;
+
+    case globals.fieldTypes.DOUBLE:
+      values = new Float64Array(count);
+      readMethod = dataSlice.readFloat64;
+      break;
+
+    default:
+      throw new RangeError(`Invalid field type: ${fieldType}`);
+  } // normal fields
+
+
+  if (!(fieldType === globals.fieldTypes.RATIONAL || fieldType === globals.fieldTypes.SRATIONAL)) {
+    for (let i = 0; i < count; ++i) {
+      values[i] = readMethod.call(dataSlice, offset + i * fieldTypeLength);
+    }
+  } else {
+    // RATIONAL or SRATIONAL
+    for (let i = 0; i < count; i += 2) {
+      values[i] = readMethod.call(dataSlice, offset + i * fieldTypeLength);
+      values[i + 1] = readMethod.call(dataSlice, offset + (i * fieldTypeLength + 4));
+    }
+  }
+
+  if (fieldType === globals.fieldTypes.ASCII) {
+    return new TextDecoder('utf-8').decode(values);
+  }
+
+  return values;
+}
+/**
+ * Data class to store the parsed file directory, geo key directory and
+ * offset to the next IFD
+ */
+
+
+class ImageFileDirectory {
+  constructor(fileDirectory, geoKeyDirectory, nextIFDByteOffset) {
+    this.fileDirectory = fileDirectory;
+    this.geoKeyDirectory = geoKeyDirectory;
+    this.nextIFDByteOffset = nextIFDByteOffset;
+  }
+
+}
+/**
+ * Error class for cases when an IFD index was requested, that does not exist
+ * in the file.
+ */
+
+
+class GeoTIFFImageIndexError extends Error {
+  constructor(index) {
+    super(`No image at index ${index}`);
+    this.index = index;
+  }
+
+}
+
+class GeoTIFFBase {
+  /**
+   * (experimental) Reads raster data from the best fitting image. This function uses
+   * the image with the lowest resolution that is still a higher resolution than the
+   * requested resolution.
+   * When specified, the `bbox` option is translated to the `window` option and the
+   * `resX` and `resY` to `width` and `height` respectively.
+   * Then, the [readRasters]{@link GeoTIFFImage#readRasters} method of the selected
+   * image is called and the result returned.
+   * @see GeoTIFFImage.readRasters
+   * @param {import('./geotiffimage').ReadRasterOptions} [options={}] optional parameters
+   * @returns {Promise<(TypedArray|TypedArray[])>} the decoded arrays as a promise
+   */
+  async readRasters() {
+    let options = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : {};
+    const {
+      window: imageWindow,
+      width,
+      height
+    } = options;
+    let {
+      resX,
+      resY,
+      bbox
+    } = options;
+    const firstImage = await this.getImage();
+    let usedImage = firstImage;
+    const imageCount = await this.getImageCount();
+    const imgBBox = firstImage.getBoundingBox();
+
+    if (imageWindow && bbox) {
+      throw new Error('Both "bbox" and "window" passed.');
+    } // if width/height is passed, transform it to resolution
+
+
+    if (width || height) {
+      // if we have an image window (pixel coordinates), transform it to a BBox
+      // using the origin/resolution of the first image.
+      if (imageWindow) {
+        const [oX, oY] = firstImage.getOrigin();
+        const [rX, rY] = firstImage.getResolution();
+        bbox = [oX + imageWindow[0] * rX, oY + imageWindow[1] * rY, oX + imageWindow[2] * rX, oY + imageWindow[3] * rY];
+      } // if we have a bbox (or calculated one)
+
+
+      const usedBBox = bbox || imgBBox;
+
+      if (width) {
+        if (resX) {
+          throw new Error('Both width and resX passed');
+        }
+
+        resX = (usedBBox[2] - usedBBox[0]) / width;
+      }
+
+      if (height) {
+        if (resY) {
+          throw new Error('Both width and resY passed');
+        }
+
+        resY = (usedBBox[3] - usedBBox[1]) / height;
+      }
+    } // if resolution is set or calculated, try to get the image with the worst acceptable resolution
+
+
+    if (resX || resY) {
+      const allImages = [];
+
+      for (let i = 0; i < imageCount; ++i) {
+        const image = await this.getImage(i);
+        const {
+          SubfileType: subfileType,
+          NewSubfileType: newSubfileType
+        } = image.fileDirectory;
+
+        if (i === 0 || subfileType === 2 || newSubfileType & 1) {
+          allImages.push(image);
+        }
+      }
+
+      allImages.sort((a, b) => a.getWidth() - b.getWidth());
+
+      for (let i = 0; i < allImages.length; ++i) {
+        const image = allImages[i];
+        const imgResX = (imgBBox[2] - imgBBox[0]) / image.getWidth();
+        const imgResY = (imgBBox[3] - imgBBox[1]) / image.getHeight();
+        usedImage = image;
+
+        if (resX && resX > imgResX || resY && resY > imgResY) {
+          break;
+        }
+      }
+    }
+
+    let wnd = imageWindow;
+
+    if (bbox) {
+      const [oX, oY] = firstImage.getOrigin();
+      const [imageResX, imageResY] = usedImage.getResolution(firstImage);
+      wnd = [Math.round((bbox[0] - oX) / imageResX), Math.round((bbox[1] - oY) / imageResY), Math.round((bbox[2] - oX) / imageResX), Math.round((bbox[3] - oY) / imageResY)];
+      wnd = [Math.min(wnd[0], wnd[2]), Math.min(wnd[1], wnd[3]), Math.max(wnd[0], wnd[2]), Math.max(wnd[1], wnd[3])];
+    }
+
+    return usedImage.readRasters({ ...options,
+      window: wnd
+    });
+  }
+
+}
+/**
+ * @typedef {Object} GeoTIFFOptions
+ * @property {boolean} [cache=false] whether or not decoded tiles shall be cached.
+ */
+
+/**
+ * The abstraction for a whole GeoTIFF file.
+ * @augments GeoTIFFBase
+ */
+
+
+class GeoTIFF extends GeoTIFFBase {
+  /**
+   * @constructor
+   * @param {*} source The datasource to read from.
+   * @param {boolean} littleEndian Whether the image uses little endian.
+   * @param {boolean} bigTiff Whether the image uses bigTIFF conventions.
+   * @param {number} firstIFDOffset The numeric byte-offset from the start of the image
+   *                                to the first IFD.
+   * @param {GeoTIFFOptions} [options] further options.
+   */
+  constructor(source, littleEndian, bigTiff, firstIFDOffset) {
+    let options = arguments.length > 4 && arguments[4] !== undefined ? arguments[4] : {};
+    super();
+    this.source = source;
+    this.littleEndian = littleEndian;
+    this.bigTiff = bigTiff;
+    this.firstIFDOffset = firstIFDOffset;
+    this.cache = options.cache || false;
+    this.ifdRequests = [];
+    this.ghostValues = null;
+  }
+
+  async getSlice(offset, size) {
+    const fallbackSize = this.bigTiff ? 4048 : 1024;
+    return new _dataslice.default((await this.source.fetch([{
+      offset,
+      length: typeof size !== 'undefined' ? size : fallbackSize
+    }]))[0], offset, this.littleEndian, this.bigTiff);
+  }
+  /**
+   * Instructs to parse an image file directory at the given file offset.
+   * As there is no way to ensure that a location is indeed the start of an IFD,
+   * this function must be called with caution (e.g only using the IFD offsets from
+   * the headers or other IFDs).
+   * @param {number} offset the offset to parse the IFD at
+   * @returns {Promise<ImageFileDirectory>} the parsed IFD
+   */
+
+
+  async parseFileDirectoryAt(offset) {
+    const entrySize = this.bigTiff ? 20 : 12;
+    const offsetSize = this.bigTiff ? 8 : 2;
+    let dataSlice = await this.getSlice(offset);
+    const numDirEntries = this.bigTiff ? dataSlice.readUint64(offset) : dataSlice.readUint16(offset); // if the slice does not cover the whole IFD, request a bigger slice, where the
+    // whole IFD fits: num of entries + n x tag length + offset to next IFD
+
+    const byteSize = numDirEntries * entrySize + (this.bigTiff ? 16 : 6);
+
+    if (!dataSlice.covers(offset, byteSize)) {
+      dataSlice = await this.getSlice(offset, byteSize);
+    }
+
+    const fileDirectory = {}; // loop over the IFD and create a file directory object
+
+    let i = offset + (this.bigTiff ? 8 : 2);
+
+    for (let entryCount = 0; entryCount < numDirEntries; i += entrySize, ++entryCount) {
+      const fieldTag = dataSlice.readUint16(i);
+      const fieldType = dataSlice.readUint16(i + 2);
+      const typeCount = this.bigTiff ? dataSlice.readUint64(i + 4) : dataSlice.readUint32(i + 4);
+      let fieldValues;
+      let value;
+      const fieldTypeLength = getFieldTypeLength(fieldType);
+      const valueOffset = i + (this.bigTiff ? 12 : 8); // check whether the value is directly encoded in the tag or refers to a
+      // different external byte range
+
+      if (fieldTypeLength * typeCount <= (this.bigTiff ? 8 : 4)) {
+        fieldValues = getValues(dataSlice, fieldType, typeCount, valueOffset);
+      } else {
+        // resolve the reference to the actual byte range
+        const actualOffset = dataSlice.readOffset(valueOffset);
+        const length = getFieldTypeLength(fieldType) * typeCount; // check, whether we actually cover the referenced byte range; if not,
+        // request a new slice of bytes to read from it
+
+        if (dataSlice.covers(actualOffset, length)) {
+          fieldValues = getValues(dataSlice, fieldType, typeCount, actualOffset);
+        } else {
+          const fieldDataSlice = await this.getSlice(actualOffset, length);
+          fieldValues = getValues(fieldDataSlice, fieldType, typeCount, actualOffset);
+        }
+      } // unpack single values from the array
+
+
+      if (typeCount === 1 && globals.arrayFields.indexOf(fieldTag) === -1 && !(fieldType === globals.fieldTypes.RATIONAL || fieldType === globals.fieldTypes.SRATIONAL)) {
+        value = fieldValues[0];
+      } else {
+        value = fieldValues;
+      } // write the tags value to the file directly
+
+
+      fileDirectory[globals.fieldTagNames[fieldTag]] = value;
+    }
+
+    const geoKeyDirectory = parseGeoKeyDirectory(fileDirectory);
+    const nextIFDByteOffset = dataSlice.readOffset(offset + offsetSize + entrySize * numDirEntries);
+    return new ImageFileDirectory(fileDirectory, geoKeyDirectory, nextIFDByteOffset);
+  }
+
+  async requestIFD(index) {
+    // see if we already have that IFD index requested.
+    if (this.ifdRequests[index]) {
+      // attach to an already requested IFD
+      return this.ifdRequests[index];
+    } else if (index === 0) {
+      // special case for index 0
+      this.ifdRequests[index] = this.parseFileDirectoryAt(this.firstIFDOffset);
+      return this.ifdRequests[index];
+    } else if (!this.ifdRequests[index - 1]) {
+      // if the previous IFD was not yet loaded, load that one first
+      // this is the recursive call.
+      try {
+        this.ifdRequests[index - 1] = this.requestIFD(index - 1);
+      } catch (e) {
+        // if the previous one already was an index error, rethrow
+        // with the current index
+        if (e instanceof GeoTIFFImageIndexError) {
+          throw new GeoTIFFImageIndexError(index);
+        } // rethrow anything else
+
+
+        throw e;
+      }
+    } // if the previous IFD was loaded, we can finally fetch the one we are interested in.
+    // we need to wrap this in an IIFE, otherwise this.ifdRequests[index] would be delayed
+
+
+    this.ifdRequests[index] = (async () => {
+      const previousIfd = await this.ifdRequests[index - 1];
+
+      if (previousIfd.nextIFDByteOffset === 0) {
+        throw new GeoTIFFImageIndexError(index);
+      }
+
+      return this.parseFileDirectoryAt(previousIfd.nextIFDByteOffset);
+    })();
+
+    return this.ifdRequests[index];
+  }
+  /**
+   * Get the n-th internal subfile of an image. By default, the first is returned.
+   *
+   * @param {number} [index=0] the index of the image to return.
+   * @returns {Promise<GeoTIFFImage>} the image at the given index
+   */
+
+
+  async getImage() {
+    let index = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : 0;
+    const ifd = await this.requestIFD(index);
+    return new _geotiffimage.default(ifd.fileDirectory, ifd.geoKeyDirectory, this.dataView, this.littleEndian, this.cache, this.source);
+  }
+  /**
+   * Returns the count of the internal subfiles.
+   *
+   * @returns {Promise<number>} the number of internal subfile images
+   */
+
+
+  async getImageCount() {
+    let index = 0; // loop until we run out of IFDs
+
+    let hasNext = true;
+
+    while (hasNext) {
+      try {
+        await this.requestIFD(index);
+        ++index;
+      } catch (e) {
+        if (e instanceof GeoTIFFImageIndexError) {
+          hasNext = false;
+        } else {
+          throw e;
+        }
+      }
+    }
+
+    return index;
+  }
+  /**
+   * Get the values of the COG ghost area as a parsed map.
+   * See https://gdal.org/drivers/raster/cog.html#header-ghost-area for reference
+   * @returns {Promise<Object>} the parsed ghost area or null, if no such area was found
+   */
+
+
+  async getGhostValues() {
+    const offset = this.bigTiff ? 16 : 8;
+
+    if (this.ghostValues) {
+      return this.ghostValues;
+    }
+
+    const detectionString = 'GDAL_STRUCTURAL_METADATA_SIZE=';
+    const heuristicAreaSize = detectionString.length + 100;
+    let slice = await this.getSlice(offset, heuristicAreaSize);
+
+    if (detectionString === getValues(slice, globals.fieldTypes.ASCII, detectionString.length, offset)) {
+      const valuesString = getValues(slice, globals.fieldTypes.ASCII, heuristicAreaSize, offset);
+      const firstLine = valuesString.split('\n')[0];
+      const metadataSize = Number(firstLine.split('=')[1].split(' ')[0]) + firstLine.length;
+
+      if (metadataSize > heuristicAreaSize) {
+        slice = await this.getSlice(offset, metadataSize);
+      }
+
+      const fullString = getValues(slice, globals.fieldTypes.ASCII, metadataSize, offset);
+      this.ghostValues = {};
+      fullString.split('\n').filter(line => line.length > 0).map(line => line.split('=')).forEach(_ref => {
+        let [key, value] = _ref;
+        this.ghostValues[key] = value;
+      });
+    }
+
+    return this.ghostValues;
+  }
+  /**
+   * Parse a (Geo)TIFF file from the given source.
+   *
+   * @param {*} source The source of data to parse from.
+   * @param {GeoTIFFOptions} [options] Additional options.
+   * @param {AbortSignal} [signal] An AbortSignal that may be signalled if the request is
+   *                               to be aborted
+   */
+
+
+  static async fromSource(source, options, signal) {
+    const headerData = (await source.fetch([{
+      offset: 0,
+      length: 1024
+    }], signal))[0];
+    const dataView = new _dataview.default(headerData);
+    const BOM = dataView.getUint16(0, 0);
+    let littleEndian;
+
+    if (BOM === 0x4949) {
+      littleEndian = true;
+    } else if (BOM === 0x4D4D) {
+      littleEndian = false;
+    } else {
+      throw new TypeError('Invalid byte order value.');
+    }
+
+    const magicNumber = dataView.getUint16(2, littleEndian);
+    let bigTiff;
+
+    if (magicNumber === 42) {
+      bigTiff = false;
+    } else if (magicNumber === 43) {
+      bigTiff = true;
+      const offsetByteSize = dataView.getUint16(4, littleEndian);
+
+      if (offsetByteSize !== 8) {
+        throw new Error('Unsupported offset byte-size.');
+      }
+    } else {
+      throw new TypeError('Invalid magic number.');
+    }
+
+    const firstIFDOffset = bigTiff ? dataView.getUint64(8, littleEndian) : dataView.getUint32(4, littleEndian);
+    return new GeoTIFF(source, littleEndian, bigTiff, firstIFDOffset, options);
+  }
+  /**
+   * Closes the underlying file buffer
+   * N.B. After the GeoTIFF has been completely processed it needs
+   * to be closed but only if it has been constructed from a file.
+   */
+
+
+  close() {
+    if (typeof this.source.close === 'function') {
+      return this.source.close();
+    }
+
+    return false;
+  }
+
+}
+
+exports.GeoTIFF = GeoTIFF;
+var _default = GeoTIFF;
+/**
+ * Wrapper for GeoTIFF files that have external overviews.
+ * @augments GeoTIFFBase
+ */
+
+exports.default = _default;
+
+class MultiGeoTIFF extends GeoTIFFBase {
+  /**
+   * Construct a new MultiGeoTIFF from a main and several overview files.
+   * @param {GeoTIFF} mainFile The main GeoTIFF file.
+   * @param {GeoTIFF[]} overviewFiles An array of overview files.
+   */
+  constructor(mainFile, overviewFiles) {
+    super();
+    this.mainFile = mainFile;
+    this.overviewFiles = overviewFiles;
+    this.imageFiles = [mainFile].concat(overviewFiles);
+    this.fileDirectoriesPerFile = null;
+    this.fileDirectoriesPerFileParsing = null;
+    this.imageCount = null;
+  }
+
+  async parseFileDirectoriesPerFile() {
+    const requests = [this.mainFile.parseFileDirectoryAt(this.mainFile.firstIFDOffset)].concat(this.overviewFiles.map(file => file.parseFileDirectoryAt(file.firstIFDOffset)));
+    this.fileDirectoriesPerFile = await Promise.all(requests);
+    return this.fileDirectoriesPerFile;
+  }
+  /**
+   * Get the n-th internal subfile of an image. By default, the first is returned.
+   *
+   * @param {number} [index=0] the index of the image to return.
+   * @returns {Promise<GeoTIFFImage>} the image at the given index
+   */
+
+
+  async getImage() {
+    let index = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : 0;
+    await this.getImageCount();
+    await this.parseFileDirectoriesPerFile();
+    let visited = 0;
+    let relativeIndex = 0;
+
+    for (let i = 0; i < this.imageFiles.length; i++) {
+      const imageFile = this.imageFiles[i];
+
+      for (let ii = 0; ii < this.imageCounts[i]; ii++) {
+        if (index === visited) {
+          const ifd = await imageFile.requestIFD(relativeIndex);
+          return new _geotiffimage.default(ifd.fileDirectory, ifd.geoKeyDirectory, imageFile.dataView, imageFile.littleEndian, imageFile.cache, imageFile.source);
+        }
+
+        visited++;
+        relativeIndex++;
+      }
+
+      relativeIndex = 0;
+    }
+
+    throw new RangeError('Invalid image index');
+  }
+  /**
+   * Returns the count of the internal subfiles.
+   *
+   * @returns {Promise<number>} the number of internal subfile images
+   */
+
+
+  async getImageCount() {
+    if (this.imageCount !== null) {
+      return this.imageCount;
+    }
+
+    const requests = [this.mainFile.getImageCount()].concat(this.overviewFiles.map(file => file.getImageCount()));
+    this.imageCounts = await Promise.all(requests);
+    this.imageCount = this.imageCounts.reduce((count, ifds) => count + ifds, 0);
+    return this.imageCount;
+  }
+
+}
+
+exports.MultiGeoTIFF = MultiGeoTIFF;
+
+/**
+ * Creates a new GeoTIFF from a remote URL.
+ * @param {string} url The URL to access the image from
+ * @param {object} [options] Additional options to pass to the source.
+ *                           See {@link makeRemoteSource} for details.
+ * @param {AbortSignal} [signal] An AbortSignal that may be signalled if the request is
+ *                               to be aborted
+ * @returns {Promise<GeoTIFF>} The resulting GeoTIFF file.
+ */
+async function fromUrl(url) {
+  let options = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : {};
+  let signal = arguments.length > 2 ? arguments[2] : undefined;
+  return GeoTIFF.fromSource((0, _remote.makeRemoteSource)(url, options), signal);
+}
+/**
+ * Construct a new GeoTIFF from an
+ * [ArrayBuffer]{@link https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/ArrayBuffer}.
+ * @param {ArrayBuffer} arrayBuffer The data to read the file from.
+ * @param {AbortSignal} [signal] An AbortSignal that may be signalled if the request is
+ *                               to be aborted
+ * @returns {Promise<GeoTIFF>} The resulting GeoTIFF file.
+ */
+
+
+async function fromArrayBuffer(arrayBuffer, signal) {
+  return GeoTIFF.fromSource((0, _arraybuffer.makeBufferSource)(arrayBuffer), signal);
+}
+/**
+ * Construct a GeoTIFF from a local file path. This uses the node
+ * [filesystem API]{@link https://nodejs.org/api/fs.html} and is
+ * not available on browsers.
+ *
+ * N.B. After the GeoTIFF has been completely processed it needs
+ * to be closed but only if it has been constructed from a file.
+ * @param {string} path The file path to read from.
+ * @param {AbortSignal} [signal] An AbortSignal that may be signalled if the request is
+ *                               to be aborted
+ * @returns {Promise<GeoTIFF>} The resulting GeoTIFF file.
+ */
+
+
+async function fromFile(path, signal) {
+  return GeoTIFF.fromSource((0, _file.makeFileSource)(path), signal);
+}
+/**
+ * Construct a GeoTIFF from an HTML
+ * [Blob]{@link https://developer.mozilla.org/en-US/docs/Web/API/Blob} or
+ * [File]{@link https://developer.mozilla.org/en-US/docs/Web/API/File}
+ * object.
+ * @param {Blob|File} blob The Blob or File object to read from.
+ * @param {AbortSignal} [signal] An AbortSignal that may be signalled if the request is
+ *                               to be aborted
+ * @returns {Promise<GeoTIFF>} The resulting GeoTIFF file.
+ */
+
+
+async function fromBlob(blob, signal) {
+  return GeoTIFF.fromSource((0, _filereader.makeFileReaderSource)(blob), signal);
+}
+/**
+ * Construct a MultiGeoTIFF from the given URLs.
+ * @param {string} mainUrl The URL for the main file.
+ * @param {string[]} overviewUrls An array of URLs for the overview images.
+ * @param {Object} [options] Additional options to pass to the source.
+ *                           See [makeRemoteSource]{@link module:source.makeRemoteSource}
+ *                           for details.
+ * @param {AbortSignal} [signal] An AbortSignal that may be signalled if the request is
+ *                               to be aborted
+ * @returns {Promise<MultiGeoTIFF>} The resulting MultiGeoTIFF file.
+ */
+
+
+async function fromUrls(mainUrl) {
+  let overviewUrls = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : [];
+  let options = arguments.length > 2 && arguments[2] !== undefined ? arguments[2] : {};
+  let signal = arguments.length > 3 ? arguments[3] : undefined;
+  const mainFile = await GeoTIFF.fromSource((0, _remote.makeRemoteSource)(mainUrl, options), signal);
+  const overviewFiles = await Promise.all(overviewUrls.map(url => GeoTIFF.fromSource((0, _remote.makeRemoteSource)(url, options))));
+  return new MultiGeoTIFF(mainFile, overviewFiles);
+}
+/**
+ * Main creating function for GeoTIFF files.
+ * @param {(Array)} array of pixel values
+ * @returns {metadata} metadata
+ */
+
+
+function writeArrayBuffer(values, metadata) {
+  return (0, _geotiffwriter.writeGeotiff)(values, metadata);
+}
+},{"./geotiffimage.js":"node_modules/geotiff/dist-module/geotiffimage.js","./dataview64.js":"node_modules/geotiff/dist-module/dataview64.js","./dataslice.js":"node_modules/geotiff/dist-module/dataslice.js","./pool.js":"node_modules/geotiff/dist-module/pool.js","./source/remote.js":"node_modules/geotiff/dist-module/source/remote.js","./source/arraybuffer.js":"node_modules/geotiff/dist-module/source/arraybuffer.js","./source/filereader.js":"node_modules/geotiff/dist-module/source/filereader.js","./source/file.js":"node_modules/geotiff/dist-module/source/file.js","./globals.js":"node_modules/geotiff/dist-module/globals.js","./geotiffwriter.js":"node_modules/geotiff/dist-module/geotiffwriter.js","./rgb.js":"node_modules/geotiff/dist-module/rgb.js","./compression/index.js":"node_modules/geotiff/dist-module/compression/index.js","./logging.js":"node_modules/geotiff/dist-module/logging.js","./compression/basedecoder.js":"node_modules/geotiff/dist-module/compression/basedecoder.js"}],"node_modules/ol/source/GeoTIFF.js":[function(require,module,exports) {
+"use strict";
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+exports.default = void 0;
+
+var _DataTile = _interopRequireDefault(require("./DataTile.js"));
+
+var _State = _interopRequireDefault(require("./State.js"));
+
+var _TileGrid = _interopRequireDefault(require("../tilegrid/TileGrid.js"));
+
+var _geotiff = require("geotiff");
+
+var _proj = require("../proj.js");
+
+var _math = require("../math.js");
+
+var _extent = require("../extent.js");
+
+var _size = require("../size.js");
+
+var _Units = require("../proj/Units.js");
+
+function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
+
+var __extends = void 0 && (void 0).__extends || function () {
+  var extendStatics = function (d, b) {
+    extendStatics = Object.setPrototypeOf || {
+      __proto__: []
+    } instanceof Array && function (d, b) {
+      d.__proto__ = b;
+    } || function (d, b) {
+      for (var p in b) if (Object.prototype.hasOwnProperty.call(b, p)) d[p] = b[p];
+    };
+
+    return extendStatics(d, b);
+  };
+
+  return function (d, b) {
+    if (typeof b !== "function" && b !== null) throw new TypeError("Class extends value " + String(b) + " is not a constructor or null");
+    extendStatics(d, b);
+
+    function __() {
+      this.constructor = d;
+    }
+
+    d.prototype = b === null ? Object.create(b) : (__.prototype = b.prototype, new __());
+  };
+}();
+/**
+ * @module ol/source/GeoTIFF
+ */
+
+
+/**
+ * @typedef {Object} SourceInfo
+ * @property {string} url URL for the source GeoTIFF.
+ * @property {Array<string>} [overviews] List of any overview URLs.
+ * @property {number} [min=0] The minimum source data value.  Rendered values are scaled from 0 to 1 based on
+ * the configured min and max.  If not provided and raster statistics are available, those will be used instead.
+ * If neither are available, the minimum for the data type will be used.  To disable this behavior, set
+ * the `normalize` option to `false` in the constructor.
+ * @property {number} [max] The maximum source data value.  Rendered values are scaled from 0 to 1 based on
+ * the configured min and max.  If not provided and raster statistics are available, those will be used instead.
+ * If neither are available, the maximum for the data type will be used.  To disable this behavior, set
+ * the `normalize` option to `false` in the constructor.
+ * @property {number} [nodata] Values to discard (overriding any nodata values in the metadata).
+ * When provided, an additional alpha band will be added to the data.  Often the GeoTIFF metadata
+ * will include information about nodata values, so you should only need to set this property if
+ * you find that it is not already extracted from the metadata.
+ * @property {Array<number>} [bands] Band numbers to be read from (where the first band is `1`). If not provided, all bands will
+ * be read. For example, if a GeoTIFF has blue (1), green (2), red (3), and near-infrared (4) bands, and you only need the
+ * near-infrared band, configure `bands: [4]`.
+ */
+
+/**
+ * @typedef {Object} GeoKeys
+ * @property {number} GTModelTypeGeoKey Model type.
+ * @property {number} GTRasterTypeGeoKey Raster type.
+ * @property {number} GeogAngularUnitsGeoKey Angular units.
+ * @property {number} GeogInvFlatteningGeoKey Inverse flattening.
+ * @property {number} GeogSemiMajorAxisGeoKey Semi-major axis.
+ * @property {number} GeographicTypeGeoKey Geographic coordinate system code.
+ * @property {number} ProjLinearUnitsGeoKey Projected linear unit code.
+ * @property {number} ProjectedCSTypeGeoKey Projected coordinate system code.
+ */
+
+/**
+ * @typedef {import("geotiff").GeoTIFF} GeoTIFF
+ */
+
+/**
+ * @typedef {import("geotiff").MultiGeoTIFF} MultiGeoTIFF
+ */
+
+/**
+ * @typedef {Object} GDALMetadata
+ * @property {string} STATISTICS_MINIMUM The minimum value (as a string).
+ * @property {string} STATISTICS_MAXIMUM The maximum value (as a string).
+ */
+var STATISTICS_MAXIMUM = 'STATISTICS_MAXIMUM';
+var STATISTICS_MINIMUM = 'STATISTICS_MINIMUM';
+/**
+ * @typedef {import("geotiff").GeoTIFFImage} GeoTIFFImage
+ */
+
+var workerPool;
+
+function getWorkerPool() {
+  if (!workerPool) {
+    workerPool = new _geotiff.Pool();
+  }
+
+  return workerPool;
+}
+/**
+ * Get the bounding box of an image.  If the image does not have an affine transform,
+ * the pixel bounds are returned.
+ * @param {GeoTIFFImage} image The image.
+ * @return {Array<number>} The image bounding box.
+ */
+
+
+function getBoundingBox(image) {
+  try {
+    return image.getBoundingBox();
+  } catch (_) {
+    var fileDirectory = image.fileDirectory;
+    return [0, 0, fileDirectory.ImageWidth, fileDirectory.ImageLength];
+  }
+}
+/**
+ * Get the origin of an image.  If the image does not have an affine transform,
+ * the top-left corner of the pixel bounds is returned.
+ * @param {GeoTIFFImage} image The image.
+ * @return {Array<number>} The image origin.
+ */
+
+
+function getOrigin(image) {
+  try {
+    return image.getOrigin().slice(0, 2);
+  } catch (_) {
+    return [0, image.fileDirectory.ImageLength];
+  }
+}
+/**
+ * Get the resolution of an image.  If the image does not have an affine transform,
+ * the width of the image is compared with the reference image.
+ * @param {GeoTIFFImage} image The image.
+ * @param {GeoTIFFImage} referenceImage The reference image.
+ * @return {number} The image resolution.
+ */
+
+
+function getResolution(image, referenceImage) {
+  try {
+    return image.getResolution(referenceImage)[0];
+  } catch (_) {
+    return referenceImage.fileDirectory.ImageWidth / image.fileDirectory.ImageWidth;
+  }
+}
+/**
+ * @param {GeoTIFFImage} image A GeoTIFF.
+ * @return {import("../proj/Projection.js").default} The image projection.
+ */
+
+
+function getProjection(image) {
+  var geoKeys = image.geoKeys;
+
+  if (!geoKeys) {
+    return null;
+  }
+
+  if (geoKeys.ProjectedCSTypeGeoKey) {
+    var code = 'EPSG:' + geoKeys.ProjectedCSTypeGeoKey;
+    var projection = (0, _proj.get)(code);
+
+    if (!projection) {
+      var units = (0, _Units.fromCode)(geoKeys.ProjLinearUnitsGeoKey);
+
+      if (units) {
+        projection = new _proj.Projection({
+          code: code,
+          units: units
+        });
+      }
+    }
+
+    return projection;
+  }
+
+  if (geoKeys.GeographicTypeGeoKey) {
+    var code = 'EPSG:' + geoKeys.GeographicTypeGeoKey;
+    var projection = (0, _proj.get)(code);
+
+    if (!projection) {
+      var units = (0, _Units.fromCode)(geoKeys.GeogAngularUnitsGeoKey);
+
+      if (units) {
+        projection = new _proj.Projection({
+          code: code,
+          units: units
+        });
+      }
+    }
+
+    return projection;
+  }
+
+  return null;
+}
+/**
+ * @param {GeoTIFF|MultiGeoTIFF} tiff A GeoTIFF.
+ * @return {Promise<Array<GeoTIFFImage>>} Resolves to a list of images.
+ */
+
+
+function getImagesForTIFF(tiff) {
+  return tiff.getImageCount().then(function (count) {
+    var requests = new Array(count);
+
+    for (var i = 0; i < count; ++i) {
+      requests[i] = tiff.getImage(i);
+    }
+
+    return Promise.all(requests);
+  });
+}
+/**
+ * @param {SourceInfo} source The GeoTIFF source.
+ * @param {object} options Options for the GeoTIFF source.
+ * @return {Promise<Array<GeoTIFFImage>>} Resolves to a list of images.
+ */
+
+
+function getImagesForSource(source, options) {
+  var request;
+
+  if (source.overviews) {
+    request = (0, _geotiff.fromUrls)(source.url, source.overviews, options);
+  } else {
+    request = (0, _geotiff.fromUrl)(source.url, options);
+  }
+
+  return request.then(getImagesForTIFF);
+}
+/**
+ * @param {number|Array<number>|Array<Array<number>>} expected Expected value.
+ * @param {number|Array<number>|Array<Array<number>>} got Actual value.
+ * @param {number} tolerance Accepted tolerance in fraction of expected between expected and got.
+ * @param {string} message The error message.
+ * @param {function(Error):void} rejector A function to be called with any error.
+ */
+
+
+function assertEqual(expected, got, tolerance, message, rejector) {
+  if (Array.isArray(expected)) {
+    var length_1 = expected.length;
+
+    if (!Array.isArray(got) || length_1 != got.length) {
+      var error = new Error(message);
+      rejector(error);
+      throw error;
+    }
+
+    for (var i = 0; i < length_1; ++i) {
+      assertEqual(expected[i], got[i], tolerance, message, rejector);
+    }
+
+    return;
+  }
+
+  got =
+  /** @type {number} */
+  got;
+
+  if (Math.abs(expected - got) > tolerance * expected) {
+    throw new Error(message);
+  }
+}
+/**
+ * @param {Array} array The data array.
+ * @return {number} The minimum value.
+ */
+
+
+function getMinForDataType(array) {
+  if (array instanceof Int8Array) {
+    return -128;
+  }
+
+  if (array instanceof Int16Array) {
+    return -32768;
+  }
+
+  if (array instanceof Int32Array) {
+    return -2147483648;
+  }
+
+  if (array instanceof Float32Array) {
+    return 1.2e-38;
+  }
+
+  return 0;
+}
+/**
+ * @param {Array} array The data array.
+ * @return {number} The maximum value.
+ */
+
+
+function getMaxForDataType(array) {
+  if (array instanceof Int8Array) {
+    return 127;
+  }
+
+  if (array instanceof Uint8Array) {
+    return 255;
+  }
+
+  if (array instanceof Uint8ClampedArray) {
+    return 255;
+  }
+
+  if (array instanceof Int16Array) {
+    return 32767;
+  }
+
+  if (array instanceof Uint16Array) {
+    return 65535;
+  }
+
+  if (array instanceof Int32Array) {
+    return 2147483647;
+  }
+
+  if (array instanceof Uint32Array) {
+    return 4294967295;
+  }
+
+  if (array instanceof Float32Array) {
+    return 3.4e38;
+  }
+
+  return 255;
+}
+/**
+ * @typedef {Object} GeoTIFFSourceOptions
+ * @property {boolean} [forceXHR=false] Whether to force the usage of the browsers XMLHttpRequest API.
+ * @property {Object<string, string>} [headers] additional key-value pairs of headers to be passed with each request. Key is the header name, value the header value.
+ * @property {string} [credentials] How credentials shall be handled. See
+ * https://developer.mozilla.org/en-US/docs/Web/API/fetch for reference and possible values
+ * @property {number} [maxRanges] The maximum amount of ranges to request in a single multi-range request.
+ * By default only a single range is used.
+ * @property {boolean} [allowFullFile=false] Whether or not a full file is accepted when only a portion is
+ * requested. Only use this when you know the source image to be small enough to fit in memory.
+ * @property {number} [blockSize=65536] The block size to use.
+ * @property {number} [cacheSize=100] The number of blocks that shall be held in a LRU cache.
+ */
+
+/**
+ * @typedef {Object} Options
+ * @property {Array<SourceInfo>} sources List of information about GeoTIFF sources.
+ * Multiple sources can be combined when their resolution sets are equal after applying a scale.
+ * The list of sources defines a mapping between input bands as they are read from each GeoTIFF and
+ * the output bands that are provided by data tiles. To control which bands to read from each GeoTIFF,
+ * use the {@link import("./GeoTIFF.js").SourceInfo bands} property. If, for example, you specify two
+ * sources, one with 3 bands and {@link import("./GeoTIFF.js").SourceInfo nodata} configured, and
+ * another with 1 band, the resulting data tiles will have 5 bands: 3 from the first source, 1 alpha
+ * band from the first source, and 1 band from the second source.
+ * @property {GeoTIFFSourceOptions} [sourceOptions] Additional options to be passed to [geotiff.js](https://geotiffjs.github.io/geotiff.js/module-geotiff.html)'s `fromUrl` or `fromUrls` methods.
+ * @property {boolean} [convertToRGB = false] By default, bands from the sources are read as-is. When
+ * reading GeoTIFFs with the purpose of displaying them as RGB images, setting this to `true` will
+ * convert other color spaces (YCbCr, CMYK) to RGB.
+ * @property {boolean} [normalize=true] By default, the source data is normalized to values between
+ * 0 and 1 with scaling factors based on the raster statistics or `min` and `max` properties of each source.
+ * If instead you want to work with the raw values in a style expression, set this to `false`.  Setting this option
+ * to `false` will make it so any `min` and `max` properties on sources are ignored.
+ * @property {boolean} [opaque=false] Whether the layer is opaque.
+ * @property {number} [transition=250] Duration of the opacity transition for rendering.
+ * To disable the opacity transition, pass `transition: 0`.
+ * @property {boolean} [wrapX=false] Render tiles beyond the tile grid extent.
+ * @property {boolean} [interpolate=true] Use interpolated values when resampling.  By default,
+ * the linear interpolation is used to resample the data.  If false, nearest neighbor is used.
+ */
+
+/**
+ * @classdesc
+ * A source for working with GeoTIFF data.
+ * @api
+ */
+
+
+var GeoTIFFSource =
+/** @class */
+function (_super) {
+  __extends(GeoTIFFSource, _super);
+  /**
+   * @param {Options} options Data tile options.
+   */
+
+
+  function GeoTIFFSource(options) {
+    var _this = _super.call(this, {
+      state: _State.default.LOADING,
+      tileGrid: null,
+      projection: null,
+      opaque: options.opaque,
+      transition: options.transition,
+      interpolate: options.interpolate !== false,
+      wrapX: options.wrapX
+    }) || this;
+    /**
+     * @type {Array<SourceInfo>}
+     * @private
+     */
+
+
+    _this.sourceInfo_ = options.sources;
+    var numSources = _this.sourceInfo_.length;
+    /**
+     * @type {object}
+     * @private
+     */
+
+    _this.sourceOptions_ = options.sourceOptions;
+    /**
+     * @type {Array<Array<GeoTIFFImage>>}
+     * @private
+     */
+
+    _this.sourceImagery_ = new Array(numSources);
+    /**
+     * @type {Array<number>}
+     * @private
+     */
+
+    _this.resolutionFactors_ = new Array(numSources);
+    /**
+     * @type {Array<number>}
+     * @private
+     */
+
+    _this.samplesPerPixel_;
+    /**
+     * @type {Array<Array<number>>}
+     * @private
+     */
+
+    _this.nodataValues_;
+    /**
+     * @type {Array<Array<GDALMetadata>>}
+     * @private
+     */
+
+    _this.metadata_;
+    /**
+     * @type {boolean}
+     * @private
+     */
+
+    _this.normalize_ = options.normalize !== false;
+    /**
+     * @type {boolean}
+     * @private
+     */
+
+    _this.addAlpha_ = false;
+    /**
+     * @type {Error}
+     * @private
+     */
+
+    _this.error_ = null;
+    /**
+     * @type {'readRasters' | 'readRGB'}
+     */
+
+    _this.readMethod_ = options.convertToRGB ? 'readRGB' : 'readRasters';
+
+    _this.setKey(_this.sourceInfo_.map(function (source) {
+      return source.url;
+    }).join(','));
+
+    var self = _this;
+    var requests = new Array(numSources);
+
+    for (var i = 0; i < numSources; ++i) {
+      requests[i] = getImagesForSource(_this.sourceInfo_[i], _this.sourceOptions_);
+    }
+
+    Promise.all(requests).then(function (sources) {
+      self.configure_(sources);
+    }).catch(function (error) {
+      console.error(error); // eslint-disable-line no-console
+
+      self.error_ = error;
+      self.setState(_State.default.ERROR);
+    });
+    return _this;
+  }
+  /**
+   * @return {Error} A source loading error. When the source state is `error`, use this function
+   * to get more information about the error. To debug a faulty configuration, you may want to use
+   * a listener like
+   * ```js
+   * geotiffSource.on('change', () => {
+   *   if (geotiffSource.getState() === 'error') {
+   *     console.error(geotiffSource.getError());
+   *   }
+   * });
+   * ```
+   */
+
+
+  GeoTIFFSource.prototype.getError = function () {
+    return this.error_;
+  };
+  /**
+   * Configure the tile grid based on images within the source GeoTIFFs.  Each GeoTIFF
+   * must have the same internal tiled structure.
+   * @param {Array<Array<GeoTIFFImage>>} sources Each source is a list of images
+   * from a single GeoTIFF.
+   * @private
+   */
+
+
+  GeoTIFFSource.prototype.configure_ = function (sources) {
+    var extent;
+    var origin;
+    var tileSizes;
+    var resolutions;
+    var samplesPerPixel = new Array(sources.length);
+    var nodataValues = new Array(sources.length);
+    var metadata = new Array(sources.length);
+    var minZoom = 0;
+    var sourceCount = sources.length;
+
+    var _loop_1 = function (sourceIndex) {
+      var images = sources[sourceIndex];
+      var imageCount = images.length;
+      var sourceExtent = void 0;
+      var sourceOrigin = void 0;
+      var sourceTileSizes = new Array(imageCount);
+      var sourceResolutions = new Array(imageCount);
+      nodataValues[sourceIndex] = new Array(imageCount);
+      metadata[sourceIndex] = new Array(imageCount);
+
+      for (var imageIndex = 0; imageIndex < imageCount; ++imageIndex) {
+        var image = images[imageIndex];
+        var nodataValue = image.getGDALNoData();
+        metadata[sourceIndex][imageIndex] = image.getGDALMetadata(0);
+        nodataValues[sourceIndex][imageIndex] = nodataValue === null ? NaN : nodataValue;
+        var wantedSamples = this_1.sourceInfo_[sourceIndex].bands;
+        samplesPerPixel[sourceIndex] = wantedSamples ? wantedSamples.length : image.getSamplesPerPixel();
+        var level = imageCount - (imageIndex + 1);
+
+        if (!sourceExtent) {
+          sourceExtent = getBoundingBox(image);
+        }
+
+        if (!sourceOrigin) {
+          sourceOrigin = getOrigin(image);
+        }
+
+        sourceResolutions[level] = getResolution(image, images[0]);
+        sourceTileSizes[level] = [image.getTileWidth(), image.getTileHeight()];
+      }
+
+      if (!extent) {
+        extent = sourceExtent;
+      } else {
+        (0, _extent.getIntersection)(extent, sourceExtent, extent);
+      }
+
+      if (!origin) {
+        origin = sourceOrigin;
+      } else {
+        var message = "Origin mismatch for source ".concat(sourceIndex, ", got [").concat(sourceOrigin, "] but expected [").concat(origin, "]");
+        assertEqual(origin, sourceOrigin, 0, message, this_1.viewRejector);
+      }
+
+      if (!resolutions) {
+        resolutions = sourceResolutions;
+        this_1.resolutionFactors_[sourceIndex] = 1;
+      } else {
+        if (resolutions.length - minZoom > sourceResolutions.length) {
+          minZoom = resolutions.length - sourceResolutions.length;
+        }
+
+        var resolutionFactor_1 = resolutions[resolutions.length - 1] / sourceResolutions[sourceResolutions.length - 1];
+        this_1.resolutionFactors_[sourceIndex] = resolutionFactor_1;
+        var scaledSourceResolutions = sourceResolutions.map(function (resolution) {
+          return resolution *= resolutionFactor_1;
+        });
+        var message = "Resolution mismatch for source ".concat(sourceIndex, ", got [").concat(scaledSourceResolutions, "] but expected [").concat(resolutions, "]");
+        assertEqual(resolutions.slice(minZoom, resolutions.length), scaledSourceResolutions, 0.02, message, this_1.viewRejector);
+      }
+
+      if (!tileSizes) {
+        tileSizes = sourceTileSizes;
+      } else {
+        assertEqual(tileSizes.slice(minZoom, tileSizes.length), sourceTileSizes, 0, "Tile size mismatch for source ".concat(sourceIndex), this_1.viewRejector);
+      }
+
+      this_1.sourceImagery_[sourceIndex] = images.reverse();
+    };
+
+    var this_1 = this;
+
+    for (var sourceIndex = 0; sourceIndex < sourceCount; ++sourceIndex) {
+      _loop_1(sourceIndex);
+    }
+
+    for (var i = 0, ii = this.sourceImagery_.length; i < ii; ++i) {
+      var sourceImagery = this.sourceImagery_[i];
+
+      while (sourceImagery.length < resolutions.length) {
+        sourceImagery.unshift(undefined);
+      }
+    }
+
+    if (!this.getProjection()) {
+      var firstSource = sources[0];
+
+      for (var i = firstSource.length - 1; i >= 0; --i) {
+        var image = firstSource[i];
+        var projection = getProjection(image);
+
+        if (projection) {
+          this.projection = projection;
+          break;
+        }
+      }
+    }
+
+    this.samplesPerPixel_ = samplesPerPixel;
+    this.nodataValues_ = nodataValues;
+    this.metadata_ = metadata; // decide if we need to add an alpha band to handle nodata
+
+    outer: for (var sourceIndex = 0; sourceIndex < sourceCount; ++sourceIndex) {
+      // option 1: source is configured with a nodata value
+      if (this.sourceInfo_[sourceIndex].nodata !== undefined) {
+        this.addAlpha_ = true;
+        break;
+      }
+
+      var values = nodataValues[sourceIndex]; // option 2: check image metadata for limited bands
+
+      var bands = this.sourceInfo_[sourceIndex].bands;
+
+      if (bands) {
+        for (var i = 0; i < bands.length; ++i) {
+          if (!isNaN(values[bands[i] - 1])) {
+            this.addAlpha_ = true;
+            break outer;
+          }
+        }
+
+        continue;
+      } // option 3: check image metadata for all bands
+
+
+      for (var imageIndex = 0; imageIndex < values.length; ++imageIndex) {
+        if (!isNaN(values[imageIndex])) {
+          this.addAlpha_ = true;
+          break outer;
+        }
+      }
+    }
+
+    var additionalBands = this.addAlpha_ ? 1 : 0;
+    this.bandCount = samplesPerPixel.reduce(function (accumulator, value) {
+      accumulator += value;
+      return accumulator;
+    }, 0) + additionalBands;
+    var tileGrid = new _TileGrid.default({
+      extent: extent,
+      minZoom: minZoom,
+      origin: origin,
+      resolutions: resolutions,
+      tileSizes: tileSizes
+    });
+    this.tileGrid = tileGrid;
+    this.setLoader(this.loadTile_.bind(this));
+    this.setState(_State.default.READY);
+    this.viewResolver({
+      projection: this.projection,
+      resolutions: resolutions,
+      center: (0, _proj.toUserCoordinate)((0, _extent.getCenter)(extent), this.projection),
+      extent: (0, _proj.toUserExtent)(extent, this.projection),
+      zoom: 0
+    });
+  };
+
+  GeoTIFFSource.prototype.loadTile_ = function (z, x, y) {
+    var size = (0, _size.toSize)(this.tileGrid.getTileSize(z));
+    var sourceCount = this.sourceImagery_.length;
+    var requests = new Array(sourceCount);
+    var addAlpha = this.addAlpha_;
+    var bandCount = this.bandCount;
+    var samplesPerPixel = this.samplesPerPixel_;
+    var nodataValues = this.nodataValues_;
+    var sourceInfo = this.sourceInfo_;
+
+    var _loop_2 = function (sourceIndex) {
+      var source = sourceInfo[sourceIndex];
+      var resolutionFactor = this_2.resolutionFactors_[sourceIndex];
+      var pixelBounds = [Math.round(x * (size[0] * resolutionFactor)), Math.round(y * (size[1] * resolutionFactor)), Math.round((x + 1) * (size[0] * resolutionFactor)), Math.round((y + 1) * (size[1] * resolutionFactor))];
+      var image = this_2.sourceImagery_[sourceIndex][z];
+      var samples = void 0;
+
+      if (source.bands) {
+        samples = source.bands.map(function (bandNumber) {
+          return bandNumber - 1;
+        });
+      }
+      /** @type {number|Array<number>} */
+
+
+      var fillValue = void 0;
+
+      if (!isNaN(source.nodata)) {
+        fillValue = source.nodata;
+      } else {
+        if (!samples) {
+          fillValue = nodataValues[sourceIndex];
+        } else {
+          fillValue = samples.map(function (sampleIndex) {
+            return nodataValues[sourceIndex][sampleIndex];
+          });
+        }
+      }
+
+      requests[sourceIndex] = image[this_2.readMethod_]({
+        window: pixelBounds,
+        width: size[0],
+        height: size[1],
+        samples: samples,
+        fillValue: fillValue,
+        pool: getWorkerPool(),
+        interleave: false
+      });
+    };
+
+    var this_2 = this;
+
+    for (var sourceIndex = 0; sourceIndex < sourceCount; ++sourceIndex) {
+      _loop_2(sourceIndex);
+    }
+
+    var pixelCount = size[0] * size[1];
+    var dataLength = pixelCount * bandCount;
+    var normalize = this.normalize_;
+    var metadata = this.metadata_;
+    return Promise.all(requests).then(function (sourceSamples) {
+      /** @type {Uint8Array|Float32Array} */
+      var data;
+
+      if (normalize) {
+        data = new Uint8Array(dataLength);
+      } else {
+        data = new Float32Array(dataLength);
+      }
+
+      var dataIndex = 0;
+
+      for (var pixelIndex = 0; pixelIndex < pixelCount; ++pixelIndex) {
+        var transparent = addAlpha;
+
+        for (var sourceIndex = 0; sourceIndex < sourceCount; ++sourceIndex) {
+          var source = sourceInfo[sourceIndex];
+          var min = source.min;
+          var max = source.max;
+          var gain = void 0,
+              bias = void 0;
+
+          if (normalize) {
+            var stats = metadata[sourceIndex][0];
+
+            if (min === undefined) {
+              if (stats && STATISTICS_MINIMUM in stats) {
+                min = parseFloat(stats[STATISTICS_MINIMUM]);
+              } else {
+                min = getMinForDataType(sourceSamples[sourceIndex][0]);
+              }
+            }
+
+            if (max === undefined) {
+              if (stats && STATISTICS_MAXIMUM in stats) {
+                max = parseFloat(stats[STATISTICS_MAXIMUM]);
+              } else {
+                max = getMaxForDataType(sourceSamples[sourceIndex][0]);
+              }
+            }
+
+            gain = 255 / (max - min);
+            bias = -min * gain;
+          }
+
+          for (var sampleIndex = 0; sampleIndex < samplesPerPixel[sourceIndex]; ++sampleIndex) {
+            var sourceValue = sourceSamples[sourceIndex][sampleIndex][pixelIndex];
+            var value = void 0;
+
+            if (normalize) {
+              value = (0, _math.clamp)(gain * sourceValue + bias, 0, 255);
+            } else {
+              value = sourceValue;
+            }
+
+            if (!addAlpha) {
+              data[dataIndex] = value;
+            } else {
+              var nodata = source.nodata;
+
+              if (nodata === undefined) {
+                var bandIndex = void 0;
+
+                if (source.bands) {
+                  bandIndex = source.bands[sampleIndex] - 1;
+                } else {
+                  bandIndex = sampleIndex;
+                }
+
+                nodata = nodataValues[sourceIndex][bandIndex];
+              }
+
+              if (sourceValue !== nodata) {
+                transparent = false;
+                data[dataIndex] = value;
+              }
+            }
+
+            dataIndex++;
+          }
+        }
+
+        if (addAlpha) {
+          if (!transparent) {
+            data[dataIndex] = 255;
+          }
+
+          dataIndex++;
+        }
+      }
+
+      return data;
+    });
+  };
+
+  return GeoTIFFSource;
+}(_DataTile.default);
+/**
+ * Get a promise for view properties based on the source.  Use the result of this function
+ * as the `view` option in a map constructor.
+ *
+ *     const source = new GeoTIFF(options);
+ *
+ *     const map = new Map({
+ *       target: 'map',
+ *       layers: [
+ *         new TileLayer({
+ *           source: source,
+ *         }),
+ *       ],
+ *       view: source.getView(),
+ *     });
+ *
+ * @function
+ * @return {Promise<import("../View.js").ViewOptions>} A promise for view-related properties.
+ * @api
+ *
+ */
+
+
+GeoTIFFSource.prototype.getView;
+var _default = GeoTIFFSource;
+exports.default = _default;
+},{"./DataTile.js":"node_modules/ol/source/DataTile.js","./State.js":"node_modules/ol/source/State.js","../tilegrid/TileGrid.js":"node_modules/ol/tilegrid/TileGrid.js","geotiff":"node_modules/geotiff/dist-module/geotiff.js","../proj.js":"node_modules/ol/proj.js","../math.js":"node_modules/ol/math.js","../extent.js":"node_modules/ol/extent.js","../size.js":"node_modules/ol/size.js","../proj/Units.js":"node_modules/ol/proj/Units.js"}],"node_modules/ol/source/Zoomify.js":[function(require,module,exports) {
+"use strict";
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+exports.default = exports.CustomTile = void 0;
+
+var _common = require("../tilegrid/common.js");
+
+var _ImageTile = _interopRequireDefault(require("../ImageTile.js"));
+
+var _TileGrid = _interopRequireDefault(require("../tilegrid/TileGrid.js"));
+
+var _TileImage = _interopRequireDefault(require("./TileImage.js"));
+
+var _TileState = _interopRequireDefault(require("../TileState.js"));
+
+var _asserts = require("../asserts.js");
+
+var _dom = require("../dom.js");
+
+var _tileurlfunction = require("../tileurlfunction.js");
+
+var _extent = require("../extent.js");
+
+var _size = require("../size.js");
+
+function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
+
+var __extends = void 0 && (void 0).__extends || function () {
+  var extendStatics = function (d, b) {
+    extendStatics = Object.setPrototypeOf || {
+      __proto__: []
+    } instanceof Array && function (d, b) {
+      d.__proto__ = b;
+    } || function (d, b) {
+      for (var p in b) if (Object.prototype.hasOwnProperty.call(b, p)) d[p] = b[p];
+    };
+
+    return extendStatics(d, b);
+  };
+
+  return function (d, b) {
+    if (typeof b !== "function" && b !== null) throw new TypeError("Class extends value " + String(b) + " is not a constructor or null");
+    extendStatics(d, b);
+
+    function __() {
+      this.constructor = d;
+    }
+
+    d.prototype = b === null ? Object.create(b) : (__.prototype = b.prototype, new __());
+  };
+}();
+/**
+ * @module ol/source/Zoomify
+ */
+
+
+/**
+ * @enum {string}
+ */
+var TierSizeCalculation = {
+  DEFAULT: 'default',
+  TRUNCATED: 'truncated'
+};
+
+var CustomTile =
+/** @class */
+function (_super) {
+  __extends(CustomTile, _super);
+  /**
+   * @param {import("../size.js").Size} tileSize Full tile size.
+   * @param {import("../tilecoord.js").TileCoord} tileCoord Tile coordinate.
+   * @param {import("../TileState.js").default} state State.
+   * @param {string} src Image source URI.
+   * @param {?string} crossOrigin Cross origin.
+   * @param {import("../Tile.js").LoadFunction} tileLoadFunction Tile load function.
+   * @param {import("../Tile.js").Options} [opt_options] Tile options.
+   */
+
+
+  function CustomTile(tileSize, tileCoord, state, src, crossOrigin, tileLoadFunction, opt_options) {
+    var _this = _super.call(this, tileCoord, state, src, crossOrigin, tileLoadFunction, opt_options) || this;
+    /**
+     * @private
+     * @type {HTMLCanvasElement|HTMLImageElement|HTMLVideoElement}
+     */
+
+
+    _this.zoomifyImage_ = null;
+    /**
+     * @type {import("../size.js").Size}
+     */
+
+    _this.tileSize_ = tileSize;
+    return _this;
+  }
+  /**
+   * Get the image element for this tile.
+   * @return {HTMLCanvasElement|HTMLImageElement|HTMLVideoElement} Image.
+   */
+
+
+  CustomTile.prototype.getImage = function () {
+    if (this.zoomifyImage_) {
+      return this.zoomifyImage_;
+    }
+
+    var image = _super.prototype.getImage.call(this);
+
+    if (this.state == _TileState.default.LOADED) {
+      var tileSize = this.tileSize_;
+
+      if (image.width == tileSize[0] && image.height == tileSize[1]) {
+        this.zoomifyImage_ = image;
+        return image;
+      } else {
+        var context = (0, _dom.createCanvasContext2D)(tileSize[0], tileSize[1]);
+        context.drawImage(image, 0, 0);
+        this.zoomifyImage_ = context.canvas;
+        return context.canvas;
+      }
+    } else {
+      return image;
+    }
+  };
+
+  return CustomTile;
+}(_ImageTile.default);
+
+exports.CustomTile = CustomTile;
+
+/**
+ * @typedef {Object} Options
+ * @property {import("./Source.js").AttributionLike} [attributions] Attributions.
+ * @property {number} [cacheSize] Initial tile cache size. Will auto-grow to hold at least the number of tiles in the viewport.
+ * @property {null|string} [crossOrigin] The `crossOrigin` attribute for loaded images.  Note that
+ * you must provide a `crossOrigin` value  you want to access pixel data with the Canvas renderer.
+ * See https://developer.mozilla.org/en-US/docs/Web/HTML/CORS_enabled_image for more detail.
+ * @property {boolean} [imageSmoothing=true] Deprecated.  Use the `interpolate` option instead.
+ * @property {boolean} [interpolate=true] Use interpolated values when resampling.  By default,
+ * linear interpolation is used when resampling.  Set to false to use the nearest neighbor instead.
+ * @property {import("../proj.js").ProjectionLike} [projection] Projection.
+ * @property {number} [tilePixelRatio] The pixel ratio used by the tile service. For example, if the tile service advertizes 256px by 256px tiles but actually sends 512px by 512px images (for retina/hidpi devices) then `tilePixelRatio` should be set to `2`
+ * @property {number} [reprojectionErrorThreshold=0.5] Maximum allowed reprojection error (in pixels).
+ * Higher values can increase reprojection performance, but decrease precision.
+ * @property {string} url URL template or base URL of the Zoomify service.
+ * A base URL is the fixed part
+ * of the URL, excluding the tile group, z, x, and y folder structure, e.g.
+ * `http://my.zoomify.info/IMAGE.TIF/`. A URL template must include
+ * `{TileGroup}`, `{x}`, `{y}`, and `{z}` placeholders, e.g.
+ * `http://my.zoomify.info/IMAGE.TIF/{TileGroup}/{z}-{x}-{y}.jpg`.
+ * Internet Imaging Protocol (IIP) with JTL extension can be also used with
+ * `{tileIndex}` and `{z}` placeholders, e.g.
+ * `http://my.zoomify.info?FIF=IMAGE.TIF&JTL={z},{tileIndex}`.
+ * A `{?-?}` template pattern, for example `subdomain{a-f}.domain.com`, may be
+ * used instead of defining each one separately in the `urls` option.
+ * @property {string} [tierSizeCalculation] Tier size calculation method: `default` or `truncated`.
+ * @property {import("../size.js").Size} size Size.
+ * @property {import("../extent.js").Extent} [extent] Extent for the TileGrid that is created.
+ * Default sets the TileGrid in the
+ * fourth quadrant, meaning extent is `[0, -height, width, 0]`. To change the
+ * extent to the first quadrant (the default for OpenLayers 2) set the extent
+ * as `[0, 0, width, height]`.
+ * @property {number} [transition] Duration of the opacity transition for rendering.
+ * To disable the opacity transition, pass `transition: 0`.
+ * @property {number} [tileSize=256] Tile size. Same tile size is used for all zoom levels.
+ * @property {number|import("../array.js").NearestDirectionFunction} [zDirection=0]
+ * Choose whether to use tiles with a higher or lower zoom level when between integer
+ * zoom levels. See {@link module:ol/tilegrid/TileGrid~TileGrid#getZForResolution}.
+ */
+
+/**
+ * @classdesc
+ * Layer source for tile data in Zoomify format (both Zoomify and Internet
+ * Imaging Protocol are supported).
+ * @api
+ */
+var Zoomify =
+/** @class */
+function (_super) {
+  __extends(Zoomify, _super);
+  /**
+   * @param {Options} opt_options Options.
+   */
+
+
+  function Zoomify(opt_options) {
+    var _this = this;
+
+    var options = opt_options;
+    var interpolate = options.imageSmoothing !== undefined ? options.imageSmoothing : true;
+
+    if (options.interpolate !== undefined) {
+      interpolate = options.interpolate;
+    }
+
+    var size = options.size;
+    var tierSizeCalculation = options.tierSizeCalculation !== undefined ? options.tierSizeCalculation : TierSizeCalculation.DEFAULT;
+    var tilePixelRatio = options.tilePixelRatio || 1;
+    var imageWidth = size[0];
+    var imageHeight = size[1];
+    var tierSizeInTiles = [];
+    var tileSize = options.tileSize || _common.DEFAULT_TILE_SIZE;
+    var tileSizeForTierSizeCalculation = tileSize * tilePixelRatio;
+
+    switch (tierSizeCalculation) {
+      case TierSizeCalculation.DEFAULT:
+        while (imageWidth > tileSizeForTierSizeCalculation || imageHeight > tileSizeForTierSizeCalculation) {
+          tierSizeInTiles.push([Math.ceil(imageWidth / tileSizeForTierSizeCalculation), Math.ceil(imageHeight / tileSizeForTierSizeCalculation)]);
+          tileSizeForTierSizeCalculation += tileSizeForTierSizeCalculation;
+        }
+
+        break;
+
+      case TierSizeCalculation.TRUNCATED:
+        var width = imageWidth;
+        var height = imageHeight;
+
+        while (width > tileSizeForTierSizeCalculation || height > tileSizeForTierSizeCalculation) {
+          tierSizeInTiles.push([Math.ceil(width / tileSizeForTierSizeCalculation), Math.ceil(height / tileSizeForTierSizeCalculation)]);
+          width >>= 1;
+          height >>= 1;
+        }
+
+        break;
+
+      default:
+        (0, _asserts.assert)(false, 53); // Unknown `tierSizeCalculation` configured
+
+        break;
+    }
+
+    tierSizeInTiles.push([1, 1]);
+    tierSizeInTiles.reverse();
+    var resolutions = [tilePixelRatio];
+    var tileCountUpToTier = [0];
+
+    for (var i = 1, ii = tierSizeInTiles.length; i < ii; i++) {
+      resolutions.push(tilePixelRatio << i);
+      tileCountUpToTier.push(tierSizeInTiles[i - 1][0] * tierSizeInTiles[i - 1][1] + tileCountUpToTier[i - 1]);
+    }
+
+    resolutions.reverse();
+    var tileGrid = new _TileGrid.default({
+      tileSize: tileSize,
+      extent: options.extent || [0, -imageHeight, imageWidth, 0],
+      resolutions: resolutions
+    });
+    var url = options.url;
+
+    if (url && url.indexOf('{TileGroup}') == -1 && url.indexOf('{tileIndex}') == -1) {
+      url += '{TileGroup}/{z}-{x}-{y}.jpg';
+    }
+
+    var urls = (0, _tileurlfunction.expandUrl)(url);
+    var tileWidth = tileSize * tilePixelRatio;
+    /**
+     * @param {string} template Template.
+     * @return {import("../Tile.js").UrlFunction} Tile URL function.
+     */
+
+    function createFromTemplate(template) {
+      return (
+        /**
+         * @param {import("../tilecoord.js").TileCoord} tileCoord Tile Coordinate.
+         * @param {number} pixelRatio Pixel ratio.
+         * @param {import("../proj/Projection.js").default} projection Projection.
+         * @return {string|undefined} Tile URL.
+         */
+        function (tileCoord, pixelRatio, projection) {
+          if (!tileCoord) {
+            return undefined;
+          } else {
+            var tileCoordZ = tileCoord[0];
+            var tileCoordX = tileCoord[1];
+            var tileCoordY = tileCoord[2];
+            var tileIndex = tileCoordX + tileCoordY * tierSizeInTiles[tileCoordZ][0];
+            var tileGroup = (tileIndex + tileCountUpToTier[tileCoordZ]) / tileWidth | 0;
+            var localContext_1 = {
+              'z': tileCoordZ,
+              'x': tileCoordX,
+              'y': tileCoordY,
+              'tileIndex': tileIndex,
+              'TileGroup': 'TileGroup' + tileGroup
+            };
+            return template.replace(/\{(\w+?)\}/g, function (m, p) {
+              return localContext_1[p];
+            });
+          }
+        }
+      );
+    }
+
+    var tileUrlFunction = (0, _tileurlfunction.createFromTileUrlFunctions)(urls.map(createFromTemplate));
+    var ZoomifyTileClass = CustomTile.bind(null, (0, _size.toSize)(tileSize * tilePixelRatio));
+    _this = _super.call(this, {
+      attributions: options.attributions,
+      cacheSize: options.cacheSize,
+      crossOrigin: options.crossOrigin,
+      interpolate: interpolate,
+      projection: options.projection,
+      tilePixelRatio: tilePixelRatio,
+      reprojectionErrorThreshold: options.reprojectionErrorThreshold,
+      tileClass: ZoomifyTileClass,
+      tileGrid: tileGrid,
+      tileUrlFunction: tileUrlFunction,
+      transition: options.transition
+    }) || this;
+    /**
+     * @type {number|import("../array.js").NearestDirectionFunction}
+     */
+
+    _this.zDirection = options.zDirection; // Server retina tile detection (non-standard):
+    // Try loading the center tile for the highest resolution. If it is not
+    // available, we are dealing with retina tiles, and need to adjust the
+    // tile url calculation.
+
+    var tileUrl = tileGrid.getTileCoordForCoordAndResolution((0, _extent.getCenter)(tileGrid.getExtent()), resolutions[resolutions.length - 1]);
+    var testTileUrl = tileUrlFunction(tileUrl, 1, null);
+    var image = new Image();
+    image.addEventListener('error', function () {
+      tileWidth = tileSize;
+      this.changed();
+    }.bind(_this));
+    image.src = testTileUrl;
+    return _this;
+  }
+
+  return Zoomify;
+}(_TileImage.default);
+
+var _default = Zoomify;
+exports.default = _default;
+},{"../tilegrid/common.js":"node_modules/ol/tilegrid/common.js","../ImageTile.js":"node_modules/ol/ImageTile.js","../tilegrid/TileGrid.js":"node_modules/ol/tilegrid/TileGrid.js","./TileImage.js":"node_modules/ol/source/TileImage.js","../TileState.js":"node_modules/ol/TileState.js","../asserts.js":"node_modules/ol/asserts.js","../dom.js":"node_modules/ol/dom.js","../tileurlfunction.js":"node_modules/ol/tileurlfunction.js","../extent.js":"node_modules/ol/extent.js","../size.js":"node_modules/ol/size.js"}],"node_modules/ol/format/IIIFInfo.js":[function(require,module,exports) {
+"use strict";
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+exports.default = exports.Versions = void 0;
+
+var _asserts = require("../asserts.js");
+
+var _array = require("../array.js");
+
+/**
+ * @module ol/format/IIIFInfo
+ */
+var __spreadArray = void 0 && (void 0).__spreadArray || function (to, from, pack) {
+  if (pack || arguments.length === 2) for (var i = 0, l = from.length, ar; i < l; i++) {
+    if (ar || !(i in from)) {
+      if (!ar) ar = Array.prototype.slice.call(from, 0, i);
+      ar[i] = from[i];
+    }
+  }
+  return to.concat(ar || Array.prototype.slice.call(from));
+};
+
+/**
+ * @typedef {Object} PreferredOptions
+ * @property {string} [format] Preferred image format. Will be used if the image information
+ * indicates support for that format.
+ * @property {string} [quality] IIIF image qualitiy.  Will be used if the image information
+ * indicates support for that quality.
+ */
+
+/**
+ * @typedef {Object} SupportedFeatures
+ * @property {Array<string>} [supports] Supported IIIF image size and region
+ * calculation features.
+ * @property {Array<string>} [formats] Supported image formats.
+ * @property {Array<string>} [qualities] Supported IIIF image qualities.
+ */
+
+/**
+ * @typedef {Object} TileInfo
+ * @property {Array<number>} scaleFactors Supported resolution scaling factors.
+ * @property {number} width Tile width in pixels.
+ * @property {number} [height] Tile height in pixels. Same as tile width if height is
+ * not given.
+ */
+
+/**
+ * @typedef {Object} IiifProfile
+ * @property {Array<string>} [formats] Supported image formats for the image service.
+ * @property {Array<string>} [qualities] Supported IIIF image qualities.
+ * @property {Array<string>} [supports] Supported features.
+ * @property {number} [maxArea] Maximum area (pixels) available for this image service.
+ * @property {number} [maxHeight] Maximum height.
+ * @property {number} [maxWidth] Maximum width.
+ */
+
+/**
+ * @typedef {Object<string,string|number|Array<number|string|IiifProfile|Object<string, number>|TileInfo>>}
+ *    ImageInformationResponse
+ */
+
+/**
+ * Enum representing the major IIIF Image API versions
+ * @enum {string}
+ */
+var Versions = {
+  VERSION1: 'version1',
+  VERSION2: 'version2',
+  VERSION3: 'version3'
+};
+/**
+ * Supported image formats, qualities and supported region / size calculation features
+ * for different image API versions and compliance levels
+ * @const
+ * @type {Object<string, Object<string, SupportedFeatures>>}
+ */
+
+exports.Versions = Versions;
+var IIIF_PROFILE_VALUES = {};
+IIIF_PROFILE_VALUES[Versions.VERSION1] = {
+  'level0': {
+    supports: [],
+    formats: [],
+    qualities: ['native']
+  },
+  'level1': {
+    supports: ['regionByPx', 'sizeByW', 'sizeByH', 'sizeByPct'],
+    formats: ['jpg'],
+    qualities: ['native']
+  },
+  'level2': {
+    supports: ['regionByPx', 'regionByPct', 'sizeByW', 'sizeByH', 'sizeByPct', 'sizeByConfinedWh', 'sizeByWh'],
+    formats: ['jpg', 'png'],
+    qualities: ['native', 'color', 'grey', 'bitonal']
+  }
+};
+IIIF_PROFILE_VALUES[Versions.VERSION2] = {
+  'level0': {
+    supports: [],
+    formats: ['jpg'],
+    qualities: ['default']
+  },
+  'level1': {
+    supports: ['regionByPx', 'sizeByW', 'sizeByH', 'sizeByPct'],
+    formats: ['jpg'],
+    qualities: ['default']
+  },
+  'level2': {
+    supports: ['regionByPx', 'regionByPct', 'sizeByW', 'sizeByH', 'sizeByPct', 'sizeByConfinedWh', 'sizeByDistortedWh', 'sizeByWh'],
+    formats: ['jpg', 'png'],
+    qualities: ['default', 'bitonal']
+  }
+};
+IIIF_PROFILE_VALUES[Versions.VERSION3] = {
+  'level0': {
+    supports: [],
+    formats: ['jpg'],
+    qualities: ['default']
+  },
+  'level1': {
+    supports: ['regionByPx', 'regionSquare', 'sizeByW', 'sizeByH', 'sizeByWh'],
+    formats: ['jpg'],
+    qualities: ['default']
+  },
+  'level2': {
+    supports: ['regionByPx', 'regionSquare', 'regionByPct', 'sizeByW', 'sizeByH', 'sizeByPct', 'sizeByConfinedWh', 'sizeByWh'],
+    formats: ['jpg', 'png'],
+    qualities: ['default']
+  }
+};
+IIIF_PROFILE_VALUES['none'] = {
+  'none': {
+    supports: [],
+    formats: [],
+    qualities: []
+  }
+};
+var COMPLIANCE_VERSION1 = /^https?:\/\/library\.stanford\.edu\/iiif\/image-api\/(?:1\.1\/)?compliance\.html#level[0-2]$/;
+var COMPLIANCE_VERSION2 = /^https?:\/\/iiif\.io\/api\/image\/2\/level[0-2](?:\.json)?$/;
+var COMPLIANCE_VERSION3 = /(^https?:\/\/iiif\.io\/api\/image\/3\/level[0-2](?:\.json)?$)|(^level[0-2]$)/;
+
+function generateVersion1Options(iiifInfo) {
+  var levelProfile = iiifInfo.getComplianceLevelSupportedFeatures(); // Version 1.0 and 1.1 do not require a profile.
+
+  if (levelProfile === undefined) {
+    levelProfile = IIIF_PROFILE_VALUES[Versions.VERSION1]['level0'];
+  }
+
+  return {
+    url: iiifInfo.imageInfo['@id'] === undefined ? undefined : iiifInfo.imageInfo['@id'].replace(/\/?(?:info\.json)?$/g, ''),
+    supports: levelProfile.supports,
+    formats: __spreadArray(__spreadArray([], levelProfile.formats, true), [iiifInfo.imageInfo.formats === undefined ? [] : iiifInfo.imageInfo.formats], false),
+    qualities: __spreadArray(__spreadArray([], levelProfile.qualities, true), [iiifInfo.imageInfo.qualities === undefined ? [] : iiifInfo.imageInfo.qualities], false),
+    resolutions: iiifInfo.imageInfo.scale_factors,
+    tileSize: iiifInfo.imageInfo.tile_width !== undefined ? iiifInfo.imageInfo.tile_height !== undefined ? [iiifInfo.imageInfo.tile_width, iiifInfo.imageInfo.tile_height] : [iiifInfo.imageInfo.tile_width, iiifInfo.imageInfo.tile_width] : iiifInfo.imageInfo.tile_height != undefined ? [iiifInfo.imageInfo.tile_height, iiifInfo.imageInfo.tile_height] : undefined
+  };
+}
+
+function generateVersion2Options(iiifInfo) {
+  var levelProfile = iiifInfo.getComplianceLevelSupportedFeatures(),
+      additionalProfile = Array.isArray(iiifInfo.imageInfo.profile) && iiifInfo.imageInfo.profile.length > 1,
+      profileSupports = additionalProfile && iiifInfo.imageInfo.profile[1].supports ? iiifInfo.imageInfo.profile[1].supports : [],
+      profileFormats = additionalProfile && iiifInfo.imageInfo.profile[1].formats ? iiifInfo.imageInfo.profile[1].formats : [],
+      profileQualities = additionalProfile && iiifInfo.imageInfo.profile[1].qualities ? iiifInfo.imageInfo.profile[1].qualities : [];
+  return {
+    url: iiifInfo.imageInfo['@id'].replace(/\/?(?:info\.json)?$/g, ''),
+    sizes: iiifInfo.imageInfo.sizes === undefined ? undefined : iiifInfo.imageInfo.sizes.map(function (size) {
+      return [size.width, size.height];
+    }),
+    tileSize: iiifInfo.imageInfo.tiles === undefined ? undefined : [iiifInfo.imageInfo.tiles.map(function (tile) {
+      return tile.width;
+    })[0], iiifInfo.imageInfo.tiles.map(function (tile) {
+      return tile.height === undefined ? tile.width : tile.height;
+    })[0]],
+    resolutions: iiifInfo.imageInfo.tiles === undefined ? undefined : iiifInfo.imageInfo.tiles.map(function (tile) {
+      return tile.scaleFactors;
+    })[0],
+    supports: __spreadArray(__spreadArray([], levelProfile.supports, true), profileSupports, true),
+    formats: __spreadArray(__spreadArray([], levelProfile.formats, true), profileFormats, true),
+    qualities: __spreadArray(__spreadArray([], levelProfile.qualities, true), profileQualities, true)
+  };
+}
+
+function generateVersion3Options(iiifInfo) {
+  var levelProfile = iiifInfo.getComplianceLevelSupportedFeatures(),
+      formats = iiifInfo.imageInfo.extraFormats === undefined ? levelProfile.formats : __spreadArray(__spreadArray([], levelProfile.formats, true), iiifInfo.imageInfo.extraFormats, true),
+      preferredFormat = iiifInfo.imageInfo.preferredFormats !== undefined && Array.isArray(iiifInfo.imageInfo.preferredFormats) && iiifInfo.imageInfo.preferredFormats.length > 0 ? iiifInfo.imageInfo.preferredFormats.filter(function (format) {
+    return (0, _array.includes)(['jpg', 'png', 'gif'], format);
+  }).reduce(function (acc, format) {
+    return acc === undefined && (0, _array.includes)(formats, format) ? format : acc;
+  }, undefined) : undefined;
+  return {
+    url: iiifInfo.imageInfo['id'],
+    sizes: iiifInfo.imageInfo.sizes === undefined ? undefined : iiifInfo.imageInfo.sizes.map(function (size) {
+      return [size.width, size.height];
+    }),
+    tileSize: iiifInfo.imageInfo.tiles === undefined ? undefined : [iiifInfo.imageInfo.tiles.map(function (tile) {
+      return tile.width;
+    })[0], iiifInfo.imageInfo.tiles.map(function (tile) {
+      return tile.height;
+    })[0]],
+    resolutions: iiifInfo.imageInfo.tiles === undefined ? undefined : iiifInfo.imageInfo.tiles.map(function (tile) {
+      return tile.scaleFactors;
+    })[0],
+    supports: iiifInfo.imageInfo.extraFeatures === undefined ? levelProfile.supports : __spreadArray(__spreadArray([], levelProfile.supports, true), iiifInfo.imageInfo.extraFeatures, true),
+    formats: formats,
+    qualities: iiifInfo.imageInfo.extraQualities === undefined ? levelProfile.qualities : __spreadArray(__spreadArray([], levelProfile.qualities, true), iiifInfo.imageInfo.extraQualities, true),
+    preferredFormat: preferredFormat
+  };
+}
+
+var versionFunctions = {};
+versionFunctions[Versions.VERSION1] = generateVersion1Options;
+versionFunctions[Versions.VERSION2] = generateVersion2Options;
+versionFunctions[Versions.VERSION3] = generateVersion3Options;
+/**
+ * @classdesc
+ * Format for transforming IIIF Image API image information responses into
+ * IIIF tile source ready options
+ *
+ * @api
+ */
+
+var IIIFInfo =
+/** @class */
+function () {
+  /**
+   * @param {string|ImageInformationResponse} imageInfo
+   * Deserialized image information JSON response object or JSON response as string
+   */
+  function IIIFInfo(imageInfo) {
+    this.setImageInfo(imageInfo);
+  }
+  /**
+   * @param {string|ImageInformationResponse} imageInfo
+   * Deserialized image information JSON response object or JSON response as string
+   * @api
+   */
+
+
+  IIIFInfo.prototype.setImageInfo = function (imageInfo) {
+    if (typeof imageInfo == 'string') {
+      this.imageInfo = JSON.parse(imageInfo);
+    } else {
+      this.imageInfo = imageInfo;
+    }
+  };
+  /**
+   * @return {Versions} Major IIIF version.
+   * @api
+   */
+
+
+  IIIFInfo.prototype.getImageApiVersion = function () {
+    if (this.imageInfo === undefined) {
+      return;
+    }
+
+    var context = this.imageInfo['@context'] || 'ol-no-context';
+
+    if (typeof context == 'string') {
+      context = [context];
+    }
+
+    for (var i = 0; i < context.length; i++) {
+      switch (context[i]) {
+        case 'http://library.stanford.edu/iiif/image-api/1.1/context.json':
+        case 'http://iiif.io/api/image/1/context.json':
+          return Versions.VERSION1;
+
+        case 'http://iiif.io/api/image/2/context.json':
+          return Versions.VERSION2;
+
+        case 'http://iiif.io/api/image/3/context.json':
+          return Versions.VERSION3;
+
+        case 'ol-no-context':
+          // Image API 1.0 has no '@context'
+          if (this.getComplianceLevelEntryFromProfile(Versions.VERSION1) && this.imageInfo.identifier) {
+            return Versions.VERSION1;
+          }
+
+          break;
+
+        default:
+      }
+    }
+
+    (0, _asserts.assert)(false, 61);
+  };
+  /**
+   * @param {Versions} version Optional IIIF image API version
+   * @return {string} Compliance level as it appears in the IIIF image information
+   * response.
+   */
+
+
+  IIIFInfo.prototype.getComplianceLevelEntryFromProfile = function (version) {
+    if (this.imageInfo === undefined || this.imageInfo.profile === undefined) {
+      return;
+    }
+
+    if (version === undefined) {
+      version = this.getImageApiVersion();
+    }
+
+    switch (version) {
+      case Versions.VERSION1:
+        if (COMPLIANCE_VERSION1.test(this.imageInfo.profile)) {
+          return this.imageInfo.profile;
+        }
+
+        break;
+
+      case Versions.VERSION3:
+        if (COMPLIANCE_VERSION3.test(this.imageInfo.profile)) {
+          return this.imageInfo.profile;
+        }
+
+        break;
+
+      case Versions.VERSION2:
+        if (typeof this.imageInfo.profile === 'string' && COMPLIANCE_VERSION2.test(this.imageInfo.profile)) {
+          return this.imageInfo.profile;
+        }
+
+        if (Array.isArray(this.imageInfo.profile) && this.imageInfo.profile.length > 0 && typeof this.imageInfo.profile[0] === 'string' && COMPLIANCE_VERSION2.test(this.imageInfo.profile[0])) {
+          return this.imageInfo.profile[0];
+        }
+
+        break;
+
+      default:
+    }
+  };
+  /**
+   * @param {Versions} version Optional IIIF image API version
+   * @return {string} Compliance level, on of 'level0', 'level1' or 'level2' or undefined
+   */
+
+
+  IIIFInfo.prototype.getComplianceLevelFromProfile = function (version) {
+    var complianceLevel = this.getComplianceLevelEntryFromProfile(version);
+
+    if (complianceLevel === undefined) {
+      return undefined;
+    }
+
+    var level = complianceLevel.match(/level[0-2](?:\.json)?$/g);
+    return Array.isArray(level) ? level[0].replace('.json', '') : undefined;
+  };
+  /**
+   * @return {SupportedFeatures} Image formats, qualities and region / size calculation
+   * methods that are supported by the IIIF service.
+   */
+
+
+  IIIFInfo.prototype.getComplianceLevelSupportedFeatures = function () {
+    if (this.imageInfo === undefined) {
+      return;
+    }
+
+    var version = this.getImageApiVersion();
+    var level = this.getComplianceLevelFromProfile(version);
+
+    if (level === undefined) {
+      return IIIF_PROFILE_VALUES['none']['none'];
+    }
+
+    return IIIF_PROFILE_VALUES[version][level];
+  };
+  /**
+   * @param {PreferredOptions} [opt_preferredOptions] Optional options for preferred format and quality.
+   * @return {import("../source/IIIF.js").Options} IIIF tile source ready constructor options.
+   * @api
+   */
+
+
+  IIIFInfo.prototype.getTileSourceOptions = function (opt_preferredOptions) {
+    var options = opt_preferredOptions || {},
+        version = this.getImageApiVersion();
+
+    if (version === undefined) {
+      return;
+    }
+
+    var imageOptions = version === undefined ? undefined : versionFunctions[version](this);
+
+    if (imageOptions === undefined) {
+      return;
+    }
+
+    return {
+      url: imageOptions.url,
+      version: version,
+      size: [this.imageInfo.width, this.imageInfo.height],
+      sizes: imageOptions.sizes,
+      format: options.format !== undefined && (0, _array.includes)(imageOptions.formats, options.format) ? options.format : imageOptions.preferredFormat !== undefined ? imageOptions.preferredFormat : 'jpg',
+      supports: imageOptions.supports,
+      quality: options.quality && (0, _array.includes)(imageOptions.qualities, options.quality) ? options.quality : (0, _array.includes)(imageOptions.qualities, 'native') ? 'native' : 'default',
+      resolutions: Array.isArray(imageOptions.resolutions) ? imageOptions.resolutions.sort(function (a, b) {
+        return b - a;
+      }) : undefined,
+      tileSize: imageOptions.tileSize
+    };
+  };
+
+  return IIIFInfo;
+}();
+
+var _default = IIIFInfo;
+exports.default = _default;
+},{"../asserts.js":"node_modules/ol/asserts.js","../array.js":"node_modules/ol/array.js"}],"node_modules/ol/source/IIIF.js":[function(require,module,exports) {
+"use strict";
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+exports.default = void 0;
+
+var _TileGrid = _interopRequireDefault(require("../tilegrid/TileGrid.js"));
+
+var _TileImage = _interopRequireDefault(require("./TileImage.js"));
+
+var _Zoomify = require("./Zoomify.js");
+
+var _common = require("../tilegrid/common.js");
+
+var _IIIFInfo = require("../format/IIIFInfo.js");
+
+var _asserts = require("../asserts.js");
+
+var _extent = require("../extent.js");
+
+var _array = require("../array.js");
+
+var _size = require("../size.js");
+
+function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
+
+/**
+ * @module ol/source/IIIF
+ */
+var __extends = void 0 && (void 0).__extends || function () {
+  var extendStatics = function (d, b) {
+    extendStatics = Object.setPrototypeOf || {
+      __proto__: []
+    } instanceof Array && function (d, b) {
+      d.__proto__ = b;
+    } || function (d, b) {
+      for (var p in b) if (Object.prototype.hasOwnProperty.call(b, p)) d[p] = b[p];
+    };
+
+    return extendStatics(d, b);
+  };
+
+  return function (d, b) {
+    if (typeof b !== "function" && b !== null) throw new TypeError("Class extends value " + String(b) + " is not a constructor or null");
+    extendStatics(d, b);
+
+    function __() {
+      this.constructor = d;
+    }
+
+    d.prototype = b === null ? Object.create(b) : (__.prototype = b.prototype, new __());
+  };
+}();
+
+/**
+ * @typedef {Object} Options
+ * @property {import("./Source.js").AttributionLike} [attributions] Attributions.
+ * @property {boolean} [attributionsCollapsible=true] Attributions are collapsible.
+ * @property {number} [cacheSize] Size of the cache.
+ * @property {null|string} [crossOrigin] The value for the crossOrigin option of the request.
+ * @property {import("../extent.js").Extent} [extent=[0, -height, width, 0]] The extent.
+ * @property {string} [format='jpg'] Requested image format.
+ * @property {boolean} [imageSmoothing=true] Deprecated.  Use the `interpolate` option instead.
+ * @property {boolean} [interpolate=true] Use interpolated values when resampling.  By default,
+ * linear interpolation is used when resampling.  Set to false to use the nearest neighbor instead.
+ * @property {import("../proj.js").ProjectionLike} [projection] Projection.
+ * @property {string} [quality] Requested IIIF image quality. Default is 'native'
+ * for version 1, 'default' for versions 2 and 3.
+ * @property {number} [reprojectionErrorThreshold=0.5] Maximum allowed reprojection error (in pixels).
+ * Higher values can increase reprojection performance, but decrease precision.
+ * @property {Array<number>} [resolutions] Supported resolutions as given in IIIF 'scaleFactors'
+ * @property {import("../size.js").Size} size Size of the image [width, height].
+ * @property {Array<import("../size.js").Size>} [sizes] Supported scaled image sizes.
+ * Content of the IIIF info.json 'sizes' property, but as array of Size objects.
+ * @property {import("./State.js").default} [state] Source state.
+ * @property {Array<string>} [supports=[]] Supported IIIF region and size calculation
+ * features.
+ * @property {number} [tilePixelRatio] Tile pixel ratio.
+ * @property {number|import("../size.js").Size} [tileSize] Tile size.
+ * Same tile size is used for all zoom levels. If tile size is a number,
+ * a square tile is assumed. If the IIIF image service supports arbitrary
+ * tiling (sizeByH, sizeByW, sizeByWh or sizeByPct as well as regionByPx or regionByPct
+ * are supported), the default tilesize is 256.
+ * @property {number} [transition] Transition.
+ * @property {string} [url] Base URL of the IIIF Image service.
+ * This should be the same as the IIIF Image ID.
+ * @property {import("../format/IIIFInfo.js").Versions} [version=Versions.VERSION2] Service's IIIF Image API version.
+ * @property {number|import("../array.js").NearestDirectionFunction} [zDirection=0]
+ * Choose whether to use tiles with a higher or lower zoom level when between integer
+ * zoom levels. See {@link module:ol/tilegrid/TileGrid~TileGrid#getZForResolution}.
+ */
+function formatPercentage(percentage) {
+  return percentage.toLocaleString('en', {
+    maximumFractionDigits: 10
+  });
+}
+/**
+ * @classdesc
+ * Layer source for IIIF Image API services.
+ * @api
+ */
+
+
+var IIIF =
+/** @class */
+function (_super) {
+  __extends(IIIF, _super);
+  /**
+   * @param {Options} [opt_options] Tile source options. Use {@link import("../format/IIIFInfo.js").IIIFInfo}
+   * to parse Image API service information responses into constructor options.
+   * @api
+   */
+
+
+  function IIIF(opt_options) {
+    var _this = this;
+    /**
+     * @type {Partial<Options>}
+     */
+
+
+    var options = opt_options || {};
+    var interpolate = options.imageSmoothing !== undefined ? options.imageSmoothing : true;
+
+    if (options.interpolate !== undefined) {
+      interpolate = options.interpolate;
+    }
+
+    var baseUrl = options.url || '';
+    baseUrl = baseUrl + (baseUrl.lastIndexOf('/') === baseUrl.length - 1 || baseUrl === '' ? '' : '/');
+    var version = options.version || _IIIFInfo.Versions.VERSION2;
+    var sizes = options.sizes || [];
+    var size = options.size;
+    (0, _asserts.assert)(size != undefined && Array.isArray(size) && size.length == 2 && !isNaN(size[0]) && size[0] > 0 && !isNaN(size[1]) && size[1] > 0, 60);
+    var width = size[0];
+    var height = size[1];
+    var tileSize = options.tileSize;
+    var tilePixelRatio = options.tilePixelRatio || 1;
+    var format = options.format || 'jpg';
+    var quality = options.quality || (options.version == _IIIFInfo.Versions.VERSION1 ? 'native' : 'default');
+    var resolutions = options.resolutions || [];
+    var supports = options.supports || [];
+    var extent = options.extent || [0, -height, width, 0];
+    var supportsListedSizes = sizes != undefined && Array.isArray(sizes) && sizes.length > 0;
+    var supportsListedTiles = tileSize !== undefined && (typeof tileSize === 'number' && Number.isInteger(tileSize) && tileSize > 0 || Array.isArray(tileSize) && tileSize.length > 0);
+    var supportsArbitraryTiling = supports != undefined && Array.isArray(supports) && ((0, _array.includes)(supports, 'regionByPx') || (0, _array.includes)(supports, 'regionByPct')) && ((0, _array.includes)(supports, 'sizeByWh') || (0, _array.includes)(supports, 'sizeByH') || (0, _array.includes)(supports, 'sizeByW') || (0, _array.includes)(supports, 'sizeByPct'));
+    var tileWidth, tileHeight, maxZoom;
+    resolutions.sort(function (a, b) {
+      return b - a;
+    });
+
+    if (supportsListedTiles || supportsArbitraryTiling) {
+      if (tileSize != undefined) {
+        if (typeof tileSize === 'number' && Number.isInteger(tileSize) && tileSize > 0) {
+          tileWidth = tileSize;
+          tileHeight = tileSize;
+        } else if (Array.isArray(tileSize) && tileSize.length > 0) {
+          if (tileSize.length == 1 || tileSize[1] == undefined && Number.isInteger(tileSize[0])) {
+            tileWidth = tileSize[0];
+            tileHeight = tileSize[0];
+          }
+
+          if (tileSize.length == 2) {
+            if (Number.isInteger(tileSize[0]) && Number.isInteger(tileSize[1])) {
+              tileWidth = tileSize[0];
+              tileHeight = tileSize[1];
+            } else if (tileSize[0] == undefined && Number.isInteger(tileSize[1])) {
+              tileWidth = tileSize[1];
+              tileHeight = tileSize[1];
+            }
+          }
+        }
+      }
+
+      if (tileWidth === undefined || tileHeight === undefined) {
+        tileWidth = _common.DEFAULT_TILE_SIZE;
+        tileHeight = _common.DEFAULT_TILE_SIZE;
+      }
+
+      if (resolutions.length == 0) {
+        maxZoom = Math.max(Math.ceil(Math.log(width / tileWidth) / Math.LN2), Math.ceil(Math.log(height / tileHeight) / Math.LN2));
+
+        for (var i = maxZoom; i >= 0; i--) {
+          resolutions.push(Math.pow(2, i));
+        }
+      } else {
+        var maxScaleFactor = Math.max.apply(Math, resolutions); // TODO maxScaleFactor might not be a power to 2
+
+        maxZoom = Math.round(Math.log(maxScaleFactor) / Math.LN2);
+      }
+    } else {
+      // No tile support.
+      tileWidth = width;
+      tileHeight = height;
+      resolutions = [];
+
+      if (supportsListedSizes) {
+        /*
+         * 'sizes' provided. Use full region in different resolutions. Every
+         * resolution has only one tile.
+         */
+        sizes.sort(function (a, b) {
+          return a[0] - b[0];
+        });
+        maxZoom = -1;
+        var ignoredSizesIndex = [];
+
+        for (var i = 0; i < sizes.length; i++) {
+          var resolution = width / sizes[i][0];
+
+          if (resolutions.length > 0 && resolutions[resolutions.length - 1] == resolution) {
+            ignoredSizesIndex.push(i);
+            continue;
+          }
+
+          resolutions.push(resolution);
+          maxZoom++;
+        }
+
+        if (ignoredSizesIndex.length > 0) {
+          for (var i = 0; i < ignoredSizesIndex.length; i++) {
+            sizes.splice(ignoredSizesIndex[i] - i, 1);
+          }
+        }
+      } else {
+        // No useful image information at all. Try pseudo tile with full image.
+        resolutions.push(1);
+        sizes.push([width, height]);
+        maxZoom = 0;
+      }
+    }
+
+    var tileGrid = new _TileGrid.default({
+      tileSize: [tileWidth, tileHeight],
+      extent: extent,
+      origin: (0, _extent.getTopLeft)(extent),
+      resolutions: resolutions
+    });
+
+    var tileUrlFunction = function (tileCoord, pixelRatio, projection) {
+      var regionParam, sizeParam;
+      var zoom = tileCoord[0];
+
+      if (zoom > maxZoom) {
+        return;
+      }
+
+      var tileX = tileCoord[1],
+          tileY = tileCoord[2],
+          scale = resolutions[zoom];
+
+      if (tileX === undefined || tileY === undefined || scale === undefined || tileX < 0 || Math.ceil(width / scale / tileWidth) <= tileX || tileY < 0 || Math.ceil(height / scale / tileHeight) <= tileY) {
+        return;
+      }
+
+      if (supportsArbitraryTiling || supportsListedTiles) {
+        var regionX = tileX * tileWidth * scale,
+            regionY = tileY * tileHeight * scale;
+        var regionW = tileWidth * scale,
+            regionH = tileHeight * scale,
+            sizeW = tileWidth,
+            sizeH = tileHeight;
+
+        if (regionX + regionW > width) {
+          regionW = width - regionX;
+        }
+
+        if (regionY + regionH > height) {
+          regionH = height - regionY;
+        }
+
+        if (regionX + tileWidth * scale > width) {
+          sizeW = Math.floor((width - regionX + scale - 1) / scale);
+        }
+
+        if (regionY + tileHeight * scale > height) {
+          sizeH = Math.floor((height - regionY + scale - 1) / scale);
+        }
+
+        if (regionX == 0 && regionW == width && regionY == 0 && regionH == height) {
+          // canonical full image region parameter is 'full', not 'x,y,w,h'
+          regionParam = 'full';
+        } else if (!supportsArbitraryTiling || (0, _array.includes)(supports, 'regionByPx')) {
+          regionParam = regionX + ',' + regionY + ',' + regionW + ',' + regionH;
+        } else if ((0, _array.includes)(supports, 'regionByPct')) {
+          var pctX = formatPercentage(regionX / width * 100),
+              pctY = formatPercentage(regionY / height * 100),
+              pctW = formatPercentage(regionW / width * 100),
+              pctH = formatPercentage(regionH / height * 100);
+          regionParam = 'pct:' + pctX + ',' + pctY + ',' + pctW + ',' + pctH;
+        }
+
+        if (version == _IIIFInfo.Versions.VERSION3 && (!supportsArbitraryTiling || (0, _array.includes)(supports, 'sizeByWh'))) {
+          sizeParam = sizeW + ',' + sizeH;
+        } else if (!supportsArbitraryTiling || (0, _array.includes)(supports, 'sizeByW')) {
+          sizeParam = sizeW + ',';
+        } else if ((0, _array.includes)(supports, 'sizeByH')) {
+          sizeParam = ',' + sizeH;
+        } else if ((0, _array.includes)(supports, 'sizeByWh')) {
+          sizeParam = sizeW + ',' + sizeH;
+        } else if ((0, _array.includes)(supports, 'sizeByPct')) {
+          sizeParam = 'pct:' + formatPercentage(100 / scale);
+        }
+      } else {
+        regionParam = 'full';
+
+        if (supportsListedSizes) {
+          var regionWidth = sizes[zoom][0],
+              regionHeight = sizes[zoom][1];
+
+          if (version == _IIIFInfo.Versions.VERSION3) {
+            if (regionWidth == width && regionHeight == height) {
+              sizeParam = 'max';
+            } else {
+              sizeParam = regionWidth + ',' + regionHeight;
+            }
+          } else {
+            if (regionWidth == width) {
+              sizeParam = 'full';
+            } else {
+              sizeParam = regionWidth + ',';
+            }
+          }
+        } else {
+          sizeParam = version == _IIIFInfo.Versions.VERSION3 ? 'max' : 'full';
+        }
+      }
+
+      return baseUrl + regionParam + '/' + sizeParam + '/0/' + quality + '.' + format;
+    };
+
+    var IiifTileClass = _Zoomify.CustomTile.bind(null, (0, _size.toSize)(tileSize || 256).map(function (size) {
+      return size * tilePixelRatio;
+    }));
+
+    _this = _super.call(this, {
+      attributions: options.attributions,
+      attributionsCollapsible: options.attributionsCollapsible,
+      cacheSize: options.cacheSize,
+      crossOrigin: options.crossOrigin,
+      interpolate: interpolate,
+      projection: options.projection,
+      reprojectionErrorThreshold: options.reprojectionErrorThreshold,
+      state: options.state,
+      tileClass: IiifTileClass,
+      tileGrid: tileGrid,
+      tilePixelRatio: options.tilePixelRatio,
+      tileUrlFunction: tileUrlFunction,
+      transition: options.transition
+    }) || this;
+    /**
+     * @type {number|import("../array.js").NearestDirectionFunction}
+     */
+
+    _this.zDirection = options.zDirection;
+    return _this;
+  }
+
+  return IIIF;
+}(_TileImage.default);
+
+var _default = IIIF;
+exports.default = _default;
+},{"../tilegrid/TileGrid.js":"node_modules/ol/tilegrid/TileGrid.js","./TileImage.js":"node_modules/ol/source/TileImage.js","./Zoomify.js":"node_modules/ol/source/Zoomify.js","../tilegrid/common.js":"node_modules/ol/tilegrid/common.js","../format/IIIFInfo.js":"node_modules/ol/format/IIIFInfo.js","../asserts.js":"node_modules/ol/asserts.js","../extent.js":"node_modules/ol/extent.js","../array.js":"node_modules/ol/array.js","../size.js":"node_modules/ol/size.js"}],"node_modules/ol/source/ImageArcGISRest.js":[function(require,module,exports) {
+"use strict";
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+exports.default = void 0;
+
+var _EventType = _interopRequireDefault(require("../events/EventType.js"));
+
+var _Image = _interopRequireWildcard(require("./Image.js"));
+
+var _Image2 = _interopRequireDefault(require("../Image.js"));
+
+var _uri = require("../uri.js");
+
+var _asserts = require("../asserts.js");
+
+var _obj = require("../obj.js");
+
+var _extent = require("../extent.js");
+
+function _getRequireWildcardCache(nodeInterop) { if (typeof WeakMap !== "function") return null; var cacheBabelInterop = new WeakMap(); var cacheNodeInterop = new WeakMap(); return (_getRequireWildcardCache = function (nodeInterop) { return nodeInterop ? cacheNodeInterop : cacheBabelInterop; })(nodeInterop); }
+
+function _interopRequireWildcard(obj, nodeInterop) { if (!nodeInterop && obj && obj.__esModule) { return obj; } if (obj === null || typeof obj !== "object" && typeof obj !== "function") { return { default: obj }; } var cache = _getRequireWildcardCache(nodeInterop); if (cache && cache.has(obj)) { return cache.get(obj); } var newObj = {}; var hasPropertyDescriptor = Object.defineProperty && Object.getOwnPropertyDescriptor; for (var key in obj) { if (key !== "default" && Object.prototype.hasOwnProperty.call(obj, key)) { var desc = hasPropertyDescriptor ? Object.getOwnPropertyDescriptor(obj, key) : null; if (desc && (desc.get || desc.set)) { Object.defineProperty(newObj, key, desc); } else { newObj[key] = obj[key]; } } } newObj.default = obj; if (cache) { cache.set(obj, newObj); } return newObj; }
+
+function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
+
+/**
+ * @module ol/source/ImageArcGISRest
+ */
+var __extends = void 0 && (void 0).__extends || function () {
+  var extendStatics = function (d, b) {
+    extendStatics = Object.setPrototypeOf || {
+      __proto__: []
+    } instanceof Array && function (d, b) {
+      d.__proto__ = b;
+    } || function (d, b) {
+      for (var p in b) if (Object.prototype.hasOwnProperty.call(b, p)) d[p] = b[p];
+    };
+
+    return extendStatics(d, b);
+  };
+
+  return function (d, b) {
+    if (typeof b !== "function" && b !== null) throw new TypeError("Class extends value " + String(b) + " is not a constructor or null");
+    extendStatics(d, b);
+
+    function __() {
+      this.constructor = d;
+    }
+
+    d.prototype = b === null ? Object.create(b) : (__.prototype = b.prototype, new __());
+  };
+}();
+
+/**
+ * @typedef {Object} Options
+ * @property {import("./Source.js").AttributionLike} [attributions] Attributions.
+ * @property {null|string} [crossOrigin] The `crossOrigin` attribute for loaded images.  Note that
+ * you must provide a `crossOrigin` value if you want to access pixel data with the Canvas renderer.
+ * See https://developer.mozilla.org/en-US/docs/Web/HTML/CORS_enabled_image for more detail.
+ * @property {boolean} [hidpi=true] Use the `ol/Map#pixelRatio` value when requesting the image from
+ * the remote server.
+ * @property {import("../Image.js").LoadFunction} [imageLoadFunction] Optional function to load an image given
+ * a URL.
+ * @property {boolean} [imageSmoothing=true] Deprecated.  Use the `interpolate` option instead.
+ * @property {boolean} [interpolate=true] Use interpolated values when resampling.  By default,
+ * linear interpolation is used when resampling.  Set to false to use the nearest neighbor instead.
+ * @property {Object<string,*>} [params] ArcGIS Rest parameters. This field is optional. Service
+ * defaults will be used for any fields not specified. `FORMAT` is `PNG32` by default. `F` is
+ * `IMAGE` by default. `TRANSPARENT` is `true` by default.  `BBOX`, `SIZE`, `BBOXSR`, and `IMAGESR`
+ * will be set dynamically. Set `LAYERS` to override the default service layer visibility. See
+ * https://developers.arcgis.com/rest/services-reference/export-map.htm
+ * for further reference.
+ * @property {import("../proj.js").ProjectionLike} [projection] Projection. Default is the view projection.
+ * The projection code must contain a numeric end portion separated by :
+ * or the entire code must form a valid ArcGIS SpatialReference definition.
+ * @property {number} [ratio=1.5] Ratio. `1` means image requests are the size of the map viewport,
+ * `2` means twice the size of the map viewport, and so on.
+ * @property {Array<number>} [resolutions] Resolutions. If specified, requests will be made for
+ * these resolutions only.
+ * @property {string} [url] ArcGIS Rest service URL for a Map Service or Image Service. The url
+ * should include /MapServer or /ImageServer.
+ */
+
+/**
+ * @classdesc
+ * Source for data from ArcGIS Rest services providing single, untiled images.
+ * Useful when underlying map service has labels.
+ *
+ * If underlying map service is not using labels,
+ * take advantage of ol image caching and use
+ * {@link module:ol/source/TileArcGISRest~TileArcGISRest} data source.
+ *
+ * @fires module:ol/source/Image.ImageSourceEvent
+ * @api
+ */
+var ImageArcGISRest =
+/** @class */
+function (_super) {
+  __extends(ImageArcGISRest, _super);
+  /**
+   * @param {Options} [opt_options] Image ArcGIS Rest Options.
+   */
+
+
+  function ImageArcGISRest(opt_options) {
+    var _this = this;
+
+    var options = opt_options ? opt_options : {};
+    var interpolate = options.imageSmoothing !== undefined ? options.imageSmoothing : true;
+
+    if (options.interpolate !== undefined) {
+      interpolate = options.interpolate;
+    }
+
+    _this = _super.call(this, {
+      attributions: options.attributions,
+      interpolate: interpolate,
+      projection: options.projection,
+      resolutions: options.resolutions
+    }) || this;
+    /**
+     * @private
+     * @type {?string}
+     */
+
+    _this.crossOrigin_ = options.crossOrigin !== undefined ? options.crossOrigin : null;
+    /**
+     * @private
+     * @type {boolean}
+     */
+
+    _this.hidpi_ = options.hidpi !== undefined ? options.hidpi : true;
+    /**
+     * @private
+     * @type {string|undefined}
+     */
+
+    _this.url_ = options.url;
+    /**
+     * @private
+     * @type {import("../Image.js").LoadFunction}
+     */
+
+    _this.imageLoadFunction_ = options.imageLoadFunction !== undefined ? options.imageLoadFunction : _Image.defaultImageLoadFunction;
+    /**
+     * @private
+     * @type {!Object}
+     */
+
+    _this.params_ = options.params || {};
+    /**
+     * @private
+     * @type {import("../Image.js").default}
+     */
+
+    _this.image_ = null;
+    /**
+     * @private
+     * @type {import("../size.js").Size}
+     */
+
+    _this.imageSize_ = [0, 0];
+    /**
+     * @private
+     * @type {number}
+     */
+
+    _this.renderedRevision_ = 0;
+    /**
+     * @private
+     * @type {number}
+     */
+
+    _this.ratio_ = options.ratio !== undefined ? options.ratio : 1.5;
+    return _this;
+  }
+  /**
+   * Get the user-provided params, i.e. those passed to the constructor through
+   * the "params" option, and possibly updated using the updateParams method.
+   * @return {Object} Params.
+   * @api
+   */
+
+
+  ImageArcGISRest.prototype.getParams = function () {
+    return this.params_;
+  };
+  /**
+   * @param {import("../extent.js").Extent} extent Extent.
+   * @param {number} resolution Resolution.
+   * @param {number} pixelRatio Pixel ratio.
+   * @param {import("../proj/Projection.js").default} projection Projection.
+   * @return {import("../Image.js").default} Single image.
+   */
+
+
+  ImageArcGISRest.prototype.getImageInternal = function (extent, resolution, pixelRatio, projection) {
+    if (this.url_ === undefined) {
+      return null;
+    }
+
+    resolution = this.findNearestResolution(resolution);
+    pixelRatio = this.hidpi_ ? pixelRatio : 1;
+    var image = this.image_;
+
+    if (image && this.renderedRevision_ == this.getRevision() && image.getResolution() == resolution && image.getPixelRatio() == pixelRatio && (0, _extent.containsExtent)(image.getExtent(), extent)) {
+      return image;
+    }
+
+    var params = {
+      'F': 'image',
+      'FORMAT': 'PNG32',
+      'TRANSPARENT': true
+    };
+    (0, _obj.assign)(params, this.params_);
+    extent = extent.slice();
+    var centerX = (extent[0] + extent[2]) / 2;
+    var centerY = (extent[1] + extent[3]) / 2;
+
+    if (this.ratio_ != 1) {
+      var halfWidth = this.ratio_ * (0, _extent.getWidth)(extent) / 2;
+      var halfHeight = this.ratio_ * (0, _extent.getHeight)(extent) / 2;
+      extent[0] = centerX - halfWidth;
+      extent[1] = centerY - halfHeight;
+      extent[2] = centerX + halfWidth;
+      extent[3] = centerY + halfHeight;
+    }
+
+    var imageResolution = resolution / pixelRatio; // Compute an integer width and height.
+
+    var width = Math.ceil((0, _extent.getWidth)(extent) / imageResolution);
+    var height = Math.ceil((0, _extent.getHeight)(extent) / imageResolution); // Modify the extent to match the integer width and height.
+
+    extent[0] = centerX - imageResolution * width / 2;
+    extent[2] = centerX + imageResolution * width / 2;
+    extent[1] = centerY - imageResolution * height / 2;
+    extent[3] = centerY + imageResolution * height / 2;
+    this.imageSize_[0] = width;
+    this.imageSize_[1] = height;
+    var url = this.getRequestUrl_(extent, this.imageSize_, pixelRatio, projection, params);
+    this.image_ = new _Image2.default(extent, resolution, pixelRatio, url, this.crossOrigin_, this.imageLoadFunction_);
+    this.renderedRevision_ = this.getRevision();
+    this.image_.addEventListener(_EventType.default.CHANGE, this.handleImageChange.bind(this));
+    return this.image_;
+  };
+  /**
+   * Return the image load function of the source.
+   * @return {import("../Image.js").LoadFunction} The image load function.
+   * @api
+   */
+
+
+  ImageArcGISRest.prototype.getImageLoadFunction = function () {
+    return this.imageLoadFunction_;
+  };
+  /**
+   * @param {import("../extent.js").Extent} extent Extent.
+   * @param {import("../size.js").Size} size Size.
+   * @param {number} pixelRatio Pixel ratio.
+   * @param {import("../proj/Projection.js").default} projection Projection.
+   * @param {Object} params Params.
+   * @return {string} Request URL.
+   * @private
+   */
+
+
+  ImageArcGISRest.prototype.getRequestUrl_ = function (extent, size, pixelRatio, projection, params) {
+    // ArcGIS Server only wants the numeric portion of the projection ID.
+    // (if there is no numeric portion the entire projection code must
+    // form a valid ArcGIS SpatialReference definition).
+    var srid = projection.getCode().split(/:(?=\d+$)/).pop();
+    params['SIZE'] = size[0] + ',' + size[1];
+    params['BBOX'] = extent.join(',');
+    params['BBOXSR'] = srid;
+    params['IMAGESR'] = srid;
+    params['DPI'] = Math.round(90 * pixelRatio);
+    var url = this.url_;
+    var modifiedUrl = url.replace(/MapServer\/?$/, 'MapServer/export').replace(/ImageServer\/?$/, 'ImageServer/exportImage');
+
+    if (modifiedUrl == url) {
+      (0, _asserts.assert)(false, 50); // `options.featureTypes` should be an Array
+    }
+
+    return (0, _uri.appendParams)(modifiedUrl, params);
+  };
+  /**
+   * Return the URL used for this ArcGIS source.
+   * @return {string|undefined} URL.
+   * @api
+   */
+
+
+  ImageArcGISRest.prototype.getUrl = function () {
+    return this.url_;
+  };
+  /**
+   * Set the image load function of the source.
+   * @param {import("../Image.js").LoadFunction} imageLoadFunction Image load function.
+   * @api
+   */
+
+
+  ImageArcGISRest.prototype.setImageLoadFunction = function (imageLoadFunction) {
+    this.image_ = null;
+    this.imageLoadFunction_ = imageLoadFunction;
+    this.changed();
+  };
+  /**
+   * Set the URL to use for requests.
+   * @param {string|undefined} url URL.
+   * @api
+   */
+
+
+  ImageArcGISRest.prototype.setUrl = function (url) {
+    if (url != this.url_) {
+      this.url_ = url;
+      this.image_ = null;
+      this.changed();
+    }
+  };
+  /**
+   * Update the user-provided params.
+   * @param {Object} params Params.
+   * @api
+   */
+
+
+  ImageArcGISRest.prototype.updateParams = function (params) {
+    (0, _obj.assign)(this.params_, params);
+    this.image_ = null;
+    this.changed();
+  };
+
+  return ImageArcGISRest;
+}(_Image.default);
+
+var _default = ImageArcGISRest;
+exports.default = _default;
+},{"../events/EventType.js":"node_modules/ol/events/EventType.js","./Image.js":"node_modules/ol/source/Image.js","../Image.js":"node_modules/ol/Image.js","../uri.js":"node_modules/ol/uri.js","../asserts.js":"node_modules/ol/asserts.js","../obj.js":"node_modules/ol/obj.js","../extent.js":"node_modules/ol/extent.js"}],"node_modules/ol/source/ImageCanvas.js":[function(require,module,exports) {
+"use strict";
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+exports.default = void 0;
+
+var _ImageCanvas = _interopRequireDefault(require("../ImageCanvas.js"));
+
+var _Image = _interopRequireDefault(require("./Image.js"));
+
+var _extent = require("../extent.js");
+
+function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
+
+/**
+ * @module ol/source/ImageCanvas
+ */
+var __extends = void 0 && (void 0).__extends || function () {
+  var extendStatics = function (d, b) {
+    extendStatics = Object.setPrototypeOf || {
+      __proto__: []
+    } instanceof Array && function (d, b) {
+      d.__proto__ = b;
+    } || function (d, b) {
+      for (var p in b) if (Object.prototype.hasOwnProperty.call(b, p)) d[p] = b[p];
+    };
+
+    return extendStatics(d, b);
+  };
+
+  return function (d, b) {
+    if (typeof b !== "function" && b !== null) throw new TypeError("Class extends value " + String(b) + " is not a constructor or null");
+    extendStatics(d, b);
+
+    function __() {
+      this.constructor = d;
+    }
+
+    d.prototype = b === null ? Object.create(b) : (__.prototype = b.prototype, new __());
+  };
+}();
+
+/**
+ * A function returning the canvas element (`{HTMLCanvasElement}`)
+ * used by the source as an image. The arguments passed to the function are:
+ * {@link module:ol/extent~Extent} the image extent, `{number}` the image resolution,
+ * `{number}` the pixel ratio of the map, {@link module:ol/size~Size} the image size,
+ * and {@link module:ol/proj/Projection~Projection} the image projection. The canvas returned by
+ * this function is cached by the source. The this keyword inside the function
+ * references the {@link module:ol/source/ImageCanvas~ImageCanvasSource}.
+ *
+ * @typedef {function(this:import("../ImageCanvas.js").default, import("../extent.js").Extent, number,
+ *     number, import("../size.js").Size, import("../proj/Projection.js").default): HTMLCanvasElement} FunctionType
+ */
+
+/**
+ * @typedef {Object} Options
+ * @property {import("./Source.js").AttributionLike} [attributions] Attributions.
+ * @property {FunctionType} [canvasFunction] Canvas function.
+ * The function returning the canvas element used by the source
+ * as an image. The arguments passed to the function are: {@link import("../extent.js").Extent} the
+ * image extent, `{number}` the image resolution, `{number}` the pixel ratio of the map,
+ * {@link import("../size.js").Size} the image size, and {@link import("../proj/Projection.js").default} the image
+ * projection. The canvas returned by this function is cached by the source. If
+ * the value returned by the function is later changed then
+ * `changed` should be called on the source for the source to
+ * invalidate the current cached image. See: {@link module:ol/Observable~Observable#changed}
+ * @property {boolean} [imageSmoothing=true] Deprecated.  Use the `interpolate` option instead.
+ * @property {boolean} [interpolate=true] Use interpolated values when resampling.  By default,
+ * linear interpolation is used when resampling.  Set to false to use the nearest neighbor instead.
+ * @property {import("../proj.js").ProjectionLike} [projection] Projection. Default is the view projection.
+ * @property {number} [ratio=1.5] Ratio. 1 means canvases are the size of the map viewport, 2 means twice the
+ * width and height of the map viewport, and so on. Must be `1` or higher.
+ * @property {Array<number>} [resolutions] Resolutions.
+ * If specified, new canvases will be created for these resolutions
+ * @property {import("./State.js").default} [state] Source state.
+ */
+
+/**
+ * @classdesc
+ * Base class for image sources where a canvas element is the image.
+ * @api
+ */
+var ImageCanvasSource =
+/** @class */
+function (_super) {
+  __extends(ImageCanvasSource, _super);
+  /**
+   * @param {Options} [opt_options] ImageCanvas options.
+   */
+
+
+  function ImageCanvasSource(opt_options) {
+    var _this = this;
+
+    var options = opt_options ? opt_options : {};
+    var interpolate = options.imageSmoothing !== undefined ? options.imageSmoothing : true;
+
+    if (options.interpolate !== undefined) {
+      interpolate = options.interpolate;
+    }
+
+    _this = _super.call(this, {
+      attributions: options.attributions,
+      interpolate: interpolate,
+      projection: options.projection,
+      resolutions: options.resolutions,
+      state: options.state
+    }) || this;
+    /**
+     * @private
+     * @type {FunctionType}
+     */
+
+    _this.canvasFunction_ = options.canvasFunction;
+    /**
+     * @private
+     * @type {import("../ImageCanvas.js").default}
+     */
+
+    _this.canvas_ = null;
+    /**
+     * @private
+     * @type {number}
+     */
+
+    _this.renderedRevision_ = 0;
+    /**
+     * @private
+     * @type {number}
+     */
+
+    _this.ratio_ = options.ratio !== undefined ? options.ratio : 1.5;
+    return _this;
+  }
+  /**
+   * @param {import("../extent.js").Extent} extent Extent.
+   * @param {number} resolution Resolution.
+   * @param {number} pixelRatio Pixel ratio.
+   * @param {import("../proj/Projection.js").default} projection Projection.
+   * @return {import("../ImageCanvas.js").default} Single image.
+   */
+
+
+  ImageCanvasSource.prototype.getImageInternal = function (extent, resolution, pixelRatio, projection) {
+    resolution = this.findNearestResolution(resolution);
+    var canvas = this.canvas_;
+
+    if (canvas && this.renderedRevision_ == this.getRevision() && canvas.getResolution() == resolution && canvas.getPixelRatio() == pixelRatio && (0, _extent.containsExtent)(canvas.getExtent(), extent)) {
+      return canvas;
+    }
+
+    extent = extent.slice();
+    (0, _extent.scaleFromCenter)(extent, this.ratio_);
+    var width = (0, _extent.getWidth)(extent) / resolution;
+    var height = (0, _extent.getHeight)(extent) / resolution;
+    var size = [width * pixelRatio, height * pixelRatio];
+    var canvasElement = this.canvasFunction_.call(this, extent, resolution, pixelRatio, size, projection);
+
+    if (canvasElement) {
+      canvas = new _ImageCanvas.default(extent, resolution, pixelRatio, canvasElement);
+    }
+
+    this.canvas_ = canvas;
+    this.renderedRevision_ = this.getRevision();
+    return canvas;
+  };
+
+  return ImageCanvasSource;
+}(_Image.default);
+
+var _default = ImageCanvasSource;
+exports.default = _default;
+},{"../ImageCanvas.js":"node_modules/ol/ImageCanvas.js","./Image.js":"node_modules/ol/source/Image.js","../extent.js":"node_modules/ol/extent.js"}],"node_modules/ol/source/ImageMapGuide.js":[function(require,module,exports) {
+"use strict";
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+exports.default = void 0;
+
+var _EventType = _interopRequireDefault(require("../events/EventType.js"));
+
+var _Image = _interopRequireWildcard(require("./Image.js"));
+
+var _Image2 = _interopRequireDefault(require("../Image.js"));
+
+var _uri = require("../uri.js");
+
+var _obj = require("../obj.js");
+
+var _extent = require("../extent.js");
+
+function _getRequireWildcardCache(nodeInterop) { if (typeof WeakMap !== "function") return null; var cacheBabelInterop = new WeakMap(); var cacheNodeInterop = new WeakMap(); return (_getRequireWildcardCache = function (nodeInterop) { return nodeInterop ? cacheNodeInterop : cacheBabelInterop; })(nodeInterop); }
+
+function _interopRequireWildcard(obj, nodeInterop) { if (!nodeInterop && obj && obj.__esModule) { return obj; } if (obj === null || typeof obj !== "object" && typeof obj !== "function") { return { default: obj }; } var cache = _getRequireWildcardCache(nodeInterop); if (cache && cache.has(obj)) { return cache.get(obj); } var newObj = {}; var hasPropertyDescriptor = Object.defineProperty && Object.getOwnPropertyDescriptor; for (var key in obj) { if (key !== "default" && Object.prototype.hasOwnProperty.call(obj, key)) { var desc = hasPropertyDescriptor ? Object.getOwnPropertyDescriptor(obj, key) : null; if (desc && (desc.get || desc.set)) { Object.defineProperty(newObj, key, desc); } else { newObj[key] = obj[key]; } } } newObj.default = obj; if (cache) { cache.set(obj, newObj); } return newObj; }
+
+function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
+
+/**
+ * @module ol/source/ImageMapGuide
+ */
+var __extends = void 0 && (void 0).__extends || function () {
+  var extendStatics = function (d, b) {
+    extendStatics = Object.setPrototypeOf || {
+      __proto__: []
+    } instanceof Array && function (d, b) {
+      d.__proto__ = b;
+    } || function (d, b) {
+      for (var p in b) if (Object.prototype.hasOwnProperty.call(b, p)) d[p] = b[p];
+    };
+
+    return extendStatics(d, b);
+  };
+
+  return function (d, b) {
+    if (typeof b !== "function" && b !== null) throw new TypeError("Class extends value " + String(b) + " is not a constructor or null");
+    extendStatics(d, b);
+
+    function __() {
+      this.constructor = d;
+    }
+
+    d.prototype = b === null ? Object.create(b) : (__.prototype = b.prototype, new __());
+  };
+}();
+
+/**
+ * @typedef {Object} Options
+ * @property {string} [url] The mapagent url.
+ * @property {null|string} [crossOrigin] The `crossOrigin` attribute for loaded images.  Note that
+ * you must provide a `crossOrigin` value if you want to access pixel data with the Canvas renderer.
+ * See https://developer.mozilla.org/en-US/docs/Web/HTML/CORS_enabled_image for more detail.
+ * @property {number} [displayDpi=96] The display resolution.
+ * @property {number} [metersPerUnit=1] The meters-per-unit value.
+ * @property {boolean} [hidpi=true] Use the `ol/Map#pixelRatio` value when requesting
+ * the image from the remote server.
+ * @property {boolean} [useOverlay] If `true`, will use `GETDYNAMICMAPOVERLAYIMAGE`.
+ * @property {import("../proj.js").ProjectionLike} [projection] Projection. Default is the view projection.
+ * @property {number} [ratio=1] Ratio. `1` means image requests are the size of the map viewport, `2` means
+ * twice the width and height of the map viewport, and so on. Must be `1` or higher.
+ * @property {Array<number>} [resolutions] Resolutions.
+ * If specified, requests will be made for these resolutions only.
+ * @property {import("../Image.js").LoadFunction} [imageLoadFunction] Optional function to load an image given a URL.
+ * @property {boolean} [imageSmoothing=true] Deprecated.  Use the `interpolate` option instead.
+ * @property {boolean} [interpolate=true] Use interpolated values when resampling.  By default,
+ * linear interpolation is used when resampling.  Set to false to use the nearest neighbor instead.
+ * @property {Object} [params] Additional parameters.
+ */
+
+/**
+ * @classdesc
+ * Source for images from Mapguide servers
+ *
+ * @fires module:ol/source/Image.ImageSourceEvent
+ * @api
+ */
+var ImageMapGuide =
+/** @class */
+function (_super) {
+  __extends(ImageMapGuide, _super);
+  /**
+   * @param {Options} options ImageMapGuide options.
+   */
+
+
+  function ImageMapGuide(options) {
+    var _this = this;
+
+    var interpolate = options.imageSmoothing !== undefined ? options.imageSmoothing : true;
+
+    if (options.interpolate !== undefined) {
+      interpolate = options.interpolate;
+    }
+
+    _this = _super.call(this, {
+      interpolate: interpolate,
+      projection: options.projection,
+      resolutions: options.resolutions
+    }) || this;
+    /**
+     * @private
+     * @type {?string}
+     */
+
+    _this.crossOrigin_ = options.crossOrigin !== undefined ? options.crossOrigin : null;
+    /**
+     * @private
+     * @type {number}
+     */
+
+    _this.displayDpi_ = options.displayDpi !== undefined ? options.displayDpi : 96;
+    /**
+     * @private
+     * @type {!Object}
+     */
+
+    _this.params_ = options.params || {};
+    /**
+     * @private
+     * @type {string|undefined}
+     */
+
+    _this.url_ = options.url;
+    /**
+     * @private
+     * @type {import("../Image.js").LoadFunction}
+     */
+
+    _this.imageLoadFunction_ = options.imageLoadFunction !== undefined ? options.imageLoadFunction : _Image.defaultImageLoadFunction;
+    /**
+     * @private
+     * @type {boolean}
+     */
+
+    _this.hidpi_ = options.hidpi !== undefined ? options.hidpi : true;
+    /**
+     * @private
+     * @type {number}
+     */
+
+    _this.metersPerUnit_ = options.metersPerUnit !== undefined ? options.metersPerUnit : 1;
+    /**
+     * @private
+     * @type {number}
+     */
+
+    _this.ratio_ = options.ratio !== undefined ? options.ratio : 1;
+    /**
+     * @private
+     * @type {boolean}
+     */
+
+    _this.useOverlay_ = options.useOverlay !== undefined ? options.useOverlay : false;
+    /**
+     * @private
+     * @type {import("../Image.js").default}
+     */
+
+    _this.image_ = null;
+    /**
+     * @private
+     * @type {number}
+     */
+
+    _this.renderedRevision_ = 0;
+    return _this;
+  }
+  /**
+   * Get the user-provided params, i.e. those passed to the constructor through
+   * the "params" option, and possibly updated using the updateParams method.
+   * @return {Object} Params.
+   * @api
+   */
+
+
+  ImageMapGuide.prototype.getParams = function () {
+    return this.params_;
+  };
+  /**
+   * @param {import("../extent.js").Extent} extent Extent.
+   * @param {number} resolution Resolution.
+   * @param {number} pixelRatio Pixel ratio.
+   * @param {import("../proj/Projection.js").default} projection Projection.
+   * @return {import("../Image.js").default} Single image.
+   */
+
+
+  ImageMapGuide.prototype.getImageInternal = function (extent, resolution, pixelRatio, projection) {
+    resolution = this.findNearestResolution(resolution);
+    pixelRatio = this.hidpi_ ? pixelRatio : 1;
+    var image = this.image_;
+
+    if (image && this.renderedRevision_ == this.getRevision() && image.getResolution() == resolution && image.getPixelRatio() == pixelRatio && (0, _extent.containsExtent)(image.getExtent(), extent)) {
+      return image;
+    }
+
+    if (this.ratio_ != 1) {
+      extent = extent.slice();
+      (0, _extent.scaleFromCenter)(extent, this.ratio_);
+    }
+
+    var width = (0, _extent.getWidth)(extent) / resolution;
+    var height = (0, _extent.getHeight)(extent) / resolution;
+    var size = [width * pixelRatio, height * pixelRatio];
+
+    if (this.url_ !== undefined) {
+      var imageUrl = this.getUrl(this.url_, this.params_, extent, size, projection);
+      image = new _Image2.default(extent, resolution, pixelRatio, imageUrl, this.crossOrigin_, this.imageLoadFunction_);
+      image.addEventListener(_EventType.default.CHANGE, this.handleImageChange.bind(this));
+    } else {
+      image = null;
+    }
+
+    this.image_ = image;
+    this.renderedRevision_ = this.getRevision();
+    return image;
+  };
+  /**
+   * Return the image load function of the source.
+   * @return {import("../Image.js").LoadFunction} The image load function.
+   * @api
+   */
+
+
+  ImageMapGuide.prototype.getImageLoadFunction = function () {
+    return this.imageLoadFunction_;
+  };
+  /**
+   * Update the user-provided params.
+   * @param {Object} params Params.
+   * @api
+   */
+
+
+  ImageMapGuide.prototype.updateParams = function (params) {
+    (0, _obj.assign)(this.params_, params);
+    this.changed();
+  };
+  /**
+   * @param {string} baseUrl The mapagent url.
+   * @param {Object<string, string|number>} params Request parameters.
+   * @param {import("../extent.js").Extent} extent Extent.
+   * @param {import("../size.js").Size} size Size.
+   * @param {import("../proj/Projection.js").default} projection Projection.
+   * @return {string} The mapagent map image request URL.
+   */
+
+
+  ImageMapGuide.prototype.getUrl = function (baseUrl, params, extent, size, projection) {
+    var scale = getScale(extent, size, this.metersPerUnit_, this.displayDpi_);
+    var center = (0, _extent.getCenter)(extent);
+    var baseParams = {
+      'OPERATION': this.useOverlay_ ? 'GETDYNAMICMAPOVERLAYIMAGE' : 'GETMAPIMAGE',
+      'VERSION': '2.0.0',
+      'LOCALE': 'en',
+      'CLIENTAGENT': 'ol/source/ImageMapGuide source',
+      'CLIP': '1',
+      'SETDISPLAYDPI': this.displayDpi_,
+      'SETDISPLAYWIDTH': Math.round(size[0]),
+      'SETDISPLAYHEIGHT': Math.round(size[1]),
+      'SETVIEWSCALE': scale,
+      'SETVIEWCENTERX': center[0],
+      'SETVIEWCENTERY': center[1]
+    };
+    (0, _obj.assign)(baseParams, params);
+    return (0, _uri.appendParams)(baseUrl, baseParams);
+  };
+  /**
+   * Set the image load function of the MapGuide source.
+   * @param {import("../Image.js").LoadFunction} imageLoadFunction Image load function.
+   * @api
+   */
+
+
+  ImageMapGuide.prototype.setImageLoadFunction = function (imageLoadFunction) {
+    this.image_ = null;
+    this.imageLoadFunction_ = imageLoadFunction;
+    this.changed();
+  };
+
+  return ImageMapGuide;
+}(_Image.default);
+/**
+ * @param {import("../extent.js").Extent} extent The map extents.
+ * @param {import("../size.js").Size} size The viewport size.
+ * @param {number} metersPerUnit The meters-per-unit value.
+ * @param {number} dpi The display resolution.
+ * @return {number} The computed map scale.
+ */
+
+
+function getScale(extent, size, metersPerUnit, dpi) {
+  var mcsW = (0, _extent.getWidth)(extent);
+  var mcsH = (0, _extent.getHeight)(extent);
+  var devW = size[0];
+  var devH = size[1];
+  var mpp = 0.0254 / dpi;
+
+  if (devH * mcsW > devW * mcsH) {
+    return mcsW * metersPerUnit / (devW * mpp); // width limited
+  } else {
+    return mcsH * metersPerUnit / (devH * mpp); // height limited
+  }
+}
+
+var _default = ImageMapGuide;
+exports.default = _default;
+},{"../events/EventType.js":"node_modules/ol/events/EventType.js","./Image.js":"node_modules/ol/source/Image.js","../Image.js":"node_modules/ol/Image.js","../uri.js":"node_modules/ol/uri.js","../obj.js":"node_modules/ol/obj.js","../extent.js":"node_modules/ol/extent.js"}],"node_modules/ol/source/ImageStatic.js":[function(require,module,exports) {
+"use strict";
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+exports.default = void 0;
+
+var _EventType = _interopRequireDefault(require("../events/EventType.js"));
+
+var _Image = _interopRequireWildcard(require("./Image.js"));
+
+var _ImageState = _interopRequireDefault(require("../ImageState.js"));
+
+var _Image2 = _interopRequireDefault(require("../Image.js"));
+
+var _common = require("../renderer/canvas/common.js");
+
+var _obj = require("../obj.js");
+
+var _dom = require("../dom.js");
+
+var _extent = require("../extent.js");
+
+var _proj = require("../proj.js");
+
+function _getRequireWildcardCache(nodeInterop) { if (typeof WeakMap !== "function") return null; var cacheBabelInterop = new WeakMap(); var cacheNodeInterop = new WeakMap(); return (_getRequireWildcardCache = function (nodeInterop) { return nodeInterop ? cacheNodeInterop : cacheBabelInterop; })(nodeInterop); }
+
+function _interopRequireWildcard(obj, nodeInterop) { if (!nodeInterop && obj && obj.__esModule) { return obj; } if (obj === null || typeof obj !== "object" && typeof obj !== "function") { return { default: obj }; } var cache = _getRequireWildcardCache(nodeInterop); if (cache && cache.has(obj)) { return cache.get(obj); } var newObj = {}; var hasPropertyDescriptor = Object.defineProperty && Object.getOwnPropertyDescriptor; for (var key in obj) { if (key !== "default" && Object.prototype.hasOwnProperty.call(obj, key)) { var desc = hasPropertyDescriptor ? Object.getOwnPropertyDescriptor(obj, key) : null; if (desc && (desc.get || desc.set)) { Object.defineProperty(newObj, key, desc); } else { newObj[key] = obj[key]; } } } newObj.default = obj; if (cache) { cache.set(obj, newObj); } return newObj; }
+
+function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
+
+/**
+ * @module ol/source/ImageStatic
+ */
+var __extends = void 0 && (void 0).__extends || function () {
+  var extendStatics = function (d, b) {
+    extendStatics = Object.setPrototypeOf || {
+      __proto__: []
+    } instanceof Array && function (d, b) {
+      d.__proto__ = b;
+    } || function (d, b) {
+      for (var p in b) if (Object.prototype.hasOwnProperty.call(b, p)) d[p] = b[p];
+    };
+
+    return extendStatics(d, b);
+  };
+
+  return function (d, b) {
+    if (typeof b !== "function" && b !== null) throw new TypeError("Class extends value " + String(b) + " is not a constructor or null");
+    extendStatics(d, b);
+
+    function __() {
+      this.constructor = d;
+    }
+
+    d.prototype = b === null ? Object.create(b) : (__.prototype = b.prototype, new __());
+  };
+}();
+
+/**
+ * @typedef {Object} Options
+ * @property {import("./Source.js").AttributionLike} [attributions] Attributions.
+ * @property {null|string} [crossOrigin] The `crossOrigin` attribute for loaded images.  Note that
+ * you must provide a `crossOrigin` value if you want to access pixel data with the Canvas renderer.
+ * See https://developer.mozilla.org/en-US/docs/Web/HTML/CORS_enabled_image for more detail.
+ * @property {import("../extent.js").Extent} [imageExtent] Extent of the image in map coordinates.
+ * This is the [left, bottom, right, top] map coordinates of your image.
+ * @property {import("../Image.js").LoadFunction} [imageLoadFunction] Optional function to load an image given a URL.
+ * @property {boolean} [imageSmoothing=true] Deprecated.  Use the `interpolate` option instead.
+ * @property {boolean} [interpolate=true] Use interpolated values when resampling.  By default,
+ * linear interpolation is used when resampling.  Set to false to use the nearest neighbor instead.
+ * @property {import("../proj.js").ProjectionLike} [projection] Projection. Default is the view projection.
+ * @property {import("../size.js").Size} [imageSize] Size of the image in pixels. Usually the image size is auto-detected, so this
+ * only needs to be set if auto-detection fails for some reason.
+ * @property {string} url Image URL.
+ */
+
+/**
+ * @classdesc
+ * A layer source for displaying a single, static image.
+ * @api
+ */
+var Static =
+/** @class */
+function (_super) {
+  __extends(Static, _super);
+  /**
+   * @param {Options} options ImageStatic options.
+   */
+
+
+  function Static(options) {
+    var _this = this;
+
+    var crossOrigin = options.crossOrigin !== undefined ? options.crossOrigin : null;
+    var
+    /** @type {import("../Image.js").LoadFunction} */
+    imageLoadFunction = options.imageLoadFunction !== undefined ? options.imageLoadFunction : _Image.defaultImageLoadFunction;
+    var interpolate = options.imageSmoothing !== undefined ? options.imageSmoothing : true;
+
+    if (options.interpolate !== undefined) {
+      interpolate = options.interpolate;
+    }
+
+    _this = _super.call(this, {
+      attributions: options.attributions,
+      interpolate: interpolate,
+      projection: (0, _proj.get)(options.projection)
+    }) || this;
+    /**
+     * @private
+     * @type {string}
+     */
+
+    _this.url_ = options.url;
+    /**
+     * @private
+     * @type {import("../extent.js").Extent}
+     */
+
+    _this.imageExtent_ = options.imageExtent;
+    /**
+     * @private
+     * @type {import("../Image.js").default}
+     */
+
+    _this.image_ = new _Image2.default(_this.imageExtent_, undefined, 1, _this.url_, crossOrigin, imageLoadFunction);
+    /**
+     * @private
+     * @type {import("../size.js").Size|null}
+     */
+
+    _this.imageSize_ = options.imageSize ? options.imageSize : null;
+
+    _this.image_.addEventListener(_EventType.default.CHANGE, _this.handleImageChange.bind(_this));
+
+    return _this;
+  }
+  /**
+   * Returns the image extent
+   * @return {import("../extent.js").Extent} image extent.
+   * @api
+   */
+
+
+  Static.prototype.getImageExtent = function () {
+    return this.imageExtent_;
+  };
+  /**
+   * @param {import("../extent.js").Extent} extent Extent.
+   * @param {number} resolution Resolution.
+   * @param {number} pixelRatio Pixel ratio.
+   * @param {import("../proj/Projection.js").default} projection Projection.
+   * @return {import("../Image.js").default} Single image.
+   */
+
+
+  Static.prototype.getImageInternal = function (extent, resolution, pixelRatio, projection) {
+    if ((0, _extent.intersects)(extent, this.image_.getExtent())) {
+      return this.image_;
+    }
+
+    return null;
+  };
+  /**
+   * Return the URL used for this image source.
+   * @return {string} URL.
+   * @api
+   */
+
+
+  Static.prototype.getUrl = function () {
+    return this.url_;
+  };
+  /**
+   * @param {import("../events/Event.js").default} evt Event.
+   */
+
+
+  Static.prototype.handleImageChange = function (evt) {
+    if (this.image_.getState() == _ImageState.default.LOADED) {
+      var imageExtent = this.image_.getExtent();
+      var image = this.image_.getImage();
+      var imageWidth = void 0,
+          imageHeight = void 0;
+
+      if (this.imageSize_) {
+        imageWidth = this.imageSize_[0];
+        imageHeight = this.imageSize_[1];
+      } else {
+        imageWidth = image.width;
+        imageHeight = image.height;
+      }
+
+      var extentWidth = (0, _extent.getWidth)(imageExtent);
+      var extentHeight = (0, _extent.getHeight)(imageExtent);
+      var xResolution = extentWidth / imageWidth;
+      var yResolution = extentHeight / imageHeight;
+      var targetWidth = imageWidth;
+      var targetHeight = imageHeight;
+
+      if (xResolution > yResolution) {
+        targetWidth = Math.round(extentWidth / yResolution);
+      } else {
+        targetHeight = Math.round(extentHeight / xResolution);
+      }
+
+      if (targetWidth !== imageWidth || targetHeight !== imageHeight) {
+        var context = (0, _dom.createCanvasContext2D)(targetWidth, targetHeight);
+
+        if (!this.getInterpolate()) {
+          (0, _obj.assign)(context, _common.IMAGE_SMOOTHING_DISABLED);
+        }
+
+        var canvas = context.canvas;
+        context.drawImage(image, 0, 0, imageWidth, imageHeight, 0, 0, canvas.width, canvas.height);
+        this.image_.setImage(canvas);
+      }
+    }
+
+    _super.prototype.handleImageChange.call(this, evt);
+  };
+
+  return Static;
+}(_Image.default);
+
+var _default = Static;
+exports.default = _default;
+},{"../events/EventType.js":"node_modules/ol/events/EventType.js","./Image.js":"node_modules/ol/source/Image.js","../ImageState.js":"node_modules/ol/ImageState.js","../Image.js":"node_modules/ol/Image.js","../renderer/canvas/common.js":"node_modules/ol/renderer/canvas/common.js","../obj.js":"node_modules/ol/obj.js","../dom.js":"node_modules/ol/dom.js","../extent.js":"node_modules/ol/extent.js","../proj.js":"node_modules/ol/proj.js"}],"node_modules/ol/source/OSM.js":[function(require,module,exports) {
+"use strict";
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+exports.default = exports.ATTRIBUTION = void 0;
+
+var _XYZ = _interopRequireDefault(require("./XYZ.js"));
+
+function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
+
+/**
+ * @module ol/source/OSM
+ */
+var __extends = void 0 && (void 0).__extends || function () {
+  var extendStatics = function (d, b) {
+    extendStatics = Object.setPrototypeOf || {
+      __proto__: []
+    } instanceof Array && function (d, b) {
+      d.__proto__ = b;
+    } || function (d, b) {
+      for (var p in b) if (Object.prototype.hasOwnProperty.call(b, p)) d[p] = b[p];
+    };
+
+    return extendStatics(d, b);
+  };
+
+  return function (d, b) {
+    if (typeof b !== "function" && b !== null) throw new TypeError("Class extends value " + String(b) + " is not a constructor or null");
+    extendStatics(d, b);
+
+    function __() {
+      this.constructor = d;
+    }
+
+    d.prototype = b === null ? Object.create(b) : (__.prototype = b.prototype, new __());
+  };
+}();
+
+/**
+ * The attribution containing a link to the OpenStreetMap Copyright and License
+ * page.
+ * @const
+ * @type {string}
+ * @api
+ */
+var ATTRIBUTION = '&#169; ' + '<a href="https://www.openstreetmap.org/copyright" target="_blank">OpenStreetMap</a> ' + 'contributors.';
+/**
+ * @typedef {Object} Options
+ * @property {import("./Source.js").AttributionLike} [attributions] Attributions.
+ * @property {number} [cacheSize] Initial tile cache size. Will auto-grow to hold at least the number of tiles in the viewport.
+ * @property {null|string} [crossOrigin='anonymous'] The `crossOrigin` attribute for loaded images.  Note that
+ * you must provide a `crossOrigin` value if you want to access pixel data with the Canvas renderer.
+ * See https://developer.mozilla.org/en-US/docs/Web/HTML/CORS_enabled_image for more detail.
+ * @property {boolean} [imageSmoothing=true] Deprecated.  Use the `interpolate` option instead.
+ * @property {boolean} [interpolate=true] Use interpolated values when resampling.  By default,
+ * linear interpolation is used when resampling.  Set to false to use the nearest neighbor instead.
+ * @property {number} [maxZoom=19] Max zoom.
+ * @property {boolean} [opaque=true] Whether the layer is opaque.
+ * @property {number} [reprojectionErrorThreshold=0.5] Maximum allowed reprojection error (in pixels).
+ * Higher values can increase reprojection performance, but decrease precision.
+ * @property {import("../Tile.js").LoadFunction} [tileLoadFunction] Optional function to load a tile given a URL. The default is
+ * ```js
+ * function(imageTile, src) {
+ *   imageTile.getImage().src = src;
+ * };
+ * ```
+ * @property {number} [transition=250] Duration of the opacity transition for rendering.
+ * To disable the opacity transition, pass `transition: 0`.
+ * @property {string} [url='https://{a-c}.tile.openstreetmap.org/{z}/{x}/{y}.png'] URL template.
+ * Must include `{x}`, `{y}` or `{-y}`, and `{z}` placeholders.
+ * @property {boolean} [wrapX=true] Whether to wrap the world horizontally.
+ * @property {number|import("../array.js").NearestDirectionFunction} [zDirection=0]
+ * Choose whether to use tiles with a higher or lower zoom level when between integer
+ * zoom levels. See {@link module:ol/tilegrid/TileGrid~TileGrid#getZForResolution}.
+ */
+
+/**
+ * @classdesc
+ * Layer source for the OpenStreetMap tile server.
+ * @api
+ */
+
+exports.ATTRIBUTION = ATTRIBUTION;
+
+var OSM =
+/** @class */
+function (_super) {
+  __extends(OSM, _super);
+  /**
+   * @param {Options} [opt_options] Open Street Map options.
+   */
+
+
+  function OSM(opt_options) {
+    var options = opt_options || {};
+    var interpolate = options.imageSmoothing !== undefined ? options.imageSmoothing : true;
+
+    if (options.interpolate !== undefined) {
+      interpolate = options.interpolate;
+    }
+
+    var attributions;
+
+    if (options.attributions !== undefined) {
+      attributions = options.attributions;
+    } else {
+      attributions = [ATTRIBUTION];
+    }
+
+    var crossOrigin = options.crossOrigin !== undefined ? options.crossOrigin : 'anonymous';
+    var url = options.url !== undefined ? options.url : 'https://{a-c}.tile.openstreetmap.org/{z}/{x}/{y}.png';
+    return _super.call(this, {
+      attributions: attributions,
+      attributionsCollapsible: false,
+      cacheSize: options.cacheSize,
+      crossOrigin: crossOrigin,
+      interpolate: interpolate,
+      maxZoom: options.maxZoom !== undefined ? options.maxZoom : 19,
+      opaque: options.opaque !== undefined ? options.opaque : true,
+      reprojectionErrorThreshold: options.reprojectionErrorThreshold,
+      tileLoadFunction: options.tileLoadFunction,
+      transition: options.transition,
+      url: url,
+      wrapX: options.wrapX,
+      zDirection: options.zDirection
+    }) || this;
+  }
+
+  return OSM;
+}(_XYZ.default);
+
+var _default = OSM;
+exports.default = _default;
+},{"./XYZ.js":"node_modules/ol/source/XYZ.js"}],"node_modules/ol/source/Raster.js":[function(require,module,exports) {
+var Buffer = require("buffer").Buffer;
+"use strict";
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+exports.default = exports.RasterSourceEvent = exports.Processor = void 0;
+exports.newImageData = newImageData;
+
+var _Disposable = _interopRequireDefault(require("../Disposable.js"));
+
+var _Event = _interopRequireDefault(require("../events/Event.js"));
+
+var _EventType = _interopRequireDefault(require("../events/EventType.js"));
+
+var _ImageCanvas = _interopRequireDefault(require("../ImageCanvas.js"));
+
+var _Image = _interopRequireDefault(require("../layer/Image.js"));
+
+var _Image2 = _interopRequireDefault(require("./Image.js"));
+
+var _Source = _interopRequireDefault(require("./Source.js"));
+
+var _State = _interopRequireDefault(require("./State.js"));
+
+var _Tile = _interopRequireDefault(require("../layer/Tile.js"));
+
+var _TileQueue = _interopRequireDefault(require("../TileQueue.js"));
+
+var _Tile2 = _interopRequireDefault(require("./Tile.js"));
+
+var _obj = require("../obj.js");
+
+var _dom = require("../dom.js");
+
+var _transform = require("../transform.js");
+
+var _extent = require("../extent.js");
+
+var _util = require("../util.js");
+
+function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
+
+var __extends = void 0 && (void 0).__extends || function () {
+  var extendStatics = function (d, b) {
+    extendStatics = Object.setPrototypeOf || {
+      __proto__: []
+    } instanceof Array && function (d, b) {
+      d.__proto__ = b;
+    } || function (d, b) {
+      for (var p in b) if (Object.prototype.hasOwnProperty.call(b, p)) d[p] = b[p];
+    };
+
+    return extendStatics(d, b);
+  };
+
+  return function (d, b) {
+    if (typeof b !== "function" && b !== null) throw new TypeError("Class extends value " + String(b) + " is not a constructor or null");
+    extendStatics(d, b);
+
+    function __() {
+      this.constructor = d;
+    }
+
+    d.prototype = b === null ? Object.create(b) : (__.prototype = b.prototype, new __());
+  };
+}();
+/**
+ * @module ol/source/Raster
+ */
+
+
+var hasImageData = true;
+
+try {
+  new ImageData(10, 10);
+} catch (_) {
+  hasImageData = false;
+}
+/** @type {CanvasRenderingContext2D} */
+
+
+var context;
+/**
+ * @param {Uint8ClampedArray} data Image data.
+ * @param {number} width Number of columns.
+ * @param {number} height Number of rows.
+ * @return {ImageData} Image data.
+ */
+
+function newImageData(data, width, height) {
+  if (hasImageData) {
+    return new ImageData(data, width, height);
+  }
+
+  if (!context) {
+    context = document.createElement('canvas').getContext('2d');
+  }
+
+  var imageData = context.createImageData(width, height);
+  imageData.data.set(data);
+  return imageData;
+}
+/**
+ * @typedef {Object} MinionData
+ * @property {Array<ArrayBuffer>} buffers Array of buffers.
+ * @property {Object} meta Operation metadata.
+ * @property {boolean} imageOps The operation is an image operation.
+ * @property {number} width The width of the image.
+ * @property {number} height The height of the image.
+ */
+
+/* istanbul ignore next */
+
+/**
+ * Create a function for running operations.  This function is serialized for
+ * use in a worker.
+ * @param {function(Array, Object):*} operation The operation.
+ * @return {function(MinionData):ArrayBuffer} A function that takes an object with
+ * buffers, meta, imageOps, width, and height properties and returns an array
+ * buffer.
+ */
+
+
+function createMinion(operation) {
+  var workerHasImageData = true;
+
+  try {
+    new ImageData(10, 10);
+  } catch (_) {
+    workerHasImageData = false;
+  }
+
+  function newWorkerImageData(data, width, height) {
+    if (workerHasImageData) {
+      return new ImageData(data, width, height);
+    } else {
+      return {
+        data: data,
+        width: width,
+        height: height
+      };
+    }
+  }
+
+  return function (data) {
+    // bracket notation for minification support
+    var buffers = data['buffers'];
+    var meta = data['meta'];
+    var imageOps = data['imageOps'];
+    var width = data['width'];
+    var height = data['height'];
+    var numBuffers = buffers.length;
+    var numBytes = buffers[0].byteLength;
+
+    if (imageOps) {
+      var images = new Array(numBuffers);
+
+      for (var b = 0; b < numBuffers; ++b) {
+        images[b] = newWorkerImageData(new Uint8ClampedArray(buffers[b]), width, height);
+      }
+
+      var output_1 = operation(images, meta).data;
+      return output_1.buffer;
+    }
+
+    var output = new Uint8ClampedArray(numBytes);
+    var arrays = new Array(numBuffers);
+    var pixels = new Array(numBuffers);
+
+    for (var b = 0; b < numBuffers; ++b) {
+      arrays[b] = new Uint8ClampedArray(buffers[b]);
+      pixels[b] = [0, 0, 0, 0];
+    }
+
+    for (var i = 0; i < numBytes; i += 4) {
+      for (var j = 0; j < numBuffers; ++j) {
+        var array = arrays[j];
+        pixels[j][0] = array[i];
+        pixels[j][1] = array[i + 1];
+        pixels[j][2] = array[i + 2];
+        pixels[j][3] = array[i + 3];
+      }
+
+      var pixel = operation(pixels, meta);
+      output[i] = pixel[0];
+      output[i + 1] = pixel[1];
+      output[i + 2] = pixel[2];
+      output[i + 3] = pixel[3];
+    }
+
+    return output.buffer;
+  };
+}
+/**
+ * Create a worker for running operations.
+ * @param {ProcessorOptions} config Processor options.
+ * @param {function(MessageEvent): void} onMessage Called with a message event.
+ * @return {Worker} The worker.
+ */
+
+
+function createWorker(config, onMessage) {
+  var lib = Object.keys(config.lib || {}).map(function (name) {
+    return 'var ' + name + ' = ' + config.lib[name].toString() + ';';
+  });
+  var lines = lib.concat(['var __minion__ = (' + createMinion.toString() + ')(', config.operation.toString(), ');', 'self.addEventListener("message", function(event) {', '  var buffer = __minion__(event.data);', '  self.postMessage({buffer: buffer, meta: event.data.meta}, [buffer]);', '});']);
+  var worker = new Worker(typeof Blob === 'undefined' ? 'data:text/javascript;base64,' + Buffer.from(lines.join('\n'), 'binary').toString('base64') : URL.createObjectURL(new Blob(lines, {
+    type: 'text/javascript'
+  })));
+  worker.addEventListener('message', onMessage);
+  return worker;
+}
+/**
+ * @typedef {Object} FauxMessageEvent
+ * @property {Object} data Message data.
+ */
+
+/**
+ * Create a faux worker for running operations.
+ * @param {ProcessorOptions} config Configuration.
+ * @param {function(FauxMessageEvent): void} onMessage Called with a message event.
+ * @return {Object} The faux worker.
+ */
+
+
+function createFauxWorker(config, onMessage) {
+  var minion = createMinion(config.operation);
+  var terminated = false;
+  return {
+    postMessage: function (data) {
+      setTimeout(function () {
+        if (terminated) {
+          return;
+        }
+
+        onMessage({
+          data: {
+            buffer: minion(data),
+            meta: data['meta']
+          }
+        });
+      }, 0);
+    },
+    terminate: function () {
+      terminated = true;
+    }
+  };
+}
+/**
+ * @typedef {function(Error, ImageData, (Object|Array<Object>)): void} JobCallback
+ */
+
+/**
+ * @typedef {Object} Job
+ * @property {Object} meta Job metadata.
+ * @property {Array<ImageData>} inputs Array of input data.
+ * @property {JobCallback} callback Called when the job is complete.
+ */
+
+/**
+ * @typedef {Object} ProcessorOptions
+ * @property {number} threads Number of workers to spawn.
+ * @property {Operation} operation The operation.
+ * @property {Object<string, Function>} [lib] Functions that will be made available to operations run in a worker.
+ * @property {number} queue The number of queued jobs to allow.
+ * @property {boolean} [imageOps=false] Pass all the image data to the operation instead of a single pixel.
+ */
+
+/**
+ * @classdesc
+ * A processor runs pixel or image operations in workers.
+ */
+
+
+var Processor =
+/** @class */
+function (_super) {
+  __extends(Processor, _super);
+  /**
+   * @param {ProcessorOptions} config Configuration.
+   */
+
+
+  function Processor(config) {
+    var _this = _super.call(this) || this;
+
+    _this._imageOps = !!config.imageOps;
+    var threads;
+
+    if (config.threads === 0) {
+      threads = 0;
+    } else if (_this._imageOps) {
+      threads = 1;
+    } else {
+      threads = config.threads || 1;
+    }
+    /**
+     * @type {Array<Worker>}
+     */
+
+
+    var workers = new Array(threads);
+
+    if (threads) {
+      for (var i = 0; i < threads; ++i) {
+        workers[i] = createWorker(config, _this._onWorkerMessage.bind(_this, i));
+      }
+    } else {
+      workers[0] = createFauxWorker(config, _this._onWorkerMessage.bind(_this, 0));
+    }
+
+    _this._workers = workers;
+    /**
+     * @type {Array<Job>}
+     * @private
+     */
+
+    _this._queue = [];
+    _this._maxQueueLength = config.queue || Infinity;
+    _this._running = 0;
+    /**
+     * @type {Object<number, any>}
+     * @private
+     */
+
+    _this._dataLookup = {};
+    /**
+     * @type {Job}
+     * @private
+     */
+
+    _this._job = null;
+    return _this;
+  }
+  /**
+   * Run operation on input data.
+   * @param {Array<ImageData>} inputs Array of image data.
+   * @param {Object} meta A user data object.  This is passed to all operations
+   *     and must be serializable.
+   * @param {function(Error, ImageData, Object): void} callback Called when work
+   *     completes.  The first argument is any error.  The second is the ImageData
+   *     generated by operations.  The third is the user data object.
+   */
+
+
+  Processor.prototype.process = function (inputs, meta, callback) {
+    this._enqueue({
+      inputs: inputs,
+      meta: meta,
+      callback: callback
+    });
+
+    this._dispatch();
+  };
+  /**
+   * Add a job to the queue.
+   * @param {Job} job The job.
+   */
+
+
+  Processor.prototype._enqueue = function (job) {
+    this._queue.push(job);
+
+    while (this._queue.length > this._maxQueueLength) {
+      this._queue.shift().callback(null, null);
+    }
+  };
+  /**
+   * Dispatch a job.
+   */
+
+
+  Processor.prototype._dispatch = function () {
+    if (this._running || this._queue.length === 0) {
+      return;
+    }
+
+    var job = this._queue.shift();
+
+    this._job = job;
+    var width = job.inputs[0].width;
+    var height = job.inputs[0].height;
+    var buffers = job.inputs.map(function (input) {
+      return input.data.buffer;
+    });
+    var threads = this._workers.length;
+    this._running = threads;
+
+    if (threads === 1) {
+      this._workers[0].postMessage({
+        buffers: buffers,
+        meta: job.meta,
+        imageOps: this._imageOps,
+        width: width,
+        height: height
+      }, buffers);
+
+      return;
+    }
+
+    var length = job.inputs[0].data.length;
+    var segmentLength = 4 * Math.ceil(length / 4 / threads);
+
+    for (var i = 0; i < threads; ++i) {
+      var offset = i * segmentLength;
+      var slices = [];
+
+      for (var j = 0, jj = buffers.length; j < jj; ++j) {
+        slices.push(buffers[j].slice(offset, offset + segmentLength));
+      }
+
+      this._workers[i].postMessage({
+        buffers: slices,
+        meta: job.meta,
+        imageOps: this._imageOps,
+        width: width,
+        height: height
+      }, slices);
+    }
+  };
+  /**
+   * Handle messages from the worker.
+   * @param {number} index The worker index.
+   * @param {MessageEvent} event The message event.
+   */
+
+
+  Processor.prototype._onWorkerMessage = function (index, event) {
+    if (this.disposed) {
+      return;
+    }
+
+    this._dataLookup[index] = event.data;
+    --this._running;
+
+    if (this._running === 0) {
+      this._resolveJob();
+    }
+  };
+  /**
+   * Resolve a job.  If there are no more worker threads, the processor callback
+   * will be called.
+   */
+
+
+  Processor.prototype._resolveJob = function () {
+    var job = this._job;
+    var threads = this._workers.length;
+    var data, meta;
+
+    if (threads === 1) {
+      data = new Uint8ClampedArray(this._dataLookup[0]['buffer']);
+      meta = this._dataLookup[0]['meta'];
+    } else {
+      var length_1 = job.inputs[0].data.length;
+      data = new Uint8ClampedArray(length_1);
+      meta = new Array(threads);
+      var segmentLength = 4 * Math.ceil(length_1 / 4 / threads);
+
+      for (var i = 0; i < threads; ++i) {
+        var buffer = this._dataLookup[i]['buffer'];
+        var offset = i * segmentLength;
+        data.set(new Uint8ClampedArray(buffer), offset);
+        meta[i] = this._dataLookup[i]['meta'];
+      }
+    }
+
+    this._job = null;
+    this._dataLookup = {};
+    job.callback(null, newImageData(data, job.inputs[0].width, job.inputs[0].height), meta);
+
+    this._dispatch();
+  };
+  /**
+   * Terminate all workers associated with the processor.
+   */
+
+
+  Processor.prototype.disposeInternal = function () {
+    for (var i = 0; i < this._workers.length; ++i) {
+      this._workers[i].terminate();
+    }
+
+    this._workers.length = 0;
+  };
+
+  return Processor;
+}(_Disposable.default);
+
+exports.Processor = Processor;
+
+/**
+ * A function that takes an array of input data, performs some operation, and
+ * returns an array of output data.
+ * For `pixel` type operations, the function will be called with an array of
+ * pixels, where each pixel is an array of four numbers (`[r, g, b, a]`) in the
+ * range of 0 - 255. It should return a single pixel array.
+ * For `'image'` type operations, functions will be called with an array of
+ * [ImageData](https://developer.mozilla.org/en-US/docs/Web/API/ImageData)
+ * and should return a single
+ * [ImageData](https://developer.mozilla.org/en-US/docs/Web/API/ImageData).
+ * The operations
+ * are called with a second "data" argument, which can be used for storage.  The
+ * data object is accessible from raster events, where it can be initialized in
+ * "beforeoperations" and accessed again in "afteroperations".
+ *
+ * @typedef {function((Array<Array<number>>|Array<ImageData>), Object):
+ *     (Array<number>|ImageData)} Operation
+ */
+
+/**
+ * @enum {string}
+ */
+var RasterEventType = {
+  /**
+   * Triggered before operations are run.  Listeners will receive an event object with
+   * a `data` property that can be used to make data available to operations.
+   * @event module:ol/source/Raster.RasterSourceEvent#beforeoperations
+   * @api
+   */
+  BEFOREOPERATIONS: 'beforeoperations',
+
+  /**
+   * Triggered after operations are run.  Listeners will receive an event object with
+   * a `data` property.  If more than one thread is used, `data` will be an array of
+   * objects.  If a single thread is used, `data` will be a single object.
+   * @event module:ol/source/Raster.RasterSourceEvent#afteroperations
+   * @api
+   */
+  AFTEROPERATIONS: 'afteroperations'
+};
+/**
+ * Raster operation type. Supported values are `'pixel'` and `'image'`.
+ * @enum {string}
+ */
+
+var RasterOperationType = {
+  PIXEL: 'pixel',
+  IMAGE: 'image'
+};
+/**
+ * @typedef {import("./Image.js").ImageSourceEventTypes|'beforeoperations'|'afteroperations'} RasterSourceEventTypes
+ */
+
+/**
+ * @classdesc
+ * Events emitted by {@link module:ol/source/Raster~RasterSource} instances are instances of this
+ * type.
+ */
+
+var RasterSourceEvent =
+/** @class */
+function (_super) {
+  __extends(RasterSourceEvent, _super);
+  /**
+   * @param {string} type Type.
+   * @param {import("../PluggableMap.js").FrameState} frameState The frame state.
+   * @param {Object|Array<Object>} data An object made available to operations.  For "afteroperations" evenets
+   * this will be an array of objects if more than one thread is used.
+   */
+
+
+  function RasterSourceEvent(type, frameState, data) {
+    var _this = _super.call(this, type) || this;
+    /**
+     * The raster extent.
+     * @type {import("../extent.js").Extent}
+     * @api
+     */
+
+
+    _this.extent = frameState.extent;
+    /**
+     * The pixel resolution (map units per pixel).
+     * @type {number}
+     * @api
+     */
+
+    _this.resolution = frameState.viewState.resolution / frameState.pixelRatio;
+    /**
+     * An object made available to all operations.  This can be used by operations
+     * as a storage object (e.g. for calculating statistics).
+     * @type {Object}
+     * @api
+     */
+
+    _this.data = data;
+    return _this;
+  }
+
+  return RasterSourceEvent;
+}(_Event.default);
+
+exports.RasterSourceEvent = RasterSourceEvent;
+
+/**
+ * @typedef {Object} Options
+ * @property {Array<import("./Source.js").default|import("../layer/Layer.js").default>} sources Input
+ * sources or layers.  For vector data, use an VectorImage layer.
+ * @property {Operation} [operation] Raster operation.
+ * The operation will be called with data from input sources
+ * and the output will be assigned to the raster source.
+ * @property {Object} [lib] Functions that will be made available to operations run in a worker.
+ * @property {number} [threads] By default, operations will be run in a single worker thread.
+ * To avoid using workers altogether, set `threads: 0`.  For pixel operations, operations can
+ * be run in multiple worker threads.  Note that there is additional overhead in
+ * transferring data to multiple workers, and that depending on the user's
+ * system, it may not be possible to parallelize the work.
+ * @property {RasterOperationType} [operationType='pixel'] Operation type.
+ * Supported values are `'pixel'` and `'image'`.  By default,
+ * `'pixel'` operations are assumed, and operations will be called with an
+ * array of pixels from input sources.  If set to `'image'`, operations will
+ * be called with an array of ImageData objects from input sources.
+ */
+
+/***
+ * @template Return
+ * @typedef {import("../Observable").OnSignature<import("../Observable").EventTypes, import("../events/Event.js").default, Return> &
+ *   import("../Observable").OnSignature<import("../ObjectEventType").Types, import("../Object").ObjectEvent, Return> &
+ *   import("../Observable").OnSignature<import("./Image.js").ImageSourceEventTypes, import("./Image.js").ImageSourceEvent, Return> &
+ *   import("../Observable").OnSignature<RasterSourceEventTypes, RasterSourceEvent, Return> &
+ *   import("../Observable").CombinedOnSignature<import("../Observable").EventTypes|import("../ObjectEventType").Types
+ *     |RasterSourceEventTypes, Return>} RasterSourceOnSignature
+ */
+
+/**
+ * @classdesc
+ * A source that transforms data from any number of input sources using an
+ * {@link module:ol/source/Raster~Operation} function to transform input pixel values into
+ * output pixel values.
+ *
+ * @fires module:ol/source/Raster.RasterSourceEvent
+ * @api
+ */
+var RasterSource =
+/** @class */
+function (_super) {
+  __extends(RasterSource, _super);
+  /**
+   * @param {Options} options Options.
+   */
+
+
+  function RasterSource(options) {
+    var _this = _super.call(this, {
+      projection: null
+    }) || this;
+    /***
+     * @type {RasterSourceOnSignature<import("../events").EventsKey>}
+     */
+
+
+    _this.on;
+    /***
+     * @type {RasterSourceOnSignature<import("../events").EventsKey>}
+     */
+
+    _this.once;
+    /***
+     * @type {RasterSourceOnSignature<void>}
+     */
+
+    _this.un;
+    /**
+     * @private
+     * @type {Processor}
+     */
+
+    _this.processor_ = null;
+    /**
+     * @private
+     * @type {RasterOperationType}
+     */
+
+    _this.operationType_ = options.operationType !== undefined ? options.operationType : RasterOperationType.PIXEL;
+    /**
+     * @private
+     * @type {number}
+     */
+
+    _this.threads_ = options.threads !== undefined ? options.threads : 1;
+    /**
+     * @private
+     * @type {Array<import("../layer/Layer.js").default>}
+     */
+
+    _this.layers_ = createLayers(options.sources);
+
+    var changed = _this.changed.bind(_this);
+
+    for (var i = 0, ii = _this.layers_.length; i < ii; ++i) {
+      _this.layers_[i].addEventListener(_EventType.default.CHANGE, changed);
+    }
+    /**
+     * @private
+     * @type {import("../TileQueue.js").default}
+     */
+
+
+    _this.tileQueue_ = new _TileQueue.default(function () {
+      return 1;
+    }, _this.changed.bind(_this));
+    /**
+     * The most recently requested frame state.
+     * @type {import("../PluggableMap.js").FrameState}
+     * @private
+     */
+
+    _this.requestedFrameState_;
+    /**
+     * The most recently rendered image canvas.
+     * @type {import("../ImageCanvas.js").default}
+     * @private
+     */
+
+    _this.renderedImageCanvas_ = null;
+    /**
+     * The most recently rendered revision.
+     * @type {number}
+     */
+
+    _this.renderedRevision_;
+    /**
+     * @private
+     * @type {import("../PluggableMap.js").FrameState}
+     */
+
+    _this.frameState_ = {
+      animate: false,
+      coordinateToPixelTransform: (0, _transform.create)(),
+      declutterTree: null,
+      extent: null,
+      index: 0,
+      layerIndex: 0,
+      layerStatesArray: getLayerStatesArray(_this.layers_),
+      pixelRatio: 1,
+      pixelToCoordinateTransform: (0, _transform.create)(),
+      postRenderFunctions: [],
+      size: [0, 0],
+      tileQueue: _this.tileQueue_,
+      time: Date.now(),
+      usedTiles: {},
+      viewState:
+      /** @type {import("../View.js").State} */
+      {
+        rotation: 0
+      },
+      viewHints: [],
+      wantedTiles: {},
+      mapId: (0, _util.getUid)(_this),
+      renderTargets: {}
+    };
+
+    _this.setAttributions(function (frameState) {
+      var attributions = [];
+
+      for (var index = 0, iMax = options.sources.length; index < iMax; ++index) {
+        var sourceOrLayer = options.sources[index];
+        var source = sourceOrLayer instanceof _Source.default ? sourceOrLayer : sourceOrLayer.getSource();
+        var attributionGetter = source.getAttributions();
+
+        if (typeof attributionGetter === 'function') {
+          var sourceAttribution = attributionGetter(frameState);
+          attributions.push.apply(attributions, sourceAttribution);
+        }
+      }
+
+      return attributions.length !== 0 ? attributions : null;
+    });
+
+    if (options.operation !== undefined) {
+      _this.setOperation(options.operation, options.lib);
+    }
+
+    return _this;
+  }
+  /**
+   * Set the operation.
+   * @param {Operation} operation New operation.
+   * @param {Object} [opt_lib] Functions that will be available to operations run
+   *     in a worker.
+   * @api
+   */
+
+
+  RasterSource.prototype.setOperation = function (operation, opt_lib) {
+    if (this.processor_) {
+      this.processor_.dispose();
+    }
+
+    this.processor_ = new Processor({
+      operation: operation,
+      imageOps: this.operationType_ === RasterOperationType.IMAGE,
+      queue: 1,
+      lib: opt_lib,
+      threads: this.threads_
+    });
+    this.changed();
+  };
+  /**
+   * Update the stored frame state.
+   * @param {import("../extent.js").Extent} extent The view extent (in map units).
+   * @param {number} resolution The view resolution.
+   * @param {import("../proj/Projection.js").default} projection The view projection.
+   * @return {import("../PluggableMap.js").FrameState} The updated frame state.
+   * @private
+   */
+
+
+  RasterSource.prototype.updateFrameState_ = function (extent, resolution, projection) {
+    var frameState =
+    /** @type {import("../PluggableMap.js").FrameState} */
+    (0, _obj.assign)({}, this.frameState_);
+    frameState.viewState =
+    /** @type {import("../View.js").State} */
+    (0, _obj.assign)({}, frameState.viewState);
+    var center = (0, _extent.getCenter)(extent);
+    frameState.extent = extent.slice();
+    frameState.size[0] = Math.round((0, _extent.getWidth)(extent) / resolution);
+    frameState.size[1] = Math.round((0, _extent.getHeight)(extent) / resolution);
+    frameState.time = Date.now();
+    var viewState = frameState.viewState;
+    viewState.center = center;
+    viewState.projection = projection;
+    viewState.resolution = resolution;
+    return frameState;
+  };
+  /**
+   * Determine if all sources are ready.
+   * @return {boolean} All sources are ready.
+   * @private
+   */
+
+
+  RasterSource.prototype.allSourcesReady_ = function () {
+    var ready = true;
+    var source;
+
+    for (var i = 0, ii = this.layers_.length; i < ii; ++i) {
+      source = this.layers_[i].getSource();
+
+      if (source.getState() !== _State.default.READY) {
+        ready = false;
+        break;
+      }
+    }
+
+    return ready;
+  };
+  /**
+   * @param {import("../extent.js").Extent} extent Extent.
+   * @param {number} resolution Resolution.
+   * @param {number} pixelRatio Pixel ratio.
+   * @param {import("../proj/Projection.js").default} projection Projection.
+   * @return {import("../ImageCanvas.js").default} Single image.
+   */
+
+
+  RasterSource.prototype.getImage = function (extent, resolution, pixelRatio, projection) {
+    if (!this.allSourcesReady_()) {
+      return null;
+    }
+
+    var frameState = this.updateFrameState_(extent, resolution, projection);
+    this.requestedFrameState_ = frameState; // check if we can't reuse the existing ol/ImageCanvas
+
+    if (this.renderedImageCanvas_) {
+      var renderedResolution = this.renderedImageCanvas_.getResolution();
+      var renderedExtent = this.renderedImageCanvas_.getExtent();
+
+      if (resolution !== renderedResolution || !(0, _extent.equals)(extent, renderedExtent)) {
+        this.renderedImageCanvas_ = null;
+      }
+    }
+
+    if (!this.renderedImageCanvas_ || this.getRevision() !== this.renderedRevision_) {
+      this.processSources_();
+    }
+
+    frameState.tileQueue.loadMoreTiles(16, 16);
+
+    if (frameState.animate) {
+      requestAnimationFrame(this.changed.bind(this));
+    }
+
+    return this.renderedImageCanvas_;
+  };
+  /**
+   * Start processing source data.
+   * @private
+   */
+
+
+  RasterSource.prototype.processSources_ = function () {
+    var frameState = this.requestedFrameState_;
+    var len = this.layers_.length;
+    var imageDatas = new Array(len);
+
+    for (var i = 0; i < len; ++i) {
+      frameState.layerIndex = i;
+      var imageData = getImageData(this.layers_[i], frameState);
+
+      if (imageData) {
+        imageDatas[i] = imageData;
+      } else {
+        return;
+      }
+    }
+
+    var data = {};
+    this.dispatchEvent(new RasterSourceEvent(RasterEventType.BEFOREOPERATIONS, frameState, data));
+    this.processor_.process(imageDatas, data, this.onWorkerComplete_.bind(this, frameState));
+  };
+  /**
+   * Called when pixel processing is complete.
+   * @param {import("../PluggableMap.js").FrameState} frameState The frame state.
+   * @param {Error} err Any error during processing.
+   * @param {ImageData} output The output image data.
+   * @param {Object|Array<Object>} data The user data (or an array if more than one thread).
+   * @private
+   */
+
+
+  RasterSource.prototype.onWorkerComplete_ = function (frameState, err, output, data) {
+    if (err || !output) {
+      return;
+    } // do nothing if extent or resolution changed
+
+
+    var extent = frameState.extent;
+    var resolution = frameState.viewState.resolution;
+
+    if (resolution !== this.requestedFrameState_.viewState.resolution || !(0, _extent.equals)(extent, this.requestedFrameState_.extent)) {
+      return;
+    }
+
+    var context;
+
+    if (this.renderedImageCanvas_) {
+      context = this.renderedImageCanvas_.getImage().getContext('2d');
+    } else {
+      var width = Math.round((0, _extent.getWidth)(extent) / resolution);
+      var height = Math.round((0, _extent.getHeight)(extent) / resolution);
+      context = (0, _dom.createCanvasContext2D)(width, height);
+      this.renderedImageCanvas_ = new _ImageCanvas.default(extent, resolution, 1, context.canvas);
+    }
+
+    context.putImageData(output, 0, 0);
+    this.changed();
+    this.renderedRevision_ = this.getRevision();
+    this.dispatchEvent(new RasterSourceEvent(RasterEventType.AFTEROPERATIONS, frameState, data));
+
+    if (frameState.animate) {
+      requestAnimationFrame(this.changed.bind(this));
+    }
+  };
+
+  RasterSource.prototype.disposeInternal = function () {
+    if (this.processor_) {
+      this.processor_.dispose();
+    }
+
+    _super.prototype.disposeInternal.call(this);
+  };
+
+  return RasterSource;
+}(_Image2.default);
+/**
+ * Clean up and unregister the worker.
+ * @function
+ * @api
+ */
+
+
+RasterSource.prototype.dispose;
+/**
+ * A reusable canvas context.
+ * @type {CanvasRenderingContext2D}
+ * @private
+ */
+
+var sharedContext = null;
+/**
+ * Get image data from a layer.
+ * @param {import("../layer/Layer.js").default} layer Layer to render.
+ * @param {import("../PluggableMap.js").FrameState} frameState The frame state.
+ * @return {ImageData} The image data.
+ */
+
+function getImageData(layer, frameState) {
+  var renderer = layer.getRenderer();
+
+  if (!renderer) {
+    throw new Error('Unsupported layer type: ' + layer);
+  }
+
+  if (!renderer.prepareFrame(frameState)) {
+    return null;
+  }
+
+  var width = frameState.size[0];
+  var height = frameState.size[1];
+
+  if (width === 0 || height === 0) {
+    return null;
+  }
+
+  var container = renderer.renderFrame(frameState, null);
+  var element;
+
+  if (container instanceof HTMLCanvasElement) {
+    element = container;
+  } else {
+    if (container) {
+      element = container.firstElementChild;
+    }
+
+    if (!(element instanceof HTMLCanvasElement)) {
+      throw new Error('Unsupported rendered element: ' + element);
+    }
+
+    if (element.width === width && element.height === height) {
+      var context_1 = element.getContext('2d');
+      return context_1.getImageData(0, 0, width, height);
+    }
+  }
+
+  if (!sharedContext) {
+    sharedContext = (0, _dom.createCanvasContext2D)(width, height);
+  } else {
+    var canvas = sharedContext.canvas;
+
+    if (canvas.width !== width || canvas.height !== height) {
+      sharedContext = (0, _dom.createCanvasContext2D)(width, height);
+    } else {
+      sharedContext.clearRect(0, 0, width, height);
+    }
+  }
+
+  sharedContext.drawImage(element, 0, 0, width, height);
+  return sharedContext.getImageData(0, 0, width, height);
+}
+/**
+ * Get a list of layer states from a list of layers.
+ * @param {Array<import("../layer/Layer.js").default>} layers Layers.
+ * @return {Array<import("../layer/Layer.js").State>} The layer states.
+ */
+
+
+function getLayerStatesArray(layers) {
+  return layers.map(function (layer) {
+    return layer.getLayerState();
+  });
+}
+/**
+ * Create layers for all sources.
+ * @param {Array<import("./Source.js").default|import("../layer/Layer.js").default>} sources The sources.
+ * @return {Array<import("../layer/Layer.js").default>} Array of layers.
+ */
+
+
+function createLayers(sources) {
+  var len = sources.length;
+  var layers = new Array(len);
+
+  for (var i = 0; i < len; ++i) {
+    layers[i] = createLayer(sources[i]);
+  }
+
+  return layers;
+}
+/**
+ * Create a layer for the provided source.
+ * @param {import("./Source.js").default|import("../layer/Layer.js").default} layerOrSource The layer or source.
+ * @return {import("../layer/Layer.js").default} The layer.
+ */
+
+
+function createLayer(layerOrSource) {
+  // @type {import("../layer/Layer.js").default}
+  var layer;
+
+  if (layerOrSource instanceof _Source.default) {
+    if (layerOrSource instanceof _Tile2.default) {
+      layer = new _Tile.default({
+        source: layerOrSource
+      });
+    } else if (layerOrSource instanceof _Image2.default) {
+      layer = new _Image.default({
+        source: layerOrSource
+      });
+    }
+  } else {
+    layer = layerOrSource;
+  }
+
+  return layer;
+}
+
+var _default = RasterSource;
+exports.default = _default;
+},{"../Disposable.js":"node_modules/ol/Disposable.js","../events/Event.js":"node_modules/ol/events/Event.js","../events/EventType.js":"node_modules/ol/events/EventType.js","../ImageCanvas.js":"node_modules/ol/ImageCanvas.js","../layer/Image.js":"node_modules/ol/layer/Image.js","./Image.js":"node_modules/ol/source/Image.js","./Source.js":"node_modules/ol/source/Source.js","./State.js":"node_modules/ol/source/State.js","../layer/Tile.js":"node_modules/ol/layer/Tile.js","../TileQueue.js":"node_modules/ol/TileQueue.js","./Tile.js":"node_modules/ol/source/Tile.js","../obj.js":"node_modules/ol/obj.js","../dom.js":"node_modules/ol/dom.js","../transform.js":"node_modules/ol/transform.js","../extent.js":"node_modules/ol/extent.js","../util.js":"node_modules/ol/util.js","buffer":"node_modules/buffer/index.js"}],"node_modules/ol/source/Stamen.js":[function(require,module,exports) {
+"use strict";
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+exports.default = void 0;
+
+var _XYZ = _interopRequireDefault(require("./XYZ.js"));
+
+var _OSM = require("./OSM.js");
+
+function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
+
+/**
+ * @module ol/source/Stamen
+ */
+var __extends = void 0 && (void 0).__extends || function () {
+  var extendStatics = function (d, b) {
+    extendStatics = Object.setPrototypeOf || {
+      __proto__: []
+    } instanceof Array && function (d, b) {
+      d.__proto__ = b;
+    } || function (d, b) {
+      for (var p in b) if (Object.prototype.hasOwnProperty.call(b, p)) d[p] = b[p];
+    };
+
+    return extendStatics(d, b);
+  };
+
+  return function (d, b) {
+    if (typeof b !== "function" && b !== null) throw new TypeError("Class extends value " + String(b) + " is not a constructor or null");
+    extendStatics(d, b);
+
+    function __() {
+      this.constructor = d;
+    }
+
+    d.prototype = b === null ? Object.create(b) : (__.prototype = b.prototype, new __());
+  };
+}();
+
+/**
+ * @const
+ * @type {Array<string>}
+ */
+var ATTRIBUTIONS = ['Map tiles by <a href="https://stamen.com/" target="_blank">Stamen Design</a>, ' + 'under <a href="https://creativecommons.org/licenses/by/3.0/" target="_blank">CC BY' + ' 3.0</a>.', _OSM.ATTRIBUTION];
+/**
+ * @type {Object<string, {extension: string, opaque: boolean}>}
+ */
+
+var LayerConfig = {
+  'terrain': {
+    extension: 'jpg',
+    opaque: true
+  },
+  'terrain-background': {
+    extension: 'jpg',
+    opaque: true
+  },
+  'terrain-labels': {
+    extension: 'png',
+    opaque: false
+  },
+  'terrain-lines': {
+    extension: 'png',
+    opaque: false
+  },
+  'toner-background': {
+    extension: 'png',
+    opaque: true
+  },
+  'toner': {
+    extension: 'png',
+    opaque: true
+  },
+  'toner-hybrid': {
+    extension: 'png',
+    opaque: false
+  },
+  'toner-labels': {
+    extension: 'png',
+    opaque: false
+  },
+  'toner-lines': {
+    extension: 'png',
+    opaque: false
+  },
+  'toner-lite': {
+    extension: 'png',
+    opaque: true
+  },
+  'watercolor': {
+    extension: 'jpg',
+    opaque: true
+  }
+};
+/**
+ * @type {Object<string, {minZoom: number, maxZoom: number}>}
+ */
+
+var ProviderConfig = {
+  'terrain': {
+    minZoom: 0,
+    maxZoom: 18
+  },
+  'toner': {
+    minZoom: 0,
+    maxZoom: 20
+  },
+  'watercolor': {
+    minZoom: 0,
+    maxZoom: 18
+  }
+};
+/**
+ * @typedef {Object} Options
+ * @property {number} [cacheSize] Initial tile cache size. Will auto-grow to hold at least the number of tiles in the viewport.
+ * @property {boolean} [imageSmoothing=true] Deprecated.  Use the `interpolate` option instead.
+ * @property {boolean} [interpolate=true] Use interpolated values when resampling.  By default,
+ * linear interpolation is used when resampling.  Set to false to use the nearest neighbor instead.
+ * @property {string} layer Layer name.
+ * @property {number} [minZoom] Minimum zoom.
+ * @property {number} [maxZoom] Maximum zoom.
+ * @property {number} [reprojectionErrorThreshold=0.5] Maximum allowed reprojection error (in pixels).
+ * Higher values can increase reprojection performance, but decrease precision.
+ * @property {import("../Tile.js").LoadFunction} [tileLoadFunction]
+ * Optional function to load a tile given a URL. The default is
+ * ```js
+ * function(imageTile, src) {
+ *   imageTile.getImage().src = src;
+ * };
+ * ```
+ * @property {number} [transition=250] Duration of the opacity transition for rendering.
+ * To disable the opacity transition, pass `transition: 0`.
+ * @property {string} [url] URL template. Must include `{x}`, `{y}` or `{-y}`, and `{z}` placeholders.
+ * @property {boolean} [wrapX=true] Whether to wrap the world horizontally.
+ * @property {number|import("../array.js").NearestDirectionFunction} [zDirection=0]
+ * Choose whether to use tiles with a higher or lower zoom level when between integer
+ * zoom levels. See {@link module:ol/tilegrid/TileGrid~TileGrid#getZForResolution}.
+ */
+
+/**
+ * @classdesc
+ * Layer source for the Stamen tile server.
+ * @api
+ */
+
+var Stamen =
+/** @class */
+function (_super) {
+  __extends(Stamen, _super);
+  /**
+   * @param {Options} options Stamen options.
+   */
+
+
+  function Stamen(options) {
+    var interpolate = options.imageSmoothing !== undefined ? options.imageSmoothing : true;
+
+    if (options.interpolate !== undefined) {
+      interpolate = options.interpolate;
+    }
+
+    var i = options.layer.indexOf('-');
+    var provider = i == -1 ? options.layer : options.layer.slice(0, i);
+    var providerConfig = ProviderConfig[provider];
+    var layerConfig = LayerConfig[options.layer];
+    var url = options.url !== undefined ? options.url : 'https://stamen-tiles-{a-d}.a.ssl.fastly.net/' + options.layer + '/{z}/{x}/{y}.' + layerConfig.extension;
+    return _super.call(this, {
+      attributions: ATTRIBUTIONS,
+      cacheSize: options.cacheSize,
+      crossOrigin: 'anonymous',
+      interpolate: interpolate,
+      maxZoom: options.maxZoom != undefined ? options.maxZoom : providerConfig.maxZoom,
+      minZoom: options.minZoom != undefined ? options.minZoom : providerConfig.minZoom,
+      opaque: layerConfig.opaque,
+      reprojectionErrorThreshold: options.reprojectionErrorThreshold,
+      tileLoadFunction: options.tileLoadFunction,
+      transition: options.transition,
+      url: url,
+      wrapX: options.wrapX,
+      zDirection: options.zDirection
+    }) || this;
+  }
+
+  return Stamen;
+}(_XYZ.default);
+
+var _default = Stamen;
+exports.default = _default;
+},{"./XYZ.js":"node_modules/ol/source/XYZ.js","./OSM.js":"node_modules/ol/source/OSM.js"}],"node_modules/ol/source/TileArcGISRest.js":[function(require,module,exports) {
+"use strict";
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+exports.default = void 0;
+
+var _TileImage = _interopRequireDefault(require("./TileImage.js"));
+
+var _uri = require("../uri.js");
+
+var _obj = require("../obj.js");
+
+var _extent = require("../extent.js");
+
+var _math = require("../math.js");
+
+var _size = require("../size.js");
+
+var _tilecoord = require("../tilecoord.js");
+
+function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
+
+/**
+ * @module ol/source/TileArcGISRest
+ */
+var __extends = void 0 && (void 0).__extends || function () {
+  var extendStatics = function (d, b) {
+    extendStatics = Object.setPrototypeOf || {
+      __proto__: []
+    } instanceof Array && function (d, b) {
+      d.__proto__ = b;
+    } || function (d, b) {
+      for (var p in b) if (Object.prototype.hasOwnProperty.call(b, p)) d[p] = b[p];
+    };
+
+    return extendStatics(d, b);
+  };
+
+  return function (d, b) {
+    if (typeof b !== "function" && b !== null) throw new TypeError("Class extends value " + String(b) + " is not a constructor or null");
+    extendStatics(d, b);
+
+    function __() {
+      this.constructor = d;
+    }
+
+    d.prototype = b === null ? Object.create(b) : (__.prototype = b.prototype, new __());
+  };
+}();
+
+/**
+ * @typedef {Object} Options
+ * @property {import("./Source.js").AttributionLike} [attributions] Attributions.
+ * @property {number} [cacheSize] Initial tile cache size. Will auto-grow to hold at least the number of tiles in the viewport.
+ * @property {null|string} [crossOrigin] The `crossOrigin` attribute for loaded images.  Note that
+ * you must provide a `crossOrigin` value if you want to access pixel data with the Canvas renderer.
+ * See https://developer.mozilla.org/en-US/docs/Web/HTML/CORS_enabled_image for more detail.
+ * @property {boolean} [imageSmoothing=true] Deprecated.  Use the `interpolate` option instead.
+ * @property {boolean} [interpolate=true] Use interpolated values when resampling.  By default,
+ * linear interpolation is used when resampling.  Set to false to use the nearest neighbor instead.
+ * @property {Object<string,*>} [params] ArcGIS Rest parameters. This field is optional. Service defaults will be
+ * used for any fields not specified. `FORMAT` is `PNG32` by default. `F` is `IMAGE` by
+ * default. `TRANSPARENT` is `true` by default.  `BBOX`, `SIZE`, `BBOXSR`,
+ * and `IMAGESR` will be set dynamically. Set `LAYERS` to
+ * override the default service layer visibility. See
+ * https://developers.arcgis.com/rest/services-reference/export-map.htm
+ * for further reference.
+ * @property {boolean} [hidpi=true] Use the `ol/Map#pixelRatio` value when requesting
+ * the image from the remote server.
+ * @property {import("../tilegrid/TileGrid.js").default} [tileGrid] Tile grid. Base this on the resolutions,
+ * tilesize and extent supported by the server.
+ * If this is not defined, a default grid will be used: if there is a projection
+ * extent, the grid will be based on that; if not, a grid based on a global
+ * extent with origin at 0,0 will be used.
+ * @property {import("../proj.js").ProjectionLike} [projection] Projection. Default is the view projection.
+ * The projection code must contain a numeric end portion separated by :
+ * or the entire code must form a valid ArcGIS SpatialReference definition.
+ * @property {number} [reprojectionErrorThreshold=0.5] Maximum allowed reprojection error (in pixels).
+ * Higher values can increase reprojection performance, but decrease precision.
+ * @property {import("../Tile.js").LoadFunction} [tileLoadFunction] Optional function to load a tile given a URL.
+ * The default is
+ * ```js
+ * function(imageTile, src) {
+ *   imageTile.getImage().src = src;
+ * };
+ * ```
+ * @property {string} [url] ArcGIS Rest service URL for a Map Service or Image Service. The
+ * url should include /MapServer or /ImageServer.
+ * @property {boolean} [wrapX=true] Whether to wrap the world horizontally.
+ * @property {number} [transition] Duration of the opacity transition for rendering.  To disable the opacity
+ * transition, pass `transition: 0`.
+ * @property {Array<string>} [urls] ArcGIS Rest service urls. Use this instead of `url` when the ArcGIS
+ * Service supports multiple urls for export requests.
+ * @property {number|import("../array.js").NearestDirectionFunction} [zDirection=0]
+ * Choose whether to use tiles with a higher or lower zoom level when between integer
+ * zoom levels. See {@link module:ol/tilegrid/TileGrid~TileGrid#getZForResolution}.
+ */
+
+/**
+ * @classdesc
+ * Layer source for tile data from ArcGIS Rest services. Map and Image
+ * Services are supported.
+ *
+ * For cached ArcGIS services, better performance is available using the
+ * {@link module:ol/source/XYZ~XYZ} data source.
+ * @api
+ */
+var TileArcGISRest =
+/** @class */
+function (_super) {
+  __extends(TileArcGISRest, _super);
+  /**
+   * @param {Options} [opt_options] Tile ArcGIS Rest options.
+   */
+
+
+  function TileArcGISRest(opt_options) {
+    var _this = this;
+
+    var options = opt_options ? opt_options : {};
+    var interpolate = options.imageSmoothing !== undefined ? options.imageSmoothing : true;
+
+    if (options.interpolate !== undefined) {
+      interpolate = options.interpolate;
+    }
+
+    _this = _super.call(this, {
+      attributions: options.attributions,
+      cacheSize: options.cacheSize,
+      crossOrigin: options.crossOrigin,
+      interpolate: interpolate,
+      projection: options.projection,
+      reprojectionErrorThreshold: options.reprojectionErrorThreshold,
+      tileGrid: options.tileGrid,
+      tileLoadFunction: options.tileLoadFunction,
+      url: options.url,
+      urls: options.urls,
+      wrapX: options.wrapX !== undefined ? options.wrapX : true,
+      transition: options.transition,
+      zDirection: options.zDirection
+    }) || this;
+    /**
+     * @private
+     * @type {!Object}
+     */
+
+    _this.params_ = options.params || {};
+    /**
+     * @private
+     * @type {boolean}
+     */
+
+    _this.hidpi_ = options.hidpi !== undefined ? options.hidpi : true;
+    /**
+     * @private
+     * @type {import("../extent.js").Extent}
+     */
+
+    _this.tmpExtent_ = (0, _extent.createEmpty)();
+
+    _this.setKey(_this.getKeyForParams_());
+
+    return _this;
+  }
+  /**
+   * @private
+   * @return {string} The key for the current params.
+   */
+
+
+  TileArcGISRest.prototype.getKeyForParams_ = function () {
+    var i = 0;
+    var res = [];
+
+    for (var key in this.params_) {
+      res[i++] = key + '-' + this.params_[key];
+    }
+
+    return res.join('/');
+  };
+  /**
+   * Get the user-provided params, i.e. those passed to the constructor through
+   * the "params" option, and possibly updated using the updateParams method.
+   * @return {Object} Params.
+   * @api
+   */
+
+
+  TileArcGISRest.prototype.getParams = function () {
+    return this.params_;
+  };
+  /**
+   * @param {import("../tilecoord.js").TileCoord} tileCoord Tile coordinate.
+   * @param {import("../size.js").Size} tileSize Tile size.
+   * @param {import("../extent.js").Extent} tileExtent Tile extent.
+   * @param {number} pixelRatio Pixel ratio.
+   * @param {import("../proj/Projection.js").default} projection Projection.
+   * @param {Object} params Params.
+   * @return {string|undefined} Request URL.
+   * @private
+   */
+
+
+  TileArcGISRest.prototype.getRequestUrl_ = function (tileCoord, tileSize, tileExtent, pixelRatio, projection, params) {
+    var urls = this.urls;
+
+    if (!urls) {
+      return undefined;
+    } // ArcGIS Server only wants the numeric portion of the projection ID.
+    // (if there is no numeric portion the entire projection code must
+    // form a valid ArcGIS SpatialReference definition).
+
+
+    var srid = projection.getCode().split(/:(?=\d+$)/).pop();
+    params['SIZE'] = tileSize[0] + ',' + tileSize[1];
+    params['BBOX'] = tileExtent.join(',');
+    params['BBOXSR'] = srid;
+    params['IMAGESR'] = srid;
+    params['DPI'] = Math.round(params['DPI'] ? params['DPI'] * pixelRatio : 90 * pixelRatio);
+    var url;
+
+    if (urls.length == 1) {
+      url = urls[0];
+    } else {
+      var index = (0, _math.modulo)((0, _tilecoord.hash)(tileCoord), urls.length);
+      url = urls[index];
+    }
+
+    var modifiedUrl = url.replace(/MapServer\/?$/, 'MapServer/export').replace(/ImageServer\/?$/, 'ImageServer/exportImage');
+    return (0, _uri.appendParams)(modifiedUrl, params);
+  };
+  /**
+   * Get the tile pixel ratio for this source.
+   * @param {number} pixelRatio Pixel ratio.
+   * @return {number} Tile pixel ratio.
+   */
+
+
+  TileArcGISRest.prototype.getTilePixelRatio = function (pixelRatio) {
+    return this.hidpi_ ? pixelRatio : 1;
+  };
+  /**
+   * Update the user-provided params.
+   * @param {Object} params Params.
+   * @api
+   */
+
+
+  TileArcGISRest.prototype.updateParams = function (params) {
+    (0, _obj.assign)(this.params_, params);
+    this.setKey(this.getKeyForParams_());
+  };
+  /**
+   * @param {import("../tilecoord.js").TileCoord} tileCoord The tile coordinate
+   * @param {number} pixelRatio The pixel ratio
+   * @param {import("../proj/Projection.js").default} projection The projection
+   * @return {string|undefined} The tile URL
+   * @override
+   */
+
+
+  TileArcGISRest.prototype.tileUrlFunction = function (tileCoord, pixelRatio, projection) {
+    var tileGrid = this.getTileGrid();
+
+    if (!tileGrid) {
+      tileGrid = this.getTileGridForProjection(projection);
+    }
+
+    if (tileGrid.getResolutions().length <= tileCoord[0]) {
+      return undefined;
+    }
+
+    if (pixelRatio != 1 && !this.hidpi_) {
+      pixelRatio = 1;
+    }
+
+    var tileExtent = tileGrid.getTileCoordExtent(tileCoord, this.tmpExtent_);
+    var tileSize = (0, _size.toSize)(tileGrid.getTileSize(tileCoord[0]), this.tmpSize);
+
+    if (pixelRatio != 1) {
+      tileSize = (0, _size.scale)(tileSize, pixelRatio, this.tmpSize);
+    } // Apply default params and override with user specified values.
+
+
+    var baseParams = {
+      'F': 'image',
+      'FORMAT': 'PNG32',
+      'TRANSPARENT': true
+    };
+    (0, _obj.assign)(baseParams, this.params_);
+    return this.getRequestUrl_(tileCoord, tileSize, tileExtent, pixelRatio, projection, baseParams);
+  };
+
+  return TileArcGISRest;
+}(_TileImage.default);
+
+var _default = TileArcGISRest;
+exports.default = _default;
+},{"./TileImage.js":"node_modules/ol/source/TileImage.js","../uri.js":"node_modules/ol/uri.js","../obj.js":"node_modules/ol/obj.js","../extent.js":"node_modules/ol/extent.js","../math.js":"node_modules/ol/math.js","../size.js":"node_modules/ol/size.js","../tilecoord.js":"node_modules/ol/tilecoord.js"}],"node_modules/ol/source/TileDebug.js":[function(require,module,exports) {
+"use strict";
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+exports.default = void 0;
+
+var _XYZ = _interopRequireDefault(require("./XYZ.js"));
+
+var _dom = require("../dom.js");
+
+var _size = require("../size.js");
+
+function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
+
+/**
+ * @module ol/source/TileDebug
+ */
+var __extends = void 0 && (void 0).__extends || function () {
+  var extendStatics = function (d, b) {
+    extendStatics = Object.setPrototypeOf || {
+      __proto__: []
+    } instanceof Array && function (d, b) {
+      d.__proto__ = b;
+    } || function (d, b) {
+      for (var p in b) if (Object.prototype.hasOwnProperty.call(b, p)) d[p] = b[p];
+    };
+
+    return extendStatics(d, b);
+  };
+
+  return function (d, b) {
+    if (typeof b !== "function" && b !== null) throw new TypeError("Class extends value " + String(b) + " is not a constructor or null");
+    extendStatics(d, b);
+
+    function __() {
+      this.constructor = d;
+    }
+
+    d.prototype = b === null ? Object.create(b) : (__.prototype = b.prototype, new __());
+  };
+}();
+
+/**
+ * @typedef {Object} Options
+ * @property {import("../proj.js").ProjectionLike} [projection='EPSG:3857'] Optional projection.
+ * @property {import("../tilegrid/TileGrid.js").default} [tileGrid] Tile grid.
+ * @property {boolean} [wrapX=true] Whether to wrap the world horizontally.
+ * @property {number|import("../array.js").NearestDirectionFunction} [zDirection=0]
+ * Set to `1` when debugging `VectorTile` sources with a default configuration.
+ * Choose whether to use tiles with a higher or lower zoom level when between integer
+ * zoom levels. See {@link module:ol/tilegrid/TileGrid~TileGrid#getZForResolution}.
+ * @property {string} [template='z:{z} x:{x} y:{y}'] Template for labeling the tiles.
+ * Should include `{x}`, `{y}` or `{-y}`, and `{z}` placeholders.
+ */
+
+/**
+ * @classdesc
+ * A pseudo tile source, which does not fetch tiles from a server, but renders
+ * a grid outline for the tile grid/projection along with the coordinates for
+ * each tile. See examples/canvas-tiles for an example.
+ * @api
+ */
+var TileDebug =
+/** @class */
+function (_super) {
+  __extends(TileDebug, _super);
+  /**
+   * @param {Options} [opt_options] Debug tile options.
+   */
+
+
+  function TileDebug(opt_options) {
+    var _this = this;
+    /**
+     * @type {Options}
+     */
+
+
+    var options = opt_options || {};
+    _this = _super.call(this, {
+      opaque: false,
+      projection: options.projection,
+      tileGrid: options.tileGrid,
+      wrapX: options.wrapX !== undefined ? options.wrapX : true,
+      zDirection: options.zDirection,
+      url: options.template || 'z:{z} x:{x} y:{y}',
+      tileLoadFunction: function (tile, text) {
+        var z = tile.getTileCoord()[0];
+        var tileSize = (0, _size.toSize)(_this.tileGrid.getTileSize(z));
+        var context = (0, _dom.createCanvasContext2D)(tileSize[0], tileSize[1]);
+        context.strokeStyle = 'grey';
+        context.strokeRect(0.5, 0.5, tileSize[0] + 0.5, tileSize[1] + 0.5);
+        context.fillStyle = 'grey';
+        context.strokeStyle = 'white';
+        context.textAlign = 'center';
+        context.textBaseline = 'middle';
+        context.font = '24px sans-serif';
+        context.lineWidth = 4;
+        context.strokeText(text, tileSize[0] / 2, tileSize[1] / 2, tileSize[0]);
+        context.fillText(text, tileSize[0] / 2, tileSize[1] / 2, tileSize[0]);
+        /** @type {import("../ImageTile.js").default} */
+
+        tile.setImage(context.canvas);
+      }
+    }) || this;
+    return _this;
+  }
+
+  return TileDebug;
+}(_XYZ.default);
+
+var _default = TileDebug;
+exports.default = _default;
+},{"./XYZ.js":"node_modules/ol/source/XYZ.js","../dom.js":"node_modules/ol/dom.js","../size.js":"node_modules/ol/size.js"}],"node_modules/ol/source/UTFGrid.js":[function(require,module,exports) {
+"use strict";
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+exports.default = exports.CustomTile = void 0;
+
+var _EventType = _interopRequireDefault(require("../events/EventType.js"));
+
+var _State = _interopRequireDefault(require("./State.js"));
+
+var _Tile = _interopRequireDefault(require("../Tile.js"));
+
+var _Tile2 = _interopRequireDefault(require("./Tile.js"));
+
+var _TileState = _interopRequireDefault(require("../TileState.js"));
+
+var _extent = require("../extent.js");
+
+var _asserts = require("../asserts.js");
+
+var _tileurlfunction = require("../tileurlfunction.js");
+
+var _tilegrid = require("../tilegrid.js");
+
+var _tilecoord = require("../tilecoord.js");
+
+var _proj = require("../proj.js");
+
+var _events = require("../events.js");
+
+var _net = require("../net.js");
+
+function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
+
+/**
+ * @module ol/source/UTFGrid
+ */
+var __extends = void 0 && (void 0).__extends || function () {
+  var extendStatics = function (d, b) {
+    extendStatics = Object.setPrototypeOf || {
+      __proto__: []
+    } instanceof Array && function (d, b) {
+      d.__proto__ = b;
+    } || function (d, b) {
+      for (var p in b) if (Object.prototype.hasOwnProperty.call(b, p)) d[p] = b[p];
+    };
+
+    return extendStatics(d, b);
+  };
+
+  return function (d, b) {
+    if (typeof b !== "function" && b !== null) throw new TypeError("Class extends value " + String(b) + " is not a constructor or null");
+    extendStatics(d, b);
+
+    function __() {
+      this.constructor = d;
+    }
+
+    d.prototype = b === null ? Object.create(b) : (__.prototype = b.prototype, new __());
+  };
+}();
+
+/**
+ * @typedef {Object} UTFGridJSON
+ * @property {Array<string>} grid The grid.
+ * @property {Array<string>} keys The keys.
+ * @property {Object<string, Object>} [data] Optional data.
+ */
+var CustomTile =
+/** @class */
+function (_super) {
+  __extends(CustomTile, _super);
+  /**
+   * @param {import("../tilecoord.js").TileCoord} tileCoord Tile coordinate.
+   * @param {import("../TileState.js").default} state State.
+   * @param {string} src Image source URI.
+   * @param {import("../extent.js").Extent} extent Extent of the tile.
+   * @param {boolean} preemptive Load the tile when visible (before it's needed).
+   * @param {boolean} jsonp Load the tile as a script.
+   */
+
+
+  function CustomTile(tileCoord, state, src, extent, preemptive, jsonp) {
+    var _this = _super.call(this, tileCoord, state) || this;
+    /**
+     * @private
+     * @type {string}
+     */
+
+
+    _this.src_ = src;
+    /**
+     * @private
+     * @type {import("../extent.js").Extent}
+     */
+
+    _this.extent_ = extent;
+    /**
+     * @private
+     * @type {boolean}
+     */
+
+    _this.preemptive_ = preemptive;
+    /**
+     * @private
+     * @type {Array<string>}
+     */
+
+    _this.grid_ = null;
+    /**
+     * @private
+     * @type {Array<string>}
+     */
+
+    _this.keys_ = null;
+    /**
+     * @private
+     * @type {Object<string, Object>|undefined}
+     */
+
+    _this.data_ = null;
+    /**
+     * @private
+     * @type {boolean}
+     */
+
+    _this.jsonp_ = jsonp;
+    return _this;
+  }
+  /**
+   * Get the image element for this tile.
+   * @return {HTMLImageElement} Image.
+   */
+
+
+  CustomTile.prototype.getImage = function () {
+    return null;
+  };
+  /**
+   * Synchronously returns data at given coordinate (if available).
+   * @param {import("../coordinate.js").Coordinate} coordinate Coordinate.
+   * @return {*} The data.
+   */
+
+
+  CustomTile.prototype.getData = function (coordinate) {
+    if (!this.grid_ || !this.keys_) {
+      return null;
+    }
+
+    var xRelative = (coordinate[0] - this.extent_[0]) / (this.extent_[2] - this.extent_[0]);
+    var yRelative = (coordinate[1] - this.extent_[1]) / (this.extent_[3] - this.extent_[1]);
+    var row = this.grid_[Math.floor((1 - yRelative) * this.grid_.length)];
+
+    if (typeof row !== 'string') {
+      return null;
+    }
+
+    var code = row.charCodeAt(Math.floor(xRelative * row.length));
+
+    if (code >= 93) {
+      code--;
+    }
+
+    if (code >= 35) {
+      code--;
+    }
+
+    code -= 32;
+    var data = null;
+
+    if (code in this.keys_) {
+      var id = this.keys_[code];
+
+      if (this.data_ && id in this.data_) {
+        data = this.data_[id];
+      } else {
+        data = id;
+      }
+    }
+
+    return data;
+  };
+  /**
+   * Calls the callback (synchronously by default) with the available data
+   * for given coordinate (or `null` if not yet loaded).
+   * @param {import("../coordinate.js").Coordinate} coordinate Coordinate.
+   * @param {function(*): void} callback Callback.
+   * @param {boolean} [opt_request] If `true` the callback is always async.
+   *                               The tile data is requested if not yet loaded.
+   */
+
+
+  CustomTile.prototype.forDataAtCoordinate = function (coordinate, callback, opt_request) {
+    if (this.state == _TileState.default.EMPTY && opt_request === true) {
+      this.state = _TileState.default.IDLE;
+      (0, _events.listenOnce)(this, _EventType.default.CHANGE, function (e) {
+        callback(this.getData(coordinate));
+      }, this);
+      this.loadInternal_();
+    } else {
+      if (opt_request === true) {
+        setTimeout(function () {
+          callback(this.getData(coordinate));
+        }.bind(this), 0);
+      } else {
+        callback(this.getData(coordinate));
+      }
+    }
+  };
+  /**
+   * Return the key to be used for all tiles in the source.
+   * @return {string} The key for all tiles.
+   */
+
+
+  CustomTile.prototype.getKey = function () {
+    return this.src_;
+  };
+  /**
+   * @private
+   */
+
+
+  CustomTile.prototype.handleError_ = function () {
+    this.state = _TileState.default.ERROR;
+    this.changed();
+  };
+  /**
+   * @param {!UTFGridJSON} json UTFGrid data.
+   * @private
+   */
+
+
+  CustomTile.prototype.handleLoad_ = function (json) {
+    this.grid_ = json['grid'];
+    this.keys_ = json['keys'];
+    this.data_ = json['data'];
+    this.state = _TileState.default.LOADED;
+    this.changed();
+  };
+  /**
+   * @private
+   */
+
+
+  CustomTile.prototype.loadInternal_ = function () {
+    if (this.state == _TileState.default.IDLE) {
+      this.state = _TileState.default.LOADING;
+
+      if (this.jsonp_) {
+        (0, _net.jsonp)(this.src_, this.handleLoad_.bind(this), this.handleError_.bind(this));
+      } else {
+        var client = new XMLHttpRequest();
+        client.addEventListener('load', this.onXHRLoad_.bind(this));
+        client.addEventListener('error', this.onXHRError_.bind(this));
+        client.open('GET', this.src_);
+        client.send();
+      }
+    }
+  };
+  /**
+   * @private
+   * @param {Event} event The load event.
+   */
+
+
+  CustomTile.prototype.onXHRLoad_ = function (event) {
+    var client =
+    /** @type {XMLHttpRequest} */
+    event.target; // status will be 0 for file:// urls
+
+    if (!client.status || client.status >= 200 && client.status < 300) {
+      var response = void 0;
+
+      try {
+        response =
+        /** @type {!UTFGridJSON} */
+        JSON.parse(client.responseText);
+      } catch (err) {
+        this.handleError_();
+        return;
+      }
+
+      this.handleLoad_(response);
+    } else {
+      this.handleError_();
+    }
+  };
+  /**
+   * @private
+   * @param {Event} event The error event.
+   */
+
+
+  CustomTile.prototype.onXHRError_ = function (event) {
+    this.handleError_();
+  };
+  /**
+   */
+
+
+  CustomTile.prototype.load = function () {
+    if (this.preemptive_) {
+      this.loadInternal_();
+    } else {
+      this.setState(_TileState.default.EMPTY);
+    }
+  };
+
+  return CustomTile;
+}(_Tile.default);
+
+exports.CustomTile = CustomTile;
+
+/**
+ * @typedef {Object} Options
+ * @property {boolean} [preemptive=true]
+ * If `true` the UTFGrid source loads the tiles based on their "visibility".
+ * This improves the speed of response, but increases traffic.
+ * Note that if set to `false` (lazy loading), you need to pass `true` as
+ * `opt_request` to the `forDataAtCoordinateAndResolution` method otherwise no
+ * data will ever be loaded.
+ * @property {boolean} [jsonp=false] Use JSONP with callback to load the TileJSON.
+ * Useful when the server does not support CORS..
+ * @property {import("./TileJSON.js").Config} [tileJSON] TileJSON configuration for this source.
+ * If not provided, `url` must be configured.
+ * @property {string} [url] TileJSON endpoint that provides the configuration for this source.
+ * Request will be made through JSONP. If not provided, `tileJSON` must be configured.
+ * @property {number|import("../array.js").NearestDirectionFunction} [zDirection=0]
+ * Choose whether to use tiles with a higher or lower zoom level when between integer
+ * zoom levels. See {@link module:ol/tilegrid/TileGrid~TileGrid#getZForResolution}.
+ */
+
+/**
+ * @classdesc
+ * Layer source for UTFGrid interaction data loaded from TileJSON format.
+ * @api
+ */
+var UTFGrid =
+/** @class */
+function (_super) {
+  __extends(UTFGrid, _super);
+  /**
+   * @param {Options} options Source options.
+   */
+
+
+  function UTFGrid(options) {
+    var _this = _super.call(this, {
+      projection: (0, _proj.get)('EPSG:3857'),
+      state: _State.default.LOADING,
+      zDirection: options.zDirection
+    }) || this;
+    /**
+     * @private
+     * @type {boolean}
+     */
+
+
+    _this.preemptive_ = options.preemptive !== undefined ? options.preemptive : true;
+    /**
+     * @private
+     * @type {!import("../Tile.js").UrlFunction}
+     */
+
+    _this.tileUrlFunction_ = _tileurlfunction.nullTileUrlFunction;
+    /**
+     * @private
+     * @type {string|undefined}
+     */
+
+    _this.template_ = undefined;
+    /**
+     * @private
+     * @type {boolean}
+     */
+
+    _this.jsonp_ = options.jsonp || false;
+
+    if (options.url) {
+      if (_this.jsonp_) {
+        (0, _net.jsonp)(options.url, _this.handleTileJSONResponse.bind(_this), _this.handleTileJSONError.bind(_this));
+      } else {
+        var client = new XMLHttpRequest();
+        client.addEventListener('load', _this.onXHRLoad_.bind(_this));
+        client.addEventListener('error', _this.onXHRError_.bind(_this));
+        client.open('GET', options.url);
+        client.send();
+      }
+    } else if (options.tileJSON) {
+      _this.handleTileJSONResponse(options.tileJSON);
+    } else {
+      (0, _asserts.assert)(false, 51); // Either `url` or `tileJSON` options must be provided
+    }
+
+    return _this;
+  }
+  /**
+   * @private
+   * @param {Event} event The load event.
+   */
+
+
+  UTFGrid.prototype.onXHRLoad_ = function (event) {
+    var client =
+    /** @type {XMLHttpRequest} */
+    event.target; // status will be 0 for file:// urls
+
+    if (!client.status || client.status >= 200 && client.status < 300) {
+      var response = void 0;
+
+      try {
+        response =
+        /** @type {import("./TileJSON.js").Config} */
+        JSON.parse(client.responseText);
+      } catch (err) {
+        this.handleTileJSONError();
+        return;
+      }
+
+      this.handleTileJSONResponse(response);
+    } else {
+      this.handleTileJSONError();
+    }
+  };
+  /**
+   * @private
+   * @param {Event} event The error event.
+   */
+
+
+  UTFGrid.prototype.onXHRError_ = function (event) {
+    this.handleTileJSONError();
+  };
+  /**
+   * Return the template from TileJSON.
+   * @return {string|undefined} The template from TileJSON.
+   * @api
+   */
+
+
+  UTFGrid.prototype.getTemplate = function () {
+    return this.template_;
+  };
+  /**
+   * Calls the callback (synchronously by default) with the available data
+   * for given coordinate and resolution (or `null` if not yet loaded or
+   * in case of an error).
+   * @param {import("../coordinate.js").Coordinate} coordinate Coordinate.
+   * @param {number} resolution Resolution.
+   * @param {function(*): void} callback Callback.
+   * @param {boolean} [opt_request] If `true` the callback is always async.
+   *                               The tile data is requested if not yet loaded.
+   * @api
+   */
+
+
+  UTFGrid.prototype.forDataAtCoordinateAndResolution = function (coordinate, resolution, callback, opt_request) {
+    if (this.tileGrid) {
+      var z = this.tileGrid.getZForResolution(resolution, this.zDirection);
+      var tileCoord = this.tileGrid.getTileCoordForCoordAndZ(coordinate, z);
+      var tile =
+      /** @type {!CustomTile} */
+      this.getTile(tileCoord[0], tileCoord[1], tileCoord[2], 1, this.getProjection());
+      tile.forDataAtCoordinate(coordinate, callback, opt_request);
+    } else {
+      if (opt_request === true) {
+        setTimeout(function () {
+          callback(null);
+        }, 0);
+      } else {
+        callback(null);
+      }
+    }
+  };
+  /**
+   * @protected
+   */
+
+
+  UTFGrid.prototype.handleTileJSONError = function () {
+    this.setState(_State.default.ERROR);
+  };
+  /**
+   * TODO: very similar to ol/source/TileJSON#handleTileJSONResponse
+   * @protected
+   * @param {import("./TileJSON.js").Config} tileJSON Tile JSON.
+   */
+
+
+  UTFGrid.prototype.handleTileJSONResponse = function (tileJSON) {
+    var epsg4326Projection = (0, _proj.get)('EPSG:4326');
+    var sourceProjection = this.getProjection();
+    var extent;
+
+    if (tileJSON['bounds'] !== undefined) {
+      var transform = (0, _proj.getTransformFromProjections)(epsg4326Projection, sourceProjection);
+      extent = (0, _extent.applyTransform)(tileJSON['bounds'], transform);
+    }
+
+    var gridExtent = (0, _tilegrid.extentFromProjection)(sourceProjection);
+    var minZoom = tileJSON['minzoom'] || 0;
+    var maxZoom = tileJSON['maxzoom'] || 22;
+    var tileGrid = (0, _tilegrid.createXYZ)({
+      extent: gridExtent,
+      maxZoom: maxZoom,
+      minZoom: minZoom
+    });
+    this.tileGrid = tileGrid;
+    this.template_ = tileJSON['template'];
+    var grids = tileJSON['grids'];
+
+    if (!grids) {
+      this.setState(_State.default.ERROR);
+      return;
+    }
+
+    this.tileUrlFunction_ = (0, _tileurlfunction.createFromTemplates)(grids, tileGrid);
+
+    if (tileJSON['attribution'] !== undefined) {
+      var attributionExtent_1 = extent !== undefined ? extent : gridExtent;
+      this.setAttributions(function (frameState) {
+        if ((0, _extent.intersects)(attributionExtent_1, frameState.extent)) {
+          return [tileJSON['attribution']];
+        }
+
+        return null;
+      });
+    }
+
+    this.setState(_State.default.READY);
+  };
+  /**
+   * @param {number} z Tile coordinate z.
+   * @param {number} x Tile coordinate x.
+   * @param {number} y Tile coordinate y.
+   * @param {number} pixelRatio Pixel ratio.
+   * @param {import("../proj/Projection.js").default} projection Projection.
+   * @return {!CustomTile} Tile.
+   */
+
+
+  UTFGrid.prototype.getTile = function (z, x, y, pixelRatio, projection) {
+    var tileCoordKey = (0, _tilecoord.getKeyZXY)(z, x, y);
+
+    if (this.tileCache.containsKey(tileCoordKey)) {
+      return this.tileCache.get(tileCoordKey);
+    } else {
+      var tileCoord = [z, x, y];
+      var urlTileCoord = this.getTileCoordForTileUrlFunction(tileCoord, projection);
+      var tileUrl = this.tileUrlFunction_(urlTileCoord, pixelRatio, projection);
+      var tile = new CustomTile(tileCoord, tileUrl !== undefined ? _TileState.default.IDLE : _TileState.default.EMPTY, tileUrl !== undefined ? tileUrl : '', this.tileGrid.getTileCoordExtent(tileCoord), this.preemptive_, this.jsonp_);
+      this.tileCache.set(tileCoordKey, tile);
+      return tile;
+    }
+  };
+  /**
+   * Marks a tile coord as being used, without triggering a load.
+   * @param {number} z Tile coordinate z.
+   * @param {number} x Tile coordinate x.
+   * @param {number} y Tile coordinate y.
+   */
+
+
+  UTFGrid.prototype.useTile = function (z, x, y) {
+    var tileCoordKey = (0, _tilecoord.getKeyZXY)(z, x, y);
+
+    if (this.tileCache.containsKey(tileCoordKey)) {
+      this.tileCache.get(tileCoordKey);
+    }
+  };
+
+  return UTFGrid;
+}(_Tile2.default);
+
+var _default = UTFGrid;
+exports.default = _default;
+},{"../events/EventType.js":"node_modules/ol/events/EventType.js","./State.js":"node_modules/ol/source/State.js","../Tile.js":"node_modules/ol/Tile.js","./Tile.js":"node_modules/ol/source/Tile.js","../TileState.js":"node_modules/ol/TileState.js","../extent.js":"node_modules/ol/extent.js","../asserts.js":"node_modules/ol/asserts.js","../tileurlfunction.js":"node_modules/ol/tileurlfunction.js","../tilegrid.js":"node_modules/ol/tilegrid.js","../tilecoord.js":"node_modules/ol/tilecoord.js","../proj.js":"node_modules/ol/proj.js","../events.js":"node_modules/ol/events.js","../net.js":"node_modules/ol/net.js"}],"node_modules/ol/source/WMTSRequestEncoding.js":[function(require,module,exports) {
+"use strict";
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+exports.default = void 0;
+
+/**
+ * @module ol/source/WMTSRequestEncoding
+ */
+
+/**
+ * Request encoding. One of 'KVP', 'REST'.
+ * @enum {string}
+ */
+var _default = {
+  KVP: 'KVP',
+  REST: 'REST' // see spec §10
+
+};
+exports.default = _default;
+},{}],"node_modules/ol/tilegrid/WMTS.js":[function(require,module,exports) {
+"use strict";
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+exports.createFromCapabilitiesMatrixSet = createFromCapabilitiesMatrixSet;
+exports.default = void 0;
+
+var _TileGrid = _interopRequireDefault(require("./TileGrid.js"));
+
+var _array = require("../array.js");
+
+var _proj = require("../proj.js");
+
+function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
+
+/**
+ * @module ol/tilegrid/WMTS
+ */
+var __extends = void 0 && (void 0).__extends || function () {
+  var extendStatics = function (d, b) {
+    extendStatics = Object.setPrototypeOf || {
+      __proto__: []
+    } instanceof Array && function (d, b) {
+      d.__proto__ = b;
+    } || function (d, b) {
+      for (var p in b) if (Object.prototype.hasOwnProperty.call(b, p)) d[p] = b[p];
+    };
+
+    return extendStatics(d, b);
+  };
+
+  return function (d, b) {
+    if (typeof b !== "function" && b !== null) throw new TypeError("Class extends value " + String(b) + " is not a constructor or null");
+    extendStatics(d, b);
+
+    function __() {
+      this.constructor = d;
+    }
+
+    d.prototype = b === null ? Object.create(b) : (__.prototype = b.prototype, new __());
+  };
+}();
+
+/**
+ * @typedef {Object} Options
+ * @property {import("../extent.js").Extent} [extent] Extent for the tile grid. No tiles
+ * outside this extent will be requested by {@link module:ol/source/Tile~TileSource} sources.
+ * When no `origin` or `origins` are configured, the `origin` will be set to the
+ * top-left corner of the extent.
+ * @property {import("../coordinate.js").Coordinate} [origin] The tile grid origin, i.e.
+ * where the `x` and `y` axes meet (`[z, 0, 0]`). Tile coordinates increase left
+ * to right and downwards. If not specified, `extent` or `origins` must be provided.
+ * @property {Array<import("../coordinate.js").Coordinate>} [origins] Tile grid origins,
+ * i.e. where the `x` and `y` axes meet (`[z, 0, 0]`), for each zoom level. If
+ * given, the array length should match the length of the `resolutions` array, i.e.
+ * each resolution can have a different origin. Tile coordinates increase left to
+ * right and downwards. If not specified, `extent` or `origin` must be provided.
+ * @property {!Array<number>} resolutions Resolutions. The array index of each
+ * resolution needs to match the zoom level. This means that even if a `minZoom`
+ * is configured, the resolutions array will have a length of `maxZoom + 1`
+ * @property {!Array<string>} matrixIds matrix IDs. The length of this array needs
+ * to match the length of the `resolutions` array.
+ * @property {Array<import("../size.js").Size>} [sizes] Number of tile rows and columns
+ * of the grid for each zoom level. The values here are the `TileMatrixWidth` and
+ * `TileMatrixHeight` advertised in the GetCapabilities response of the WMTS, and
+ * define each zoom level's extent together with the `origin` or `origins`.
+ * A grid `extent` can be configured in addition, and will further limit the extent for
+ * which tile requests are made by sources. If the bottom-left corner of
+ * an extent is used as `origin` or `origins`, then the `y` value must be
+ * negative because OpenLayers tile coordinates use the top left as the origin.
+ * @property {number|import("../size.js").Size} [tileSize] Tile size.
+ * @property {Array<import("../size.js").Size>} [tileSizes] Tile sizes. The length of
+ * this array needs to match the length of the `resolutions` array.
+ */
+
+/**
+ * @classdesc
+ * Set the grid pattern for sources accessing WMTS tiled-image servers.
+ * @api
+ */
+var WMTSTileGrid =
+/** @class */
+function (_super) {
+  __extends(WMTSTileGrid, _super);
+  /**
+   * @param {Options} options WMTS options.
+   */
+
+
+  function WMTSTileGrid(options) {
+    var _this = _super.call(this, {
+      extent: options.extent,
+      origin: options.origin,
+      origins: options.origins,
+      resolutions: options.resolutions,
+      tileSize: options.tileSize,
+      tileSizes: options.tileSizes,
+      sizes: options.sizes
+    }) || this;
+    /**
+     * @private
+     * @type {!Array<string>}
+     */
+
+
+    _this.matrixIds_ = options.matrixIds;
+    return _this;
+  }
+  /**
+   * @param {number} z Z.
+   * @return {string} MatrixId..
+   */
+
+
+  WMTSTileGrid.prototype.getMatrixId = function (z) {
+    return this.matrixIds_[z];
+  };
+  /**
+   * Get the list of matrix identifiers.
+   * @return {Array<string>} MatrixIds.
+   * @api
+   */
+
+
+  WMTSTileGrid.prototype.getMatrixIds = function () {
+    return this.matrixIds_;
+  };
+
+  return WMTSTileGrid;
+}(_TileGrid.default);
+
+var _default = WMTSTileGrid;
+/**
+ * Create a tile grid from a WMTS capabilities matrix set and an
+ * optional TileMatrixSetLimits.
+ * @param {Object} matrixSet An object representing a matrixSet in the
+ *     capabilities document.
+ * @param {import("../extent.js").Extent} [opt_extent] An optional extent to restrict the tile
+ *     ranges the server provides.
+ * @param {Array<Object>} [opt_matrixLimits] An optional object representing
+ *     the available matrices for tileGrid.
+ * @return {WMTSTileGrid} WMTS tileGrid instance.
+ * @api
+ */
+
+exports.default = _default;
+
+function createFromCapabilitiesMatrixSet(matrixSet, opt_extent, opt_matrixLimits) {
+  /** @type {!Array<number>} */
+  var resolutions = [];
+  /** @type {!Array<string>} */
+
+  var matrixIds = [];
+  /** @type {!Array<import("../coordinate.js").Coordinate>} */
+
+  var origins = [];
+  /** @type {!Array<import("../size.js").Size>} */
+
+  var tileSizes = [];
+  /** @type {!Array<import("../size.js").Size>} */
+
+  var sizes = [];
+  var matrixLimits = opt_matrixLimits !== undefined ? opt_matrixLimits : [];
+  var supportedCRSPropName = 'SupportedCRS';
+  var matrixIdsPropName = 'TileMatrix';
+  var identifierPropName = 'Identifier';
+  var scaleDenominatorPropName = 'ScaleDenominator';
+  var topLeftCornerPropName = 'TopLeftCorner';
+  var tileWidthPropName = 'TileWidth';
+  var tileHeightPropName = 'TileHeight';
+  var code = matrixSet[supportedCRSPropName];
+  var projection = (0, _proj.get)(code);
+  var metersPerUnit = projection.getMetersPerUnit(); // swap origin x and y coordinates if axis orientation is lat/long
+
+  var switchOriginXY = projection.getAxisOrientation().substr(0, 2) == 'ne';
+  matrixSet[matrixIdsPropName].sort(function (a, b) {
+    return b[scaleDenominatorPropName] - a[scaleDenominatorPropName];
+  });
+  matrixSet[matrixIdsPropName].forEach(function (elt) {
+    var matrixAvailable; // use of matrixLimits to filter TileMatrices from GetCapabilities
+    // TileMatrixSet from unavailable matrix levels.
+
+    if (matrixLimits.length > 0) {
+      matrixAvailable = (0, _array.find)(matrixLimits, function (elt_ml) {
+        if (elt[identifierPropName] == elt_ml[matrixIdsPropName]) {
+          return true;
+        } // Fallback for tileMatrix identifiers that don't get prefixed
+        // by their tileMatrixSet identifiers.
+
+
+        if (elt[identifierPropName].indexOf(':') === -1) {
+          return matrixSet[identifierPropName] + ':' + elt[identifierPropName] === elt_ml[matrixIdsPropName];
+        }
+
+        return false;
+      });
+    } else {
+      matrixAvailable = true;
+    }
+
+    if (matrixAvailable) {
+      matrixIds.push(elt[identifierPropName]);
+      var resolution = elt[scaleDenominatorPropName] * 0.28e-3 / metersPerUnit;
+      var tileWidth = elt[tileWidthPropName];
+      var tileHeight = elt[tileHeightPropName];
+
+      if (switchOriginXY) {
+        origins.push([elt[topLeftCornerPropName][1], elt[topLeftCornerPropName][0]]);
+      } else {
+        origins.push(elt[topLeftCornerPropName]);
+      }
+
+      resolutions.push(resolution);
+      tileSizes.push(tileWidth == tileHeight ? tileWidth : [tileWidth, tileHeight]);
+      sizes.push([elt['MatrixWidth'], elt['MatrixHeight']]);
+    }
+  });
+  return new WMTSTileGrid({
+    extent: opt_extent,
+    origins: origins,
+    resolutions: resolutions,
+    matrixIds: matrixIds,
+    tileSizes: tileSizes,
+    sizes: sizes
+  });
+}
+},{"./TileGrid.js":"node_modules/ol/tilegrid/TileGrid.js","../array.js":"node_modules/ol/array.js","../proj.js":"node_modules/ol/proj.js"}],"node_modules/ol/source/WMTS.js":[function(require,module,exports) {
+"use strict";
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+exports.default = void 0;
+exports.optionsFromCapabilities = optionsFromCapabilities;
+
+var _TileImage = _interopRequireDefault(require("./TileImage.js"));
+
+var _WMTSRequestEncoding = _interopRequireDefault(require("./WMTSRequestEncoding.js"));
+
+var _uri = require("../uri.js");
+
+var _obj = require("../obj.js");
+
+var _extent = require("../extent.js");
+
+var _WMTS = require("../tilegrid/WMTS.js");
+
+var _tileurlfunction = require("../tileurlfunction.js");
+
+var _proj = require("../proj.js");
+
+var _array = require("../array.js");
+
+function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
+
+/**
+ * @module ol/source/WMTS
+ */
+var __extends = void 0 && (void 0).__extends || function () {
+  var extendStatics = function (d, b) {
+    extendStatics = Object.setPrototypeOf || {
+      __proto__: []
+    } instanceof Array && function (d, b) {
+      d.__proto__ = b;
+    } || function (d, b) {
+      for (var p in b) if (Object.prototype.hasOwnProperty.call(b, p)) d[p] = b[p];
+    };
+
+    return extendStatics(d, b);
+  };
+
+  return function (d, b) {
+    if (typeof b !== "function" && b !== null) throw new TypeError("Class extends value " + String(b) + " is not a constructor or null");
+    extendStatics(d, b);
+
+    function __() {
+      this.constructor = d;
+    }
+
+    d.prototype = b === null ? Object.create(b) : (__.prototype = b.prototype, new __());
+  };
+}();
+
+/**
+ * @typedef {Object} Options
+ * @property {import("./Source.js").AttributionLike} [attributions] Attributions.
+ * @property {boolean} [attributionsCollapsible=true] Attributions are collapsible.
+ * @property {number} [cacheSize] Initial tile cache size. Will auto-grow to hold at least the number of tiles in the viewport.
+ * @property {null|string} [crossOrigin] The `crossOrigin` attribute for loaded images.  Note that
+ * you must provide a `crossOrigin` value if you want to access pixel data with the Canvas renderer.
+ * See https://developer.mozilla.org/en-US/docs/Web/HTML/CORS_enabled_image for more detail.
+ * @property {boolean} [imageSmoothing=true] Deprecated.  Use the `interpolate` option instead.
+ * @property {boolean} [interpolate=true] Use interpolated values when resampling.  By default,
+ * linear interpolation is used when resampling.  Set to false to use the nearest neighbor instead.
+ * @property {import("../tilegrid/WMTS.js").default} tileGrid Tile grid.
+ * @property {import("../proj.js").ProjectionLike} [projection] Projection. Default is the view projection.
+ * @property {number} [reprojectionErrorThreshold=0.5] Maximum allowed reprojection error (in pixels).
+ * Higher values can increase reprojection performance, but decrease precision.
+ * @property {import("./WMTSRequestEncoding.js").default|string} [requestEncoding='KVP'] Request encoding.
+ * @property {string} layer Layer name as advertised in the WMTS capabilities.
+ * @property {string} style Style name as advertised in the WMTS capabilities.
+ * @property {typeof import("../ImageTile.js").default} [tileClass]  Class used to instantiate image tiles. Default is {@link module:ol/ImageTile~ImageTile}.
+ * @property {number} [tilePixelRatio=1] The pixel ratio used by the tile service.
+ * For example, if the tile service advertizes 256px by 256px tiles but actually sends 512px
+ * by 512px images (for retina/hidpi devices) then `tilePixelRatio`
+ * should be set to `2`.
+ * @property {string} [format='image/jpeg'] Image format. Only used when `requestEncoding` is `'KVP'`.
+ * @property {string} [version='1.0.0'] WMTS version.
+ * @property {string} matrixSet Matrix set.
+ * @property {!Object} [dimensions] Additional "dimensions" for tile requests.
+ * This is an object with properties named like the advertised WMTS dimensions.
+ * @property {string} [url]  A URL for the service.
+ * For the RESTful request encoding, this is a URL
+ * template.  For KVP encoding, it is normal URL. A `{?-?}` template pattern,
+ * for example `subdomain{a-f}.domain.com`, may be used instead of defining
+ * each one separately in the `urls` option.
+ * @property {import("../Tile.js").LoadFunction} [tileLoadFunction] Optional function to load a tile given a URL. The default is
+ * ```js
+ * function(imageTile, src) {
+ *   imageTile.getImage().src = src;
+ * };
+ * ```
+ * @property {Array<string>} [urls] An array of URLs.
+ * Requests will be distributed among the URLs in this array.
+ * @property {boolean} [wrapX=false] Whether to wrap the world horizontally.
+ * @property {number} [transition] Duration of the opacity transition for rendering.
+ * To disable the opacity transition, pass `transition: 0`.
+ * @property {number|import("../array.js").NearestDirectionFunction} [zDirection=0]
+ * Choose whether to use tiles with a higher or lower zoom level when between integer
+ * zoom levels. See {@link module:ol/tilegrid/TileGrid~TileGrid#getZForResolution}.
+ */
+
+/**
+ * @classdesc
+ * Layer source for tile data from WMTS servers.
+ * @api
+ */
+var WMTS =
+/** @class */
+function (_super) {
+  __extends(WMTS, _super);
+  /**
+   * @param {Options} options WMTS options.
+   */
+
+
+  function WMTS(options) {
+    var _this = this;
+
+    var interpolate = options.imageSmoothing !== undefined ? options.imageSmoothing : true;
+
+    if (options.interpolate !== undefined) {
+      interpolate = options.interpolate;
+    } // TODO: add support for TileMatrixLimits
+
+
+    var requestEncoding = options.requestEncoding !== undefined ?
+    /** @type {import("./WMTSRequestEncoding.js").default} */
+    options.requestEncoding : _WMTSRequestEncoding.default.KVP; // FIXME: should we create a default tileGrid?
+    // we could issue a getCapabilities xhr to retrieve missing configuration
+
+    var tileGrid = options.tileGrid;
+    var urls = options.urls;
+
+    if (urls === undefined && options.url !== undefined) {
+      urls = (0, _tileurlfunction.expandUrl)(options.url);
+    }
+
+    _this = _super.call(this, {
+      attributions: options.attributions,
+      attributionsCollapsible: options.attributionsCollapsible,
+      cacheSize: options.cacheSize,
+      crossOrigin: options.crossOrigin,
+      interpolate: interpolate,
+      projection: options.projection,
+      reprojectionErrorThreshold: options.reprojectionErrorThreshold,
+      tileClass: options.tileClass,
+      tileGrid: tileGrid,
+      tileLoadFunction: options.tileLoadFunction,
+      tilePixelRatio: options.tilePixelRatio,
+      urls: urls,
+      wrapX: options.wrapX !== undefined ? options.wrapX : false,
+      transition: options.transition,
+      zDirection: options.zDirection
+    }) || this;
+    /**
+     * @private
+     * @type {string}
+     */
+
+    _this.version_ = options.version !== undefined ? options.version : '1.0.0';
+    /**
+     * @private
+     * @type {string}
+     */
+
+    _this.format_ = options.format !== undefined ? options.format : 'image/jpeg';
+    /**
+     * @private
+     * @type {!Object}
+     */
+
+    _this.dimensions_ = options.dimensions !== undefined ? options.dimensions : {};
+    /**
+     * @private
+     * @type {string}
+     */
+
+    _this.layer_ = options.layer;
+    /**
+     * @private
+     * @type {string}
+     */
+
+    _this.matrixSet_ = options.matrixSet;
+    /**
+     * @private
+     * @type {string}
+     */
+
+    _this.style_ = options.style; // FIXME: should we guess this requestEncoding from options.url(s)
+    //        structure? that would mean KVP only if a template is not provided.
+
+    /**
+     * @private
+     * @type {import("./WMTSRequestEncoding.js").default}
+     */
+
+    _this.requestEncoding_ = requestEncoding;
+
+    _this.setKey(_this.getKeyForDimensions_());
+
+    if (urls && urls.length > 0) {
+      _this.tileUrlFunction = (0, _tileurlfunction.createFromTileUrlFunctions)(urls.map(_this.createFromWMTSTemplate.bind(_this)));
+    }
+
+    return _this;
+  }
+  /**
+   * Set the URLs to use for requests.
+   * URLs may contain OGC conform URL Template Variables: {TileMatrix}, {TileRow}, {TileCol}.
+   * @param {Array<string>} urls URLs.
+   */
+
+
+  WMTS.prototype.setUrls = function (urls) {
+    this.urls = urls;
+    var key = urls.join('\n');
+    this.setTileUrlFunction((0, _tileurlfunction.createFromTileUrlFunctions)(urls.map(this.createFromWMTSTemplate.bind(this))), key);
+  };
+  /**
+   * Get the dimensions, i.e. those passed to the constructor through the
+   * "dimensions" option, and possibly updated using the updateDimensions
+   * method.
+   * @return {!Object} Dimensions.
+   * @api
+   */
+
+
+  WMTS.prototype.getDimensions = function () {
+    return this.dimensions_;
+  };
+  /**
+   * Return the image format of the WMTS source.
+   * @return {string} Format.
+   * @api
+   */
+
+
+  WMTS.prototype.getFormat = function () {
+    return this.format_;
+  };
+  /**
+   * Return the layer of the WMTS source.
+   * @return {string} Layer.
+   * @api
+   */
+
+
+  WMTS.prototype.getLayer = function () {
+    return this.layer_;
+  };
+  /**
+   * Return the matrix set of the WMTS source.
+   * @return {string} MatrixSet.
+   * @api
+   */
+
+
+  WMTS.prototype.getMatrixSet = function () {
+    return this.matrixSet_;
+  };
+  /**
+   * Return the request encoding, either "KVP" or "REST".
+   * @return {import("./WMTSRequestEncoding.js").default} Request encoding.
+   * @api
+   */
+
+
+  WMTS.prototype.getRequestEncoding = function () {
+    return this.requestEncoding_;
+  };
+  /**
+   * Return the style of the WMTS source.
+   * @return {string} Style.
+   * @api
+   */
+
+
+  WMTS.prototype.getStyle = function () {
+    return this.style_;
+  };
+  /**
+   * Return the version of the WMTS source.
+   * @return {string} Version.
+   * @api
+   */
+
+
+  WMTS.prototype.getVersion = function () {
+    return this.version_;
+  };
+  /**
+   * @private
+   * @return {string} The key for the current dimensions.
+   */
+
+
+  WMTS.prototype.getKeyForDimensions_ = function () {
+    var i = 0;
+    var res = [];
+
+    for (var key in this.dimensions_) {
+      res[i++] = key + '-' + this.dimensions_[key];
+    }
+
+    return res.join('/');
+  };
+  /**
+   * Update the dimensions.
+   * @param {Object} dimensions Dimensions.
+   * @api
+   */
+
+
+  WMTS.prototype.updateDimensions = function (dimensions) {
+    (0, _obj.assign)(this.dimensions_, dimensions);
+    this.setKey(this.getKeyForDimensions_());
+  };
+  /**
+   * @param {string} template Template.
+   * @return {import("../Tile.js").UrlFunction} Tile URL function.
+   */
+
+
+  WMTS.prototype.createFromWMTSTemplate = function (template) {
+    var requestEncoding = this.requestEncoding_; // context property names are lower case to allow for a case insensitive
+    // replacement as some services use different naming conventions
+
+    var context = {
+      'layer': this.layer_,
+      'style': this.style_,
+      'tilematrixset': this.matrixSet_
+    };
+
+    if (requestEncoding == _WMTSRequestEncoding.default.KVP) {
+      (0, _obj.assign)(context, {
+        'Service': 'WMTS',
+        'Request': 'GetTile',
+        'Version': this.version_,
+        'Format': this.format_
+      });
+    } // TODO: we may want to create our own appendParams function so that params
+    // order conforms to wmts spec guidance, and so that we can avoid to escape
+    // special template params
+
+
+    template = requestEncoding == _WMTSRequestEncoding.default.KVP ? (0, _uri.appendParams)(template, context) : template.replace(/\{(\w+?)\}/g, function (m, p) {
+      return p.toLowerCase() in context ? context[p.toLowerCase()] : m;
+    });
+    var tileGrid =
+    /** @type {import("../tilegrid/WMTS.js").default} */
+    this.tileGrid;
+    var dimensions = this.dimensions_;
+    return (
+      /**
+       * @param {import("../tilecoord.js").TileCoord} tileCoord Tile coordinate.
+       * @param {number} pixelRatio Pixel ratio.
+       * @param {import("../proj/Projection.js").default} projection Projection.
+       * @return {string|undefined} Tile URL.
+       */
+      function (tileCoord, pixelRatio, projection) {
+        if (!tileCoord) {
+          return undefined;
+        } else {
+          var localContext_1 = {
+            'TileMatrix': tileGrid.getMatrixId(tileCoord[0]),
+            'TileCol': tileCoord[1],
+            'TileRow': tileCoord[2]
+          };
+          (0, _obj.assign)(localContext_1, dimensions);
+          var url = template;
+
+          if (requestEncoding == _WMTSRequestEncoding.default.KVP) {
+            url = (0, _uri.appendParams)(url, localContext_1);
+          } else {
+            url = url.replace(/\{(\w+?)\}/g, function (m, p) {
+              return localContext_1[p];
+            });
+          }
+
+          return url;
+        }
+      }
+    );
+  };
+
+  return WMTS;
+}(_TileImage.default);
+
+var _default = WMTS;
+/**
+ * Generate source options from a capabilities object.
+ * @param {Object} wmtsCap An object representing the capabilities document.
+ * @param {!Object} config Configuration properties for the layer.  Defaults for
+ *                  the layer will apply if not provided.
+ *
+ * Required config properties:
+ *  - layer - {string} The layer identifier.
+ *
+ * Optional config properties:
+ *  - matrixSet - {string} The matrix set identifier, required if there is
+ *       more than one matrix set in the layer capabilities.
+ *  - projection - {string} The desired CRS when no matrixSet is specified.
+ *       eg: "EPSG:3857". If the desired projection is not available,
+ *       an error is thrown.
+ *  - requestEncoding - {string} url encoding format for the layer. Default is
+ *       the first tile url format found in the GetCapabilities response.
+ *  - style - {string} The name of the style
+ *  - format - {string} Image format for the layer. Default is the first
+ *       format returned in the GetCapabilities response.
+ *  - crossOrigin - {string|null|undefined} Cross origin. Default is `undefined`.
+ * @return {Options|null} WMTS source options object or `null` if the layer was not found.
+ * @api
+ */
+
+exports.default = _default;
+
+function optionsFromCapabilities(wmtsCap, config) {
+  var layers = wmtsCap['Contents']['Layer'];
+  var l = (0, _array.find)(layers, function (elt, index, array) {
+    return elt['Identifier'] == config['layer'];
+  });
+
+  if (l === null) {
+    return null;
+  }
+
+  var tileMatrixSets = wmtsCap['Contents']['TileMatrixSet'];
+  var idx;
+
+  if (l['TileMatrixSetLink'].length > 1) {
+    if ('projection' in config) {
+      idx = (0, _array.findIndex)(l['TileMatrixSetLink'], function (elt, index, array) {
+        var tileMatrixSet = (0, _array.find)(tileMatrixSets, function (el) {
+          return el['Identifier'] == elt['TileMatrixSet'];
+        });
+        var supportedCRS = tileMatrixSet['SupportedCRS'];
+        var proj1 = (0, _proj.get)(supportedCRS);
+        var proj2 = (0, _proj.get)(config['projection']);
+
+        if (proj1 && proj2) {
+          return (0, _proj.equivalent)(proj1, proj2);
+        } else {
+          return supportedCRS == config['projection'];
+        }
+      });
+    } else {
+      idx = (0, _array.findIndex)(l['TileMatrixSetLink'], function (elt, index, array) {
+        return elt['TileMatrixSet'] == config['matrixSet'];
+      });
+    }
+  } else {
+    idx = 0;
+  }
+
+  if (idx < 0) {
+    idx = 0;
+  }
+
+  var matrixSet =
+  /** @type {string} */
+  l['TileMatrixSetLink'][idx]['TileMatrixSet'];
+  var matrixLimits =
+  /** @type {Array<Object>} */
+  l['TileMatrixSetLink'][idx]['TileMatrixSetLimits'];
+  var format =
+  /** @type {string} */
+  l['Format'][0];
+
+  if ('format' in config) {
+    format = config['format'];
+  }
+
+  idx = (0, _array.findIndex)(l['Style'], function (elt, index, array) {
+    if ('style' in config) {
+      return elt['Title'] == config['style'];
+    } else {
+      return elt['isDefault'];
+    }
+  });
+
+  if (idx < 0) {
+    idx = 0;
+  }
+
+  var style =
+  /** @type {string} */
+  l['Style'][idx]['Identifier'];
+  var dimensions = {};
+
+  if ('Dimension' in l) {
+    l['Dimension'].forEach(function (elt, index, array) {
+      var key = elt['Identifier'];
+      var value = elt['Default'];
+
+      if (value === undefined) {
+        value = elt['Value'][0];
+      }
+
+      dimensions[key] = value;
+    });
+  }
+
+  var matrixSets = wmtsCap['Contents']['TileMatrixSet'];
+  var matrixSetObj = (0, _array.find)(matrixSets, function (elt, index, array) {
+    return elt['Identifier'] == matrixSet;
+  });
+  var projection;
+  var code = matrixSetObj['SupportedCRS'];
+
+  if (code) {
+    projection = (0, _proj.get)(code);
+  }
+
+  if ('projection' in config) {
+    var projConfig = (0, _proj.get)(config['projection']);
+
+    if (projConfig) {
+      if (!projection || (0, _proj.equivalent)(projConfig, projection)) {
+        projection = projConfig;
+      }
+    }
+  }
+
+  var wrapX = false;
+  var switchOriginXY = projection.getAxisOrientation().substr(0, 2) == 'ne';
+  var matrix = matrixSetObj.TileMatrix[0]; // create default matrixLimit
+
+  var selectedMatrixLimit = {
+    MinTileCol: 0,
+    MinTileRow: 0,
+    // subtract one to end up at tile top left
+    MaxTileCol: matrix.MatrixWidth - 1,
+    MaxTileRow: matrix.MatrixHeight - 1
+  }; //in case of matrix limits, use matrix limits to calculate extent
+
+  if (matrixLimits) {
+    selectedMatrixLimit = matrixLimits[matrixLimits.length - 1];
+    var m = (0, _array.find)(matrixSetObj.TileMatrix, function (tileMatrixValue) {
+      return tileMatrixValue.Identifier === selectedMatrixLimit.TileMatrix || matrixSetObj.Identifier + ':' + tileMatrixValue.Identifier === selectedMatrixLimit.TileMatrix;
+    });
+
+    if (m) {
+      matrix = m;
+    }
+  }
+
+  var resolution = matrix.ScaleDenominator * 0.00028 / projection.getMetersPerUnit(); // WMTS 1.0.0: standardized rendering pixel size
+
+  var origin = switchOriginXY ? [matrix.TopLeftCorner[1], matrix.TopLeftCorner[0]] : matrix.TopLeftCorner;
+  var tileSpanX = matrix.TileWidth * resolution;
+  var tileSpanY = matrix.TileHeight * resolution;
+  var matrixSetExtent = matrixSetObj['BoundingBox'];
+  var extent = [origin[0] + tileSpanX * selectedMatrixLimit.MinTileCol, // add one to get proper bottom/right coordinate
+  origin[1] - tileSpanY * (1 + selectedMatrixLimit.MaxTileRow), origin[0] + tileSpanX * (1 + selectedMatrixLimit.MaxTileCol), origin[1] - tileSpanY * selectedMatrixLimit.MinTileRow];
+
+  if (matrixSetExtent !== undefined && !(0, _extent.containsExtent)(matrixSetExtent, extent)) {
+    var wgs84BoundingBox = l['WGS84BoundingBox'];
+    var wgs84ProjectionExtent = (0, _proj.get)('EPSG:4326').getExtent();
+    extent = matrixSetExtent;
+
+    if (wgs84BoundingBox) {
+      wrapX = wgs84BoundingBox[0] === wgs84ProjectionExtent[0] && wgs84BoundingBox[2] === wgs84ProjectionExtent[2];
+    } else {
+      var wgs84MatrixSetExtent = (0, _proj.transformExtent)(matrixSetExtent, matrixSetObj['SupportedCRS'], 'EPSG:4326'); // Ignore slight deviation from the correct x limits
+
+      wrapX = wgs84MatrixSetExtent[0] - 1e-10 <= wgs84ProjectionExtent[0] && wgs84MatrixSetExtent[2] + 1e-10 >= wgs84ProjectionExtent[2];
+    }
+  }
+
+  var tileGrid = (0, _WMTS.createFromCapabilitiesMatrixSet)(matrixSetObj, extent, matrixLimits);
+  /** @type {!Array<string>} */
+
+  var urls = [];
+  var requestEncoding = config['requestEncoding'];
+  requestEncoding = requestEncoding !== undefined ? requestEncoding : '';
+
+  if ('OperationsMetadata' in wmtsCap && 'GetTile' in wmtsCap['OperationsMetadata']) {
+    var gets = wmtsCap['OperationsMetadata']['GetTile']['DCP']['HTTP']['Get'];
+
+    for (var i = 0, ii = gets.length; i < ii; ++i) {
+      if (gets[i]['Constraint']) {
+        var constraint = (0, _array.find)(gets[i]['Constraint'], function (element) {
+          return element['name'] == 'GetEncoding';
+        });
+        var encodings = constraint['AllowedValues']['Value'];
+
+        if (requestEncoding === '') {
+          // requestEncoding not provided, use the first encoding from the list
+          requestEncoding = encodings[0];
+        }
+
+        if (requestEncoding === _WMTSRequestEncoding.default.KVP) {
+          if ((0, _array.includes)(encodings, _WMTSRequestEncoding.default.KVP)) {
+            urls.push(
+            /** @type {string} */
+            gets[i]['href']);
+          }
+        } else {
+          break;
+        }
+      } else if (gets[i]['href']) {
+        requestEncoding = _WMTSRequestEncoding.default.KVP;
+        urls.push(
+        /** @type {string} */
+        gets[i]['href']);
+      }
+    }
+  }
+
+  if (urls.length === 0) {
+    requestEncoding = _WMTSRequestEncoding.default.REST;
+    l['ResourceURL'].forEach(function (element) {
+      if (element['resourceType'] === 'tile') {
+        format = element['format'];
+        urls.push(
+        /** @type {string} */
+        element['template']);
+      }
+    });
+  }
+
+  return {
+    urls: urls,
+    layer: config['layer'],
+    matrixSet: matrixSet,
+    format: format,
+    projection: projection,
+    requestEncoding: requestEncoding,
+    tileGrid: tileGrid,
+    style: style,
+    dimensions: dimensions,
+    wrapX: wrapX,
+    crossOrigin: config['crossOrigin']
+  };
+}
+},{"./TileImage.js":"node_modules/ol/source/TileImage.js","./WMTSRequestEncoding.js":"node_modules/ol/source/WMTSRequestEncoding.js","../uri.js":"node_modules/ol/uri.js","../obj.js":"node_modules/ol/obj.js","../extent.js":"node_modules/ol/extent.js","../tilegrid/WMTS.js":"node_modules/ol/tilegrid/WMTS.js","../tileurlfunction.js":"node_modules/ol/tileurlfunction.js","../proj.js":"node_modules/ol/proj.js","../array.js":"node_modules/ol/array.js"}],"node_modules/ol/source.js":[function(require,module,exports) {
+"use strict";
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+Object.defineProperty(exports, "BingMaps", {
+  enumerable: true,
+  get: function () {
+    return _BingMaps.default;
+  }
+});
+Object.defineProperty(exports, "CartoDB", {
+  enumerable: true,
+  get: function () {
+    return _CartoDB.default;
+  }
+});
+Object.defineProperty(exports, "Cluster", {
+  enumerable: true,
+  get: function () {
+    return _Cluster.default;
+  }
+});
+Object.defineProperty(exports, "DataTile", {
+  enumerable: true,
+  get: function () {
+    return _DataTile.default;
+  }
+});
+Object.defineProperty(exports, "GeoTIFF", {
+  enumerable: true,
+  get: function () {
+    return _GeoTIFF.default;
+  }
+});
+Object.defineProperty(exports, "IIIF", {
+  enumerable: true,
+  get: function () {
+    return _IIIF.default;
+  }
+});
+Object.defineProperty(exports, "Image", {
+  enumerable: true,
+  get: function () {
+    return _Image.default;
+  }
+});
+Object.defineProperty(exports, "ImageArcGISRest", {
+  enumerable: true,
+  get: function () {
+    return _ImageArcGISRest.default;
+  }
+});
+Object.defineProperty(exports, "ImageCanvas", {
+  enumerable: true,
+  get: function () {
+    return _ImageCanvas.default;
+  }
+});
+Object.defineProperty(exports, "ImageMapGuide", {
+  enumerable: true,
+  get: function () {
+    return _ImageMapGuide.default;
+  }
+});
+Object.defineProperty(exports, "ImageStatic", {
+  enumerable: true,
+  get: function () {
+    return _ImageStatic.default;
+  }
+});
+Object.defineProperty(exports, "ImageWMS", {
+  enumerable: true,
+  get: function () {
+    return _ImageWMS.default;
+  }
+});
+Object.defineProperty(exports, "OSM", {
+  enumerable: true,
+  get: function () {
+    return _OSM.default;
+  }
+});
+Object.defineProperty(exports, "Raster", {
+  enumerable: true,
+  get: function () {
+    return _Raster.default;
+  }
+});
+Object.defineProperty(exports, "Source", {
+  enumerable: true,
+  get: function () {
+    return _Source.default;
+  }
+});
+Object.defineProperty(exports, "Stamen", {
+  enumerable: true,
+  get: function () {
+    return _Stamen.default;
+  }
+});
+Object.defineProperty(exports, "Tile", {
+  enumerable: true,
+  get: function () {
+    return _Tile.default;
+  }
+});
+Object.defineProperty(exports, "TileArcGISRest", {
+  enumerable: true,
+  get: function () {
+    return _TileArcGISRest.default;
+  }
+});
+Object.defineProperty(exports, "TileDebug", {
+  enumerable: true,
+  get: function () {
+    return _TileDebug.default;
+  }
+});
+Object.defineProperty(exports, "TileImage", {
+  enumerable: true,
+  get: function () {
+    return _TileImage.default;
+  }
+});
+Object.defineProperty(exports, "TileJSON", {
+  enumerable: true,
+  get: function () {
+    return _TileJSON.default;
+  }
+});
+Object.defineProperty(exports, "TileWMS", {
+  enumerable: true,
+  get: function () {
+    return _TileWMS.default;
+  }
+});
+Object.defineProperty(exports, "UTFGrid", {
+  enumerable: true,
+  get: function () {
+    return _UTFGrid.default;
+  }
+});
+Object.defineProperty(exports, "UrlTile", {
+  enumerable: true,
+  get: function () {
+    return _UrlTile.default;
+  }
+});
+Object.defineProperty(exports, "Vector", {
+  enumerable: true,
+  get: function () {
+    return _Vector.default;
+  }
+});
+Object.defineProperty(exports, "VectorTile", {
+  enumerable: true,
+  get: function () {
+    return _VectorTile.default;
+  }
+});
+Object.defineProperty(exports, "WMTS", {
+  enumerable: true,
+  get: function () {
+    return _WMTS.default;
+  }
+});
+Object.defineProperty(exports, "XYZ", {
+  enumerable: true,
+  get: function () {
+    return _XYZ.default;
+  }
+});
+Object.defineProperty(exports, "Zoomify", {
+  enumerable: true,
+  get: function () {
+    return _Zoomify.default;
+  }
+});
+exports.sourcesFromTileGrid = sourcesFromTileGrid;
+
+var _LRUCache = _interopRequireDefault(require("./structs/LRUCache.js"));
+
+var _extent = require("./extent.js");
+
+var _BingMaps = _interopRequireDefault(require("./source/BingMaps.js"));
+
+var _CartoDB = _interopRequireDefault(require("./source/CartoDB.js"));
+
+var _Cluster = _interopRequireDefault(require("./source/Cluster.js"));
+
+var _DataTile = _interopRequireDefault(require("./source/DataTile.js"));
+
+var _GeoTIFF = _interopRequireDefault(require("./source/GeoTIFF.js"));
+
+var _IIIF = _interopRequireDefault(require("./source/IIIF.js"));
+
+var _Image = _interopRequireDefault(require("./source/Image.js"));
+
+var _ImageArcGISRest = _interopRequireDefault(require("./source/ImageArcGISRest.js"));
+
+var _ImageCanvas = _interopRequireDefault(require("./source/ImageCanvas.js"));
+
+var _ImageMapGuide = _interopRequireDefault(require("./source/ImageMapGuide.js"));
+
+var _ImageStatic = _interopRequireDefault(require("./source/ImageStatic.js"));
+
+var _ImageWMS = _interopRequireDefault(require("./source/ImageWMS.js"));
+
+var _OSM = _interopRequireDefault(require("./source/OSM.js"));
+
+var _Raster = _interopRequireDefault(require("./source/Raster.js"));
+
+var _Source = _interopRequireDefault(require("./source/Source.js"));
+
+var _Stamen = _interopRequireDefault(require("./source/Stamen.js"));
+
+var _Tile = _interopRequireDefault(require("./source/Tile.js"));
+
+var _TileArcGISRest = _interopRequireDefault(require("./source/TileArcGISRest.js"));
+
+var _TileDebug = _interopRequireDefault(require("./source/TileDebug.js"));
+
+var _TileImage = _interopRequireDefault(require("./source/TileImage.js"));
+
+var _TileJSON = _interopRequireDefault(require("./source/TileJSON.js"));
+
+var _TileWMS = _interopRequireDefault(require("./source/TileWMS.js"));
+
+var _UrlTile = _interopRequireDefault(require("./source/UrlTile.js"));
+
+var _UTFGrid = _interopRequireDefault(require("./source/UTFGrid.js"));
+
+var _Vector = _interopRequireDefault(require("./source/Vector.js"));
+
+var _VectorTile = _interopRequireDefault(require("./source/VectorTile.js"));
+
+var _WMTS = _interopRequireDefault(require("./source/WMTS.js"));
+
+var _XYZ = _interopRequireDefault(require("./source/XYZ.js"));
+
+var _Zoomify = _interopRequireDefault(require("./source/Zoomify.js"));
+
+function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
+
+/**
+ * @module ol/source
+ */
+
+/**
+ * Creates a sources function from a tile grid. This function can be used as value for the
+ * `sources` property of the {@link module:ol/layer/Layer~Layer} subclasses that support it.
+ * @param {import("./tilegrid/TileGrid.js").default} tileGrid Tile grid.
+ * @param {function(import("./tilecoord.js").TileCoord): import("./source/Source.js").default} factory Source factory.
+ * This function takes a {@link module:ol/tilecoord~TileCoord} as argument and is expected to return a
+ * {@link module:ol/source/Source~Source}. **Note**: The returned sources should have a tile grid with
+ * a limited set of resolutions, matching the resolution range of a single zoom level of the pyramid
+ * `tileGrid` that `createFromTileGrid` was called with.
+ * @return {function(import("./extent.js").Extent, number): Array<import("./source/Source.js").default>} Sources function.
+ * @api
+ */
+function sourcesFromTileGrid(tileGrid, factory) {
+  var sourceCache = new _LRUCache.default(32);
+  var tileGridExtent = tileGrid.getExtent();
+  return function (extent, resolution) {
+    sourceCache.expireCache();
+
+    if (tileGridExtent) {
+      extent = (0, _extent.getIntersection)(tileGridExtent, extent);
+    }
+
+    var z = tileGrid.getZForResolution(resolution);
+    var wantedSources = [];
+    tileGrid.forEachTileCoord(extent, z, function (tileCoord) {
+      var key = tileCoord.toString();
+
+      if (!sourceCache.containsKey(key)) {
+        var source = factory(tileCoord);
+        sourceCache.set(key, source);
+      }
+
+      wantedSources.push(sourceCache.get(key));
+    });
+    return wantedSources;
+  };
+}
+},{"./structs/LRUCache.js":"node_modules/ol/structs/LRUCache.js","./extent.js":"node_modules/ol/extent.js","./source/BingMaps.js":"node_modules/ol/source/BingMaps.js","./source/CartoDB.js":"node_modules/ol/source/CartoDB.js","./source/Cluster.js":"node_modules/ol/source/Cluster.js","./source/DataTile.js":"node_modules/ol/source/DataTile.js","./source/GeoTIFF.js":"node_modules/ol/source/GeoTIFF.js","./source/IIIF.js":"node_modules/ol/source/IIIF.js","./source/Image.js":"node_modules/ol/source/Image.js","./source/ImageArcGISRest.js":"node_modules/ol/source/ImageArcGISRest.js","./source/ImageCanvas.js":"node_modules/ol/source/ImageCanvas.js","./source/ImageMapGuide.js":"node_modules/ol/source/ImageMapGuide.js","./source/ImageStatic.js":"node_modules/ol/source/ImageStatic.js","./source/ImageWMS.js":"node_modules/ol/source/ImageWMS.js","./source/OSM.js":"node_modules/ol/source/OSM.js","./source/Raster.js":"node_modules/ol/source/Raster.js","./source/Source.js":"node_modules/ol/source/Source.js","./source/Stamen.js":"node_modules/ol/source/Stamen.js","./source/Tile.js":"node_modules/ol/source/Tile.js","./source/TileArcGISRest.js":"node_modules/ol/source/TileArcGISRest.js","./source/TileDebug.js":"node_modules/ol/source/TileDebug.js","./source/TileImage.js":"node_modules/ol/source/TileImage.js","./source/TileJSON.js":"node_modules/ol/source/TileJSON.js","./source/TileWMS.js":"node_modules/ol/source/TileWMS.js","./source/UrlTile.js":"node_modules/ol/source/UrlTile.js","./source/UTFGrid.js":"node_modules/ol/source/UTFGrid.js","./source/Vector.js":"node_modules/ol/source/Vector.js","./source/VectorTile.js":"node_modules/ol/source/VectorTile.js","./source/WMTS.js":"node_modules/ol/source/WMTS.js","./source/XYZ.js":"node_modules/ol/source/XYZ.js","./source/Zoomify.js":"node_modules/ol/source/Zoomify.js"}],"Scripts/Map.js":[function(require,module,exports) {
 "use strict";
 
 require("ol/ol.css");
@@ -94231,16 +109032,22 @@ var _TileWMS = _interopRequireDefault(require("ol/source/TileWMS"));
 
 var _Projection = _interopRequireDefault(require("ol/proj/Projection"));
 
+var _source = require("ol/source");
+
 function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
 
-var serverUrl = "http://172.19.16.1:5000/geoserver/wms";
-var mapProjection = new _Projection.default({
+const osmLayer = new _Tile.default({
+  source: new _source.OSM()
+}); // const serverUrl="http://172.19.16.1:5000/geoserver/wms";
+
+const serverUrl = "http://localhost:5000/geoserver/wms";
+const mapProjection = new _Projection.default({
   code: 'EPSG:4326',
   units: 'm',
   axisOrientation: 'nue',
   global: false
 });
-var CrimeTASource = new _ImageWMS.default({
+const CrimeTASource = new _ImageWMS.default({
   url: serverUrl,
   // layer:layer name
   params: {
@@ -94249,22 +109056,12 @@ var CrimeTASource = new _ImageWMS.default({
     "FORMAT": "image/png"
   }
 });
-var CrimeTALayer = new _layer.Image({
+const CrimeTALayer = new _layer.Image({
   source: CrimeTASource,
   // @ts-ignore
   name: 'City'
-}); // const CrimeAreaSource = new ImageWMS({
-//     url:serverUrl,
-//     // layer:layer name
-//     params:{"LAYERS":"Crime by area Renamed","VERSION":"1.1.1","FORMAT":"image/png"}
-// });
-// const CrimeAreaLayer = new ImageLayer({
-//     source: CrimeAreaSource,
-//     // @ts-ignore
-//     name:'Suburb'
-// });
-
-var GGmapSource = new _ImageWMS.default({
+});
+const GGmapSource = new _ImageWMS.default({
   url: serverUrl,
   // layer:layer name
   params: {
@@ -94273,27 +109070,8056 @@ var GGmapSource = new _ImageWMS.default({
     "FORMAT": "image/png"
   }
 });
-var GGmapLayer = new _layer.Image({
+const GGmapLayer = new _layer.Image({
   source: GGmapSource,
   // @ts-ignore
   name: 'Google'
 });
-var view = new _ol2.View({
+const view = new _ol2.View({
   extent: [-177.35791015625, -47.72404861450195, 178.83621215820312, -33.95849609375],
-  // extent:[-176.54006958007812, -46.98520278930664, 178.5046844482422, 54.63124465942383],
   // มาจากรูปแผนที่ตัวจริงว่าอยากให้โชว์จุดไหน
   center: [174.8336, -36.35101],
   zoom: 0,
   projection: mapProjection
 });
-var map = new _ol2.Map({
+const map = new _ol2.Map({
   target: "map",
-  layers: [GGmapLayer, CrimeTALayer],
+  layers: [osmLayer, GGmapLayer, CrimeTALayer],
   view: view
 }); // jquery
 
 $('#map').data('map', map);
-},{"ol/ol.css":"node_modules/ol/ol.css","ol":"node_modules/ol/index.js","ol/layer":"node_modules/ol/layer.js","ol/source/ImageWMS":"node_modules/ol/source/ImageWMS.js","ol/layer/Tile":"node_modules/ol/layer/Tile.js","ol/source/TileWMS":"node_modules/ol/source/TileWMS.js","ol/proj/Projection":"node_modules/ol/proj/Projection.js"}],"node_modules/parcel-bundler/src/builtins/hmr-runtime.js":[function(require,module,exports) {
+},{"ol/ol.css":"node_modules/ol/ol.css","ol":"node_modules/ol/index.js","ol/layer":"node_modules/ol/layer.js","ol/source/ImageWMS":"node_modules/ol/source/ImageWMS.js","ol/layer/Tile":"node_modules/ol/layer/Tile.js","ol/source/TileWMS":"node_modules/ol/source/TileWMS.js","ol/proj/Projection":"node_modules/ol/proj/Projection.js","ol/source":"node_modules/ol/source.js"}],"node_modules/pako/dist/pako.esm.mjs":[function(require,module,exports) {
+"use strict";
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+exports.ungzip = exports.inflateRaw = exports.inflate = exports.gzip = exports.deflateRaw = exports.deflate = exports.default = exports.constants = exports.Inflate = exports.Deflate = void 0;
+
+/*! pako 2.0.4 https://github.com/nodeca/pako @license (MIT AND Zlib) */
+// (C) 1995-2013 Jean-loup Gailly and Mark Adler
+// (C) 2014-2017 Vitaly Puzrin and Andrey Tupitsin
+//
+// This software is provided 'as-is', without any express or implied
+// warranty. In no event will the authors be held liable for any damages
+// arising from the use of this software.
+//
+// Permission is granted to anyone to use this software for any purpose,
+// including commercial applications, and to alter it and redistribute it
+// freely, subject to the following restrictions:
+//
+// 1. The origin of this software must not be misrepresented; you must not
+//   claim that you wrote the original software. If you use this software
+//   in a product, an acknowledgment in the product documentation would be
+//   appreciated but is not required.
+// 2. Altered source versions must be plainly marked as such, and must not be
+//   misrepresented as being the original software.
+// 3. This notice may not be removed or altered from any source distribution.
+
+/* eslint-disable space-unary-ops */
+
+/* Public constants ==========================================================*/
+
+/* ===========================================================================*/
+//const Z_FILTERED          = 1;
+//const Z_HUFFMAN_ONLY      = 2;
+//const Z_RLE               = 3;
+const Z_FIXED$1 = 4; //const Z_DEFAULT_STRATEGY  = 0;
+
+/* Possible values of the data_type field (though see inflate()) */
+
+const Z_BINARY = 0;
+const Z_TEXT = 1; //const Z_ASCII             = 1; // = Z_TEXT
+
+const Z_UNKNOWN$1 = 2;
+/*============================================================================*/
+
+function zero$1(buf) {
+  let len = buf.length;
+
+  while (--len >= 0) {
+    buf[len] = 0;
+  }
+} // From zutil.h
+
+
+const STORED_BLOCK = 0;
+const STATIC_TREES = 1;
+const DYN_TREES = 2;
+/* The three kinds of block type */
+
+const MIN_MATCH$1 = 3;
+const MAX_MATCH$1 = 258;
+/* The minimum and maximum match lengths */
+// From deflate.h
+
+/* ===========================================================================
+ * Internal compression state.
+ */
+
+const LENGTH_CODES$1 = 29;
+/* number of length codes, not counting the special END_BLOCK code */
+
+const LITERALS$1 = 256;
+/* number of literal bytes 0..255 */
+
+const L_CODES$1 = LITERALS$1 + 1 + LENGTH_CODES$1;
+/* number of Literal or Length codes, including the END_BLOCK code */
+
+const D_CODES$1 = 30;
+/* number of distance codes */
+
+const BL_CODES$1 = 19;
+/* number of codes used to transfer the bit lengths */
+
+const HEAP_SIZE$1 = 2 * L_CODES$1 + 1;
+/* maximum heap size */
+
+const MAX_BITS$1 = 15;
+/* All codes must not exceed MAX_BITS bits */
+
+const Buf_size = 16;
+/* size of bit buffer in bi_buf */
+
+/* ===========================================================================
+ * Constants
+ */
+
+const MAX_BL_BITS = 7;
+/* Bit length codes must not exceed MAX_BL_BITS bits */
+
+const END_BLOCK = 256;
+/* end of block literal code */
+
+const REP_3_6 = 16;
+/* repeat previous bit length 3-6 times (2 bits of repeat count) */
+
+const REPZ_3_10 = 17;
+/* repeat a zero length 3-10 times  (3 bits of repeat count) */
+
+const REPZ_11_138 = 18;
+/* repeat a zero length 11-138 times  (7 bits of repeat count) */
+
+/* eslint-disable comma-spacing,array-bracket-spacing */
+
+const extra_lbits =
+/* extra bits for each length code */
+new Uint8Array([0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 2, 2, 2, 2, 3, 3, 3, 3, 4, 4, 4, 4, 5, 5, 5, 5, 0]);
+const extra_dbits =
+/* extra bits for each distance code */
+new Uint8Array([0, 0, 0, 0, 1, 1, 2, 2, 3, 3, 4, 4, 5, 5, 6, 6, 7, 7, 8, 8, 9, 9, 10, 10, 11, 11, 12, 12, 13, 13]);
+const extra_blbits =
+/* extra bits for each bit length code */
+new Uint8Array([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 3, 7]);
+const bl_order = new Uint8Array([16, 17, 18, 0, 8, 7, 9, 6, 10, 5, 11, 4, 12, 3, 13, 2, 14, 1, 15]);
+/* eslint-enable comma-spacing,array-bracket-spacing */
+
+/* The lengths of the bit length codes are sent in order of decreasing
+ * probability, to avoid transmitting the lengths for unused bit length codes.
+ */
+
+/* ===========================================================================
+ * Local data. These are initialized only once.
+ */
+// We pre-fill arrays with 0 to avoid uninitialized gaps
+
+const DIST_CODE_LEN = 512;
+/* see definition of array dist_code below */
+// !!!! Use flat array instead of structure, Freq = i*2, Len = i*2+1
+
+const static_ltree = new Array((L_CODES$1 + 2) * 2);
+zero$1(static_ltree);
+/* The static literal tree. Since the bit lengths are imposed, there is no
+ * need for the L_CODES extra codes used during heap construction. However
+ * The codes 286 and 287 are needed to build a canonical tree (see _tr_init
+ * below).
+ */
+
+const static_dtree = new Array(D_CODES$1 * 2);
+zero$1(static_dtree);
+/* The static distance tree. (Actually a trivial tree since all codes use
+ * 5 bits.)
+ */
+
+const _dist_code = new Array(DIST_CODE_LEN);
+
+zero$1(_dist_code);
+/* Distance codes. The first 256 values correspond to the distances
+ * 3 .. 258, the last 256 values correspond to the top 8 bits of
+ * the 15 bit distances.
+ */
+
+const _length_code = new Array(MAX_MATCH$1 - MIN_MATCH$1 + 1);
+
+zero$1(_length_code);
+/* length code for each normalized match length (0 == MIN_MATCH) */
+
+const base_length = new Array(LENGTH_CODES$1);
+zero$1(base_length);
+/* First normalized length for each code (0 = MIN_MATCH) */
+
+const base_dist = new Array(D_CODES$1);
+zero$1(base_dist);
+/* First normalized distance for each code (0 = distance of 1) */
+
+function StaticTreeDesc(static_tree, extra_bits, extra_base, elems, max_length) {
+  this.static_tree = static_tree;
+  /* static tree or NULL */
+
+  this.extra_bits = extra_bits;
+  /* extra bits for each code or NULL */
+
+  this.extra_base = extra_base;
+  /* base index for extra_bits */
+
+  this.elems = elems;
+  /* max number of elements in the tree */
+
+  this.max_length = max_length;
+  /* max bit length for the codes */
+  // show if `static_tree` has data or dummy - needed for monomorphic objects
+
+  this.has_stree = static_tree && static_tree.length;
+}
+
+let static_l_desc;
+let static_d_desc;
+let static_bl_desc;
+
+function TreeDesc(dyn_tree, stat_desc) {
+  this.dyn_tree = dyn_tree;
+  /* the dynamic tree */
+
+  this.max_code = 0;
+  /* largest code with non zero frequency */
+
+  this.stat_desc = stat_desc;
+  /* the corresponding static tree */
+}
+
+const d_code = dist => {
+  return dist < 256 ? _dist_code[dist] : _dist_code[256 + (dist >>> 7)];
+};
+/* ===========================================================================
+ * Output a short LSB first on the stream.
+ * IN assertion: there is enough room in pendingBuf.
+ */
+
+
+const put_short = (s, w) => {
+  //    put_byte(s, (uch)((w) & 0xff));
+  //    put_byte(s, (uch)((ush)(w) >> 8));
+  s.pending_buf[s.pending++] = w & 0xff;
+  s.pending_buf[s.pending++] = w >>> 8 & 0xff;
+};
+/* ===========================================================================
+ * Send a value on a given number of bits.
+ * IN assertion: length <= 16 and value fits in length bits.
+ */
+
+
+const send_bits = (s, value, length) => {
+  if (s.bi_valid > Buf_size - length) {
+    s.bi_buf |= value << s.bi_valid & 0xffff;
+    put_short(s, s.bi_buf);
+    s.bi_buf = value >> Buf_size - s.bi_valid;
+    s.bi_valid += length - Buf_size;
+  } else {
+    s.bi_buf |= value << s.bi_valid & 0xffff;
+    s.bi_valid += length;
+  }
+};
+
+const send_code = (s, c, tree) => {
+  send_bits(s, tree[c * 2]
+  /*.Code*/
+  , tree[c * 2 + 1]
+  /*.Len*/
+  );
+};
+/* ===========================================================================
+ * Reverse the first len bits of a code, using straightforward code (a faster
+ * method would use a table)
+ * IN assertion: 1 <= len <= 15
+ */
+
+
+const bi_reverse = (code, len) => {
+  let res = 0;
+
+  do {
+    res |= code & 1;
+    code >>>= 1;
+    res <<= 1;
+  } while (--len > 0);
+
+  return res >>> 1;
+};
+/* ===========================================================================
+ * Flush the bit buffer, keeping at most 7 bits in it.
+ */
+
+
+const bi_flush = s => {
+  if (s.bi_valid === 16) {
+    put_short(s, s.bi_buf);
+    s.bi_buf = 0;
+    s.bi_valid = 0;
+  } else if (s.bi_valid >= 8) {
+    s.pending_buf[s.pending++] = s.bi_buf & 0xff;
+    s.bi_buf >>= 8;
+    s.bi_valid -= 8;
+  }
+};
+/* ===========================================================================
+ * Compute the optimal bit lengths for a tree and update the total bit length
+ * for the current block.
+ * IN assertion: the fields freq and dad are set, heap[heap_max] and
+ *    above are the tree nodes sorted by increasing frequency.
+ * OUT assertions: the field len is set to the optimal bit length, the
+ *     array bl_count contains the frequencies for each bit length.
+ *     The length opt_len is updated; static_len is also updated if stree is
+ *     not null.
+ */
+
+
+const gen_bitlen = (s, desc) => //    deflate_state *s;
+//    tree_desc *desc;    /* the tree descriptor */
+{
+  const tree = desc.dyn_tree;
+  const max_code = desc.max_code;
+  const stree = desc.stat_desc.static_tree;
+  const has_stree = desc.stat_desc.has_stree;
+  const extra = desc.stat_desc.extra_bits;
+  const base = desc.stat_desc.extra_base;
+  const max_length = desc.stat_desc.max_length;
+  let h;
+  /* heap index */
+
+  let n, m;
+  /* iterate over the tree elements */
+
+  let bits;
+  /* bit length */
+
+  let xbits;
+  /* extra bits */
+
+  let f;
+  /* frequency */
+
+  let overflow = 0;
+  /* number of elements with bit length too large */
+
+  for (bits = 0; bits <= MAX_BITS$1; bits++) {
+    s.bl_count[bits] = 0;
+  }
+  /* In a first pass, compute the optimal bit lengths (which may
+   * overflow in the case of the bit length tree).
+   */
+
+
+  tree[s.heap[s.heap_max] * 2 + 1]
+  /*.Len*/
+  = 0;
+  /* root of the heap */
+
+  for (h = s.heap_max + 1; h < HEAP_SIZE$1; h++) {
+    n = s.heap[h];
+    bits = tree[tree[n * 2 + 1]
+    /*.Dad*/
+    * 2 + 1]
+    /*.Len*/
+    + 1;
+
+    if (bits > max_length) {
+      bits = max_length;
+      overflow++;
+    }
+
+    tree[n * 2 + 1]
+    /*.Len*/
+    = bits;
+    /* We overwrite tree[n].Dad which is no longer needed */
+
+    if (n > max_code) {
+      continue;
+    }
+    /* not a leaf node */
+
+
+    s.bl_count[bits]++;
+    xbits = 0;
+
+    if (n >= base) {
+      xbits = extra[n - base];
+    }
+
+    f = tree[n * 2]
+    /*.Freq*/
+    ;
+    s.opt_len += f * (bits + xbits);
+
+    if (has_stree) {
+      s.static_len += f * (stree[n * 2 + 1]
+      /*.Len*/
+      + xbits);
+    }
+  }
+
+  if (overflow === 0) {
+    return;
+  } // Trace((stderr,"\nbit length overflow\n"));
+
+  /* This happens for example on obj2 and pic of the Calgary corpus */
+
+  /* Find the first bit length which could increase: */
+
+
+  do {
+    bits = max_length - 1;
+
+    while (s.bl_count[bits] === 0) {
+      bits--;
+    }
+
+    s.bl_count[bits]--;
+    /* move one leaf down the tree */
+
+    s.bl_count[bits + 1] += 2;
+    /* move one overflow item as its brother */
+
+    s.bl_count[max_length]--;
+    /* The brother of the overflow item also moves one step up,
+     * but this does not affect bl_count[max_length]
+     */
+
+    overflow -= 2;
+  } while (overflow > 0);
+  /* Now recompute all bit lengths, scanning in increasing frequency.
+   * h is still equal to HEAP_SIZE. (It is simpler to reconstruct all
+   * lengths instead of fixing only the wrong ones. This idea is taken
+   * from 'ar' written by Haruhiko Okumura.)
+   */
+
+
+  for (bits = max_length; bits !== 0; bits--) {
+    n = s.bl_count[bits];
+
+    while (n !== 0) {
+      m = s.heap[--h];
+
+      if (m > max_code) {
+        continue;
+      }
+
+      if (tree[m * 2 + 1]
+      /*.Len*/
+      !== bits) {
+        // Trace((stderr,"code %d bits %d->%d\n", m, tree[m].Len, bits));
+        s.opt_len += (bits - tree[m * 2 + 1]
+        /*.Len*/
+        ) * tree[m * 2]
+        /*.Freq*/
+        ;
+        tree[m * 2 + 1]
+        /*.Len*/
+        = bits;
+      }
+
+      n--;
+    }
+  }
+};
+/* ===========================================================================
+ * Generate the codes for a given tree and bit counts (which need not be
+ * optimal).
+ * IN assertion: the array bl_count contains the bit length statistics for
+ * the given tree and the field len is set for all tree elements.
+ * OUT assertion: the field code is set for all tree elements of non
+ *     zero code length.
+ */
+
+
+const gen_codes = (tree, max_code, bl_count) => //    ct_data *tree;             /* the tree to decorate */
+//    int max_code;              /* largest code with non zero frequency */
+//    ushf *bl_count;            /* number of codes at each bit length */
+{
+  const next_code = new Array(MAX_BITS$1 + 1);
+  /* next code value for each bit length */
+
+  let code = 0;
+  /* running code value */
+
+  let bits;
+  /* bit index */
+
+  let n;
+  /* code index */
+
+  /* The distribution counts are first used to generate the code values
+   * without bit reversal.
+   */
+
+  for (bits = 1; bits <= MAX_BITS$1; bits++) {
+    next_code[bits] = code = code + bl_count[bits - 1] << 1;
+  }
+  /* Check that the bit counts in bl_count are consistent. The last code
+   * must be all ones.
+   */
+  //Assert (code + bl_count[MAX_BITS]-1 == (1<<MAX_BITS)-1,
+  //        "inconsistent bit counts");
+  //Tracev((stderr,"\ngen_codes: max_code %d ", max_code));
+
+
+  for (n = 0; n <= max_code; n++) {
+    let len = tree[n * 2 + 1]
+    /*.Len*/
+    ;
+
+    if (len === 0) {
+      continue;
+    }
+    /* Now reverse the bits */
+
+
+    tree[n * 2]
+    /*.Code*/
+    = bi_reverse(next_code[len]++, len); //Tracecv(tree != static_ltree, (stderr,"\nn %3d %c l %2d c %4x (%x) ",
+    //     n, (isgraph(n) ? n : ' '), len, tree[n].Code, next_code[len]-1));
+  }
+};
+/* ===========================================================================
+ * Initialize the various 'constant' tables.
+ */
+
+
+const tr_static_init = () => {
+  let n;
+  /* iterates over tree elements */
+
+  let bits;
+  /* bit counter */
+
+  let length;
+  /* length value */
+
+  let code;
+  /* code value */
+
+  let dist;
+  /* distance index */
+
+  const bl_count = new Array(MAX_BITS$1 + 1);
+  /* number of codes at each bit length for an optimal tree */
+  // do check in _tr_init()
+  //if (static_init_done) return;
+
+  /* For some embedded targets, global variables are not initialized: */
+
+  /*#ifdef NO_INIT_GLOBAL_POINTERS
+    static_l_desc.static_tree = static_ltree;
+    static_l_desc.extra_bits = extra_lbits;
+    static_d_desc.static_tree = static_dtree;
+    static_d_desc.extra_bits = extra_dbits;
+    static_bl_desc.extra_bits = extra_blbits;
+  #endif*/
+
+  /* Initialize the mapping length (0..255) -> length code (0..28) */
+
+  length = 0;
+
+  for (code = 0; code < LENGTH_CODES$1 - 1; code++) {
+    base_length[code] = length;
+
+    for (n = 0; n < 1 << extra_lbits[code]; n++) {
+      _length_code[length++] = code;
+    }
+  } //Assert (length == 256, "tr_static_init: length != 256");
+
+  /* Note that the length 255 (match length 258) can be represented
+   * in two different ways: code 284 + 5 bits or code 285, so we
+   * overwrite length_code[255] to use the best encoding:
+   */
+
+
+  _length_code[length - 1] = code;
+  /* Initialize the mapping dist (0..32K) -> dist code (0..29) */
+
+  dist = 0;
+
+  for (code = 0; code < 16; code++) {
+    base_dist[code] = dist;
+
+    for (n = 0; n < 1 << extra_dbits[code]; n++) {
+      _dist_code[dist++] = code;
+    }
+  } //Assert (dist == 256, "tr_static_init: dist != 256");
+
+
+  dist >>= 7;
+  /* from now on, all distances are divided by 128 */
+
+  for (; code < D_CODES$1; code++) {
+    base_dist[code] = dist << 7;
+
+    for (n = 0; n < 1 << extra_dbits[code] - 7; n++) {
+      _dist_code[256 + dist++] = code;
+    }
+  } //Assert (dist == 256, "tr_static_init: 256+dist != 512");
+
+  /* Construct the codes of the static literal tree */
+
+
+  for (bits = 0; bits <= MAX_BITS$1; bits++) {
+    bl_count[bits] = 0;
+  }
+
+  n = 0;
+
+  while (n <= 143) {
+    static_ltree[n * 2 + 1]
+    /*.Len*/
+    = 8;
+    n++;
+    bl_count[8]++;
+  }
+
+  while (n <= 255) {
+    static_ltree[n * 2 + 1]
+    /*.Len*/
+    = 9;
+    n++;
+    bl_count[9]++;
+  }
+
+  while (n <= 279) {
+    static_ltree[n * 2 + 1]
+    /*.Len*/
+    = 7;
+    n++;
+    bl_count[7]++;
+  }
+
+  while (n <= 287) {
+    static_ltree[n * 2 + 1]
+    /*.Len*/
+    = 8;
+    n++;
+    bl_count[8]++;
+  }
+  /* Codes 286 and 287 do not exist, but we must include them in the
+   * tree construction to get a canonical Huffman tree (longest code
+   * all ones)
+   */
+
+
+  gen_codes(static_ltree, L_CODES$1 + 1, bl_count);
+  /* The static distance tree is trivial: */
+
+  for (n = 0; n < D_CODES$1; n++) {
+    static_dtree[n * 2 + 1]
+    /*.Len*/
+    = 5;
+    static_dtree[n * 2]
+    /*.Code*/
+    = bi_reverse(n, 5);
+  } // Now data ready and we can init static trees
+
+
+  static_l_desc = new StaticTreeDesc(static_ltree, extra_lbits, LITERALS$1 + 1, L_CODES$1, MAX_BITS$1);
+  static_d_desc = new StaticTreeDesc(static_dtree, extra_dbits, 0, D_CODES$1, MAX_BITS$1);
+  static_bl_desc = new StaticTreeDesc(new Array(0), extra_blbits, 0, BL_CODES$1, MAX_BL_BITS); //static_init_done = true;
+};
+/* ===========================================================================
+ * Initialize a new block.
+ */
+
+
+const init_block = s => {
+  let n;
+  /* iterates over tree elements */
+
+  /* Initialize the trees. */
+
+  for (n = 0; n < L_CODES$1; n++) {
+    s.dyn_ltree[n * 2]
+    /*.Freq*/
+    = 0;
+  }
+
+  for (n = 0; n < D_CODES$1; n++) {
+    s.dyn_dtree[n * 2]
+    /*.Freq*/
+    = 0;
+  }
+
+  for (n = 0; n < BL_CODES$1; n++) {
+    s.bl_tree[n * 2]
+    /*.Freq*/
+    = 0;
+  }
+
+  s.dyn_ltree[END_BLOCK * 2]
+  /*.Freq*/
+  = 1;
+  s.opt_len = s.static_len = 0;
+  s.last_lit = s.matches = 0;
+};
+/* ===========================================================================
+ * Flush the bit buffer and align the output on a byte boundary
+ */
+
+
+const bi_windup = s => {
+  if (s.bi_valid > 8) {
+    put_short(s, s.bi_buf);
+  } else if (s.bi_valid > 0) {
+    //put_byte(s, (Byte)s->bi_buf);
+    s.pending_buf[s.pending++] = s.bi_buf;
+  }
+
+  s.bi_buf = 0;
+  s.bi_valid = 0;
+};
+/* ===========================================================================
+ * Copy a stored block, storing first the length and its
+ * one's complement if requested.
+ */
+
+
+const copy_block = (s, buf, len, header) => //DeflateState *s;
+//charf    *buf;    /* the input data */
+//unsigned len;     /* its length */
+//int      header;  /* true if block header must be written */
+{
+  bi_windup(s);
+  /* align on byte boundary */
+
+  if (header) {
+    put_short(s, len);
+    put_short(s, ~len);
+  } //  while (len--) {
+  //    put_byte(s, *buf++);
+  //  }
+
+
+  s.pending_buf.set(s.window.subarray(buf, buf + len), s.pending);
+  s.pending += len;
+};
+/* ===========================================================================
+ * Compares to subtrees, using the tree depth as tie breaker when
+ * the subtrees have equal frequency. This minimizes the worst case length.
+ */
+
+
+const smaller = (tree, n, m, depth) => {
+  const _n2 = n * 2;
+
+  const _m2 = m * 2;
+
+  return tree[_n2]
+  /*.Freq*/
+  < tree[_m2]
+  /*.Freq*/
+  || tree[_n2]
+  /*.Freq*/
+  === tree[_m2]
+  /*.Freq*/
+  && depth[n] <= depth[m];
+};
+/* ===========================================================================
+ * Restore the heap property by moving down the tree starting at node k,
+ * exchanging a node with the smallest of its two sons if necessary, stopping
+ * when the heap property is re-established (each father smaller than its
+ * two sons).
+ */
+
+
+const pqdownheap = (s, tree, k) => //    deflate_state *s;
+//    ct_data *tree;  /* the tree to restore */
+//    int k;               /* node to move down */
+{
+  const v = s.heap[k];
+  let j = k << 1;
+  /* left son of k */
+
+  while (j <= s.heap_len) {
+    /* Set j to the smallest of the two sons: */
+    if (j < s.heap_len && smaller(tree, s.heap[j + 1], s.heap[j], s.depth)) {
+      j++;
+    }
+    /* Exit if v is smaller than both sons */
+
+
+    if (smaller(tree, v, s.heap[j], s.depth)) {
+      break;
+    }
+    /* Exchange v with the smallest son */
+
+
+    s.heap[k] = s.heap[j];
+    k = j;
+    /* And continue down the tree, setting j to the left son of k */
+
+    j <<= 1;
+  }
+
+  s.heap[k] = v;
+}; // inlined manually
+// const SMALLEST = 1;
+
+/* ===========================================================================
+ * Send the block data compressed using the given Huffman trees
+ */
+
+
+const compress_block = (s, ltree, dtree) => //    deflate_state *s;
+//    const ct_data *ltree; /* literal tree */
+//    const ct_data *dtree; /* distance tree */
+{
+  let dist;
+  /* distance of matched string */
+
+  let lc;
+  /* match length or unmatched char (if dist == 0) */
+
+  let lx = 0;
+  /* running index in l_buf */
+
+  let code;
+  /* the code to send */
+
+  let extra;
+  /* number of extra bits to send */
+
+  if (s.last_lit !== 0) {
+    do {
+      dist = s.pending_buf[s.d_buf + lx * 2] << 8 | s.pending_buf[s.d_buf + lx * 2 + 1];
+      lc = s.pending_buf[s.l_buf + lx];
+      lx++;
+
+      if (dist === 0) {
+        send_code(s, lc, ltree);
+        /* send a literal byte */
+        //Tracecv(isgraph(lc), (stderr," '%c' ", lc));
+      } else {
+        /* Here, lc is the match length - MIN_MATCH */
+        code = _length_code[lc];
+        send_code(s, code + LITERALS$1 + 1, ltree);
+        /* send the length code */
+
+        extra = extra_lbits[code];
+
+        if (extra !== 0) {
+          lc -= base_length[code];
+          send_bits(s, lc, extra);
+          /* send the extra length bits */
+        }
+
+        dist--;
+        /* dist is now the match distance - 1 */
+
+        code = d_code(dist); //Assert (code < D_CODES, "bad d_code");
+
+        send_code(s, code, dtree);
+        /* send the distance code */
+
+        extra = extra_dbits[code];
+
+        if (extra !== 0) {
+          dist -= base_dist[code];
+          send_bits(s, dist, extra);
+          /* send the extra distance bits */
+        }
+      }
+      /* literal or match pair ? */
+
+      /* Check that the overlay between pending_buf and d_buf+l_buf is ok: */
+      //Assert((uInt)(s->pending) < s->lit_bufsize + 2*lx,
+      //       "pendingBuf overflow");
+
+    } while (lx < s.last_lit);
+  }
+
+  send_code(s, END_BLOCK, ltree);
+};
+/* ===========================================================================
+ * Construct one Huffman tree and assigns the code bit strings and lengths.
+ * Update the total bit length for the current block.
+ * IN assertion: the field freq is set for all tree elements.
+ * OUT assertions: the fields len and code are set to the optimal bit length
+ *     and corresponding code. The length opt_len is updated; static_len is
+ *     also updated if stree is not null. The field max_code is set.
+ */
+
+
+const build_tree = (s, desc) => //    deflate_state *s;
+//    tree_desc *desc; /* the tree descriptor */
+{
+  const tree = desc.dyn_tree;
+  const stree = desc.stat_desc.static_tree;
+  const has_stree = desc.stat_desc.has_stree;
+  const elems = desc.stat_desc.elems;
+  let n, m;
+  /* iterate over heap elements */
+
+  let max_code = -1;
+  /* largest code with non zero frequency */
+
+  let node;
+  /* new node being created */
+
+  /* Construct the initial heap, with least frequent element in
+   * heap[SMALLEST]. The sons of heap[n] are heap[2*n] and heap[2*n+1].
+   * heap[0] is not used.
+   */
+
+  s.heap_len = 0;
+  s.heap_max = HEAP_SIZE$1;
+
+  for (n = 0; n < elems; n++) {
+    if (tree[n * 2]
+    /*.Freq*/
+    !== 0) {
+      s.heap[++s.heap_len] = max_code = n;
+      s.depth[n] = 0;
+    } else {
+      tree[n * 2 + 1]
+      /*.Len*/
+      = 0;
+    }
+  }
+  /* The pkzip format requires that at least one distance code exists,
+   * and that at least one bit should be sent even if there is only one
+   * possible code. So to avoid special checks later on we force at least
+   * two codes of non zero frequency.
+   */
+
+
+  while (s.heap_len < 2) {
+    node = s.heap[++s.heap_len] = max_code < 2 ? ++max_code : 0;
+    tree[node * 2]
+    /*.Freq*/
+    = 1;
+    s.depth[node] = 0;
+    s.opt_len--;
+
+    if (has_stree) {
+      s.static_len -= stree[node * 2 + 1]
+      /*.Len*/
+      ;
+    }
+    /* node is 0 or 1 so it does not have extra bits */
+
+  }
+
+  desc.max_code = max_code;
+  /* The elements heap[heap_len/2+1 .. heap_len] are leaves of the tree,
+   * establish sub-heaps of increasing lengths:
+   */
+
+  for (n = s.heap_len >> 1
+  /*int /2*/
+  ; n >= 1; n--) {
+    pqdownheap(s, tree, n);
+  }
+  /* Construct the Huffman tree by repeatedly combining the least two
+   * frequent nodes.
+   */
+
+
+  node = elems;
+  /* next internal node of the tree */
+
+  do {
+    //pqremove(s, tree, n);  /* n = node of least frequency */
+
+    /*** pqremove ***/
+    n = s.heap[1
+    /*SMALLEST*/
+    ];
+    s.heap[1
+    /*SMALLEST*/
+    ] = s.heap[s.heap_len--];
+    pqdownheap(s, tree, 1
+    /*SMALLEST*/
+    );
+    /***/
+
+    m = s.heap[1
+    /*SMALLEST*/
+    ];
+    /* m = node of next least frequency */
+
+    s.heap[--s.heap_max] = n;
+    /* keep the nodes sorted by frequency */
+
+    s.heap[--s.heap_max] = m;
+    /* Create a new node father of n and m */
+
+    tree[node * 2]
+    /*.Freq*/
+    = tree[n * 2]
+    /*.Freq*/
+    + tree[m * 2]
+    /*.Freq*/
+    ;
+    s.depth[node] = (s.depth[n] >= s.depth[m] ? s.depth[n] : s.depth[m]) + 1;
+    tree[n * 2 + 1]
+    /*.Dad*/
+    = tree[m * 2 + 1]
+    /*.Dad*/
+    = node;
+    /* and insert the new node in the heap */
+
+    s.heap[1
+    /*SMALLEST*/
+    ] = node++;
+    pqdownheap(s, tree, 1
+    /*SMALLEST*/
+    );
+  } while (s.heap_len >= 2);
+
+  s.heap[--s.heap_max] = s.heap[1
+  /*SMALLEST*/
+  ];
+  /* At this point, the fields freq and dad are set. We can now
+   * generate the bit lengths.
+   */
+
+  gen_bitlen(s, desc);
+  /* The field len is now set, we can generate the bit codes */
+
+  gen_codes(tree, max_code, s.bl_count);
+};
+/* ===========================================================================
+ * Scan a literal or distance tree to determine the frequencies of the codes
+ * in the bit length tree.
+ */
+
+
+const scan_tree = (s, tree, max_code) => //    deflate_state *s;
+//    ct_data *tree;   /* the tree to be scanned */
+//    int max_code;    /* and its largest code of non zero frequency */
+{
+  let n;
+  /* iterates over all tree elements */
+
+  let prevlen = -1;
+  /* last emitted length */
+
+  let curlen;
+  /* length of current code */
+
+  let nextlen = tree[0 * 2 + 1]
+  /*.Len*/
+  ;
+  /* length of next code */
+
+  let count = 0;
+  /* repeat count of the current code */
+
+  let max_count = 7;
+  /* max repeat count */
+
+  let min_count = 4;
+  /* min repeat count */
+
+  if (nextlen === 0) {
+    max_count = 138;
+    min_count = 3;
+  }
+
+  tree[(max_code + 1) * 2 + 1]
+  /*.Len*/
+  = 0xffff;
+  /* guard */
+
+  for (n = 0; n <= max_code; n++) {
+    curlen = nextlen;
+    nextlen = tree[(n + 1) * 2 + 1]
+    /*.Len*/
+    ;
+
+    if (++count < max_count && curlen === nextlen) {
+      continue;
+    } else if (count < min_count) {
+      s.bl_tree[curlen * 2]
+      /*.Freq*/
+      += count;
+    } else if (curlen !== 0) {
+      if (curlen !== prevlen) {
+        s.bl_tree[curlen * 2] /*.Freq*/++;
+      }
+
+      s.bl_tree[REP_3_6 * 2] /*.Freq*/++;
+    } else if (count <= 10) {
+      s.bl_tree[REPZ_3_10 * 2] /*.Freq*/++;
+    } else {
+      s.bl_tree[REPZ_11_138 * 2] /*.Freq*/++;
+    }
+
+    count = 0;
+    prevlen = curlen;
+
+    if (nextlen === 0) {
+      max_count = 138;
+      min_count = 3;
+    } else if (curlen === nextlen) {
+      max_count = 6;
+      min_count = 3;
+    } else {
+      max_count = 7;
+      min_count = 4;
+    }
+  }
+};
+/* ===========================================================================
+ * Send a literal or distance tree in compressed form, using the codes in
+ * bl_tree.
+ */
+
+
+const send_tree = (s, tree, max_code) => //    deflate_state *s;
+//    ct_data *tree; /* the tree to be scanned */
+//    int max_code;       /* and its largest code of non zero frequency */
+{
+  let n;
+  /* iterates over all tree elements */
+
+  let prevlen = -1;
+  /* last emitted length */
+
+  let curlen;
+  /* length of current code */
+
+  let nextlen = tree[0 * 2 + 1]
+  /*.Len*/
+  ;
+  /* length of next code */
+
+  let count = 0;
+  /* repeat count of the current code */
+
+  let max_count = 7;
+  /* max repeat count */
+
+  let min_count = 4;
+  /* min repeat count */
+
+  /* tree[max_code+1].Len = -1; */
+
+  /* guard already set */
+
+  if (nextlen === 0) {
+    max_count = 138;
+    min_count = 3;
+  }
+
+  for (n = 0; n <= max_code; n++) {
+    curlen = nextlen;
+    nextlen = tree[(n + 1) * 2 + 1]
+    /*.Len*/
+    ;
+
+    if (++count < max_count && curlen === nextlen) {
+      continue;
+    } else if (count < min_count) {
+      do {
+        send_code(s, curlen, s.bl_tree);
+      } while (--count !== 0);
+    } else if (curlen !== 0) {
+      if (curlen !== prevlen) {
+        send_code(s, curlen, s.bl_tree);
+        count--;
+      } //Assert(count >= 3 && count <= 6, " 3_6?");
+
+
+      send_code(s, REP_3_6, s.bl_tree);
+      send_bits(s, count - 3, 2);
+    } else if (count <= 10) {
+      send_code(s, REPZ_3_10, s.bl_tree);
+      send_bits(s, count - 3, 3);
+    } else {
+      send_code(s, REPZ_11_138, s.bl_tree);
+      send_bits(s, count - 11, 7);
+    }
+
+    count = 0;
+    prevlen = curlen;
+
+    if (nextlen === 0) {
+      max_count = 138;
+      min_count = 3;
+    } else if (curlen === nextlen) {
+      max_count = 6;
+      min_count = 3;
+    } else {
+      max_count = 7;
+      min_count = 4;
+    }
+  }
+};
+/* ===========================================================================
+ * Construct the Huffman tree for the bit lengths and return the index in
+ * bl_order of the last bit length code to send.
+ */
+
+
+const build_bl_tree = s => {
+  let max_blindex;
+  /* index of last bit length code of non zero freq */
+
+  /* Determine the bit length frequencies for literal and distance trees */
+
+  scan_tree(s, s.dyn_ltree, s.l_desc.max_code);
+  scan_tree(s, s.dyn_dtree, s.d_desc.max_code);
+  /* Build the bit length tree: */
+
+  build_tree(s, s.bl_desc);
+  /* opt_len now includes the length of the tree representations, except
+   * the lengths of the bit lengths codes and the 5+5+4 bits for the counts.
+   */
+
+  /* Determine the number of bit length codes to send. The pkzip format
+   * requires that at least 4 bit length codes be sent. (appnote.txt says
+   * 3 but the actual value used is 4.)
+   */
+
+  for (max_blindex = BL_CODES$1 - 1; max_blindex >= 3; max_blindex--) {
+    if (s.bl_tree[bl_order[max_blindex] * 2 + 1]
+    /*.Len*/
+    !== 0) {
+      break;
+    }
+  }
+  /* Update opt_len to include the bit length tree and counts */
+
+
+  s.opt_len += 3 * (max_blindex + 1) + 5 + 5 + 4; //Tracev((stderr, "\ndyn trees: dyn %ld, stat %ld",
+  //        s->opt_len, s->static_len));
+
+  return max_blindex;
+};
+/* ===========================================================================
+ * Send the header for a block using dynamic Huffman trees: the counts, the
+ * lengths of the bit length codes, the literal tree and the distance tree.
+ * IN assertion: lcodes >= 257, dcodes >= 1, blcodes >= 4.
+ */
+
+
+const send_all_trees = (s, lcodes, dcodes, blcodes) => //    deflate_state *s;
+//    int lcodes, dcodes, blcodes; /* number of codes for each tree */
+{
+  let rank;
+  /* index in bl_order */
+  //Assert (lcodes >= 257 && dcodes >= 1 && blcodes >= 4, "not enough codes");
+  //Assert (lcodes <= L_CODES && dcodes <= D_CODES && blcodes <= BL_CODES,
+  //        "too many codes");
+  //Tracev((stderr, "\nbl counts: "));
+
+  send_bits(s, lcodes - 257, 5);
+  /* not +255 as stated in appnote.txt */
+
+  send_bits(s, dcodes - 1, 5);
+  send_bits(s, blcodes - 4, 4);
+  /* not -3 as stated in appnote.txt */
+
+  for (rank = 0; rank < blcodes; rank++) {
+    //Tracev((stderr, "\nbl code %2d ", bl_order[rank]));
+    send_bits(s, s.bl_tree[bl_order[rank] * 2 + 1]
+    /*.Len*/
+    , 3);
+  } //Tracev((stderr, "\nbl tree: sent %ld", s->bits_sent));
+
+
+  send_tree(s, s.dyn_ltree, lcodes - 1);
+  /* literal tree */
+  //Tracev((stderr, "\nlit tree: sent %ld", s->bits_sent));
+
+  send_tree(s, s.dyn_dtree, dcodes - 1);
+  /* distance tree */
+  //Tracev((stderr, "\ndist tree: sent %ld", s->bits_sent));
+};
+/* ===========================================================================
+ * Check if the data type is TEXT or BINARY, using the following algorithm:
+ * - TEXT if the two conditions below are satisfied:
+ *    a) There are no non-portable control characters belonging to the
+ *       "black list" (0..6, 14..25, 28..31).
+ *    b) There is at least one printable character belonging to the
+ *       "white list" (9 {TAB}, 10 {LF}, 13 {CR}, 32..255).
+ * - BINARY otherwise.
+ * - The following partially-portable control characters form a
+ *   "gray list" that is ignored in this detection algorithm:
+ *   (7 {BEL}, 8 {BS}, 11 {VT}, 12 {FF}, 26 {SUB}, 27 {ESC}).
+ * IN assertion: the fields Freq of dyn_ltree are set.
+ */
+
+
+const detect_data_type = s => {
+  /* black_mask is the bit mask of black-listed bytes
+   * set bits 0..6, 14..25, and 28..31
+   * 0xf3ffc07f = binary 11110011111111111100000001111111
+   */
+  let black_mask = 0xf3ffc07f;
+  let n;
+  /* Check for non-textual ("black-listed") bytes. */
+
+  for (n = 0; n <= 31; n++, black_mask >>>= 1) {
+    if (black_mask & 1 && s.dyn_ltree[n * 2]
+    /*.Freq*/
+    !== 0) {
+      return Z_BINARY;
+    }
+  }
+  /* Check for textual ("white-listed") bytes. */
+
+
+  if (s.dyn_ltree[9 * 2]
+  /*.Freq*/
+  !== 0 || s.dyn_ltree[10 * 2]
+  /*.Freq*/
+  !== 0 || s.dyn_ltree[13 * 2]
+  /*.Freq*/
+  !== 0) {
+    return Z_TEXT;
+  }
+
+  for (n = 32; n < LITERALS$1; n++) {
+    if (s.dyn_ltree[n * 2]
+    /*.Freq*/
+    !== 0) {
+      return Z_TEXT;
+    }
+  }
+  /* There are no "black-listed" or "white-listed" bytes:
+   * this stream either is empty or has tolerated ("gray-listed") bytes only.
+   */
+
+
+  return Z_BINARY;
+};
+
+let static_init_done = false;
+/* ===========================================================================
+ * Initialize the tree data structures for a new zlib stream.
+ */
+
+const _tr_init$1 = s => {
+  if (!static_init_done) {
+    tr_static_init();
+    static_init_done = true;
+  }
+
+  s.l_desc = new TreeDesc(s.dyn_ltree, static_l_desc);
+  s.d_desc = new TreeDesc(s.dyn_dtree, static_d_desc);
+  s.bl_desc = new TreeDesc(s.bl_tree, static_bl_desc);
+  s.bi_buf = 0;
+  s.bi_valid = 0;
+  /* Initialize the first block of the first file: */
+
+  init_block(s);
+};
+/* ===========================================================================
+ * Send a stored block
+ */
+
+
+const _tr_stored_block$1 = (s, buf, stored_len, last) => //DeflateState *s;
+//charf *buf;       /* input block */
+//ulg stored_len;   /* length of input block */
+//int last;         /* one if this is the last block for a file */
+{
+  send_bits(s, (STORED_BLOCK << 1) + (last ? 1 : 0), 3);
+  /* send block type */
+
+  copy_block(s, buf, stored_len, true);
+  /* with header */
+};
+/* ===========================================================================
+ * Send one empty static block to give enough lookahead for inflate.
+ * This takes 10 bits, of which 7 may remain in the bit buffer.
+ */
+
+
+const _tr_align$1 = s => {
+  send_bits(s, STATIC_TREES << 1, 3);
+  send_code(s, END_BLOCK, static_ltree);
+  bi_flush(s);
+};
+/* ===========================================================================
+ * Determine the best encoding for the current block: dynamic trees, static
+ * trees or store, and output the encoded block to the zip file.
+ */
+
+
+const _tr_flush_block$1 = (s, buf, stored_len, last) => //DeflateState *s;
+//charf *buf;       /* input block, or NULL if too old */
+//ulg stored_len;   /* length of input block */
+//int last;         /* one if this is the last block for a file */
+{
+  let opt_lenb, static_lenb;
+  /* opt_len and static_len in bytes */
+
+  let max_blindex = 0;
+  /* index of last bit length code of non zero freq */
+
+  /* Build the Huffman trees unless a stored block is forced */
+
+  if (s.level > 0) {
+    /* Check if the file is binary or text */
+    if (s.strm.data_type === Z_UNKNOWN$1) {
+      s.strm.data_type = detect_data_type(s);
+    }
+    /* Construct the literal and distance trees */
+
+
+    build_tree(s, s.l_desc); // Tracev((stderr, "\nlit data: dyn %ld, stat %ld", s->opt_len,
+    //        s->static_len));
+
+    build_tree(s, s.d_desc); // Tracev((stderr, "\ndist data: dyn %ld, stat %ld", s->opt_len,
+    //        s->static_len));
+
+    /* At this point, opt_len and static_len are the total bit lengths of
+     * the compressed block data, excluding the tree representations.
+     */
+
+    /* Build the bit length tree for the above two trees, and get the index
+     * in bl_order of the last bit length code to send.
+     */
+
+    max_blindex = build_bl_tree(s);
+    /* Determine the best encoding. Compute the block lengths in bytes. */
+
+    opt_lenb = s.opt_len + 3 + 7 >>> 3;
+    static_lenb = s.static_len + 3 + 7 >>> 3; // Tracev((stderr, "\nopt %lu(%lu) stat %lu(%lu) stored %lu lit %u ",
+    //        opt_lenb, s->opt_len, static_lenb, s->static_len, stored_len,
+    //        s->last_lit));
+
+    if (static_lenb <= opt_lenb) {
+      opt_lenb = static_lenb;
+    }
+  } else {
+    // Assert(buf != (char*)0, "lost buf");
+    opt_lenb = static_lenb = stored_len + 5;
+    /* force a stored block */
+  }
+
+  if (stored_len + 4 <= opt_lenb && buf !== -1) {
+    /* 4: two words for the lengths */
+
+    /* The test buf != NULL is only necessary if LIT_BUFSIZE > WSIZE.
+     * Otherwise we can't have processed more than WSIZE input bytes since
+     * the last block flush, because compression would have been
+     * successful. If LIT_BUFSIZE <= WSIZE, it is never too late to
+     * transform a block into a stored block.
+     */
+    _tr_stored_block$1(s, buf, stored_len, last);
+  } else if (s.strategy === Z_FIXED$1 || static_lenb === opt_lenb) {
+    send_bits(s, (STATIC_TREES << 1) + (last ? 1 : 0), 3);
+    compress_block(s, static_ltree, static_dtree);
+  } else {
+    send_bits(s, (DYN_TREES << 1) + (last ? 1 : 0), 3);
+    send_all_trees(s, s.l_desc.max_code + 1, s.d_desc.max_code + 1, max_blindex + 1);
+    compress_block(s, s.dyn_ltree, s.dyn_dtree);
+  } // Assert (s->compressed_len == s->bits_sent, "bad compressed size");
+
+  /* The above check is made mod 2^32, for files larger than 512 MB
+   * and uLong implemented on 32 bits.
+   */
+
+
+  init_block(s);
+
+  if (last) {
+    bi_windup(s);
+  } // Tracev((stderr,"\ncomprlen %lu(%lu) ", s->compressed_len>>3,
+  //       s->compressed_len-7*last));
+
+};
+/* ===========================================================================
+ * Save the match info and tally the frequency counts. Return true if
+ * the current block must be flushed.
+ */
+
+
+const _tr_tally$1 = (s, dist, lc) => //    deflate_state *s;
+//    unsigned dist;  /* distance of matched string */
+//    unsigned lc;    /* match length-MIN_MATCH or unmatched char (if dist==0) */
+{
+  //let out_length, in_length, dcode;
+  s.pending_buf[s.d_buf + s.last_lit * 2] = dist >>> 8 & 0xff;
+  s.pending_buf[s.d_buf + s.last_lit * 2 + 1] = dist & 0xff;
+  s.pending_buf[s.l_buf + s.last_lit] = lc & 0xff;
+  s.last_lit++;
+
+  if (dist === 0) {
+    /* lc is the unmatched char */
+    s.dyn_ltree[lc * 2] /*.Freq*/++;
+  } else {
+    s.matches++;
+    /* Here, lc is the match length - MIN_MATCH */
+
+    dist--;
+    /* dist = match distance - 1 */
+    //Assert((ush)dist < (ush)MAX_DIST(s) &&
+    //       (ush)lc <= (ush)(MAX_MATCH-MIN_MATCH) &&
+    //       (ush)d_code(dist) < (ush)D_CODES,  "_tr_tally: bad match");
+
+    s.dyn_ltree[(_length_code[lc] + LITERALS$1 + 1) * 2] /*.Freq*/++;
+    s.dyn_dtree[d_code(dist) * 2] /*.Freq*/++;
+  } // (!) This block is disabled in zlib defaults,
+  // don't enable it for binary compatibility
+  //#ifdef TRUNCATE_BLOCK
+  //  /* Try to guess if it is profitable to stop the current block here */
+  //  if ((s.last_lit & 0x1fff) === 0 && s.level > 2) {
+  //    /* Compute an upper bound for the compressed length */
+  //    out_length = s.last_lit*8;
+  //    in_length = s.strstart - s.block_start;
+  //
+  //    for (dcode = 0; dcode < D_CODES; dcode++) {
+  //      out_length += s.dyn_dtree[dcode*2]/*.Freq*/ * (5 + extra_dbits[dcode]);
+  //    }
+  //    out_length >>>= 3;
+  //    //Tracev((stderr,"\nlast_lit %u, in %ld, out ~%ld(%ld%%) ",
+  //    //       s->last_lit, in_length, out_length,
+  //    //       100L - out_length*100L/in_length));
+  //    if (s.matches < (s.last_lit>>1)/*int /2*/ && out_length < (in_length>>1)/*int /2*/) {
+  //      return true;
+  //    }
+  //  }
+  //#endif
+
+
+  return s.last_lit === s.lit_bufsize - 1;
+  /* We avoid equality with lit_bufsize because of wraparound at 64K
+   * on 16 bit machines and because stored blocks are restricted to
+   * 64K-1 bytes.
+   */
+};
+
+var _tr_init_1 = _tr_init$1;
+var _tr_stored_block_1 = _tr_stored_block$1;
+var _tr_flush_block_1 = _tr_flush_block$1;
+var _tr_tally_1 = _tr_tally$1;
+var _tr_align_1 = _tr_align$1;
+var trees = {
+  _tr_init: _tr_init_1,
+  _tr_stored_block: _tr_stored_block_1,
+  _tr_flush_block: _tr_flush_block_1,
+  _tr_tally: _tr_tally_1,
+  _tr_align: _tr_align_1
+}; // Note: adler32 takes 12% for level 0 and 2% for level 6.
+// It isn't worth it to make additional optimizations as in original.
+// Small size is preferable.
+// (C) 1995-2013 Jean-loup Gailly and Mark Adler
+// (C) 2014-2017 Vitaly Puzrin and Andrey Tupitsin
+//
+// This software is provided 'as-is', without any express or implied
+// warranty. In no event will the authors be held liable for any damages
+// arising from the use of this software.
+//
+// Permission is granted to anyone to use this software for any purpose,
+// including commercial applications, and to alter it and redistribute it
+// freely, subject to the following restrictions:
+//
+// 1. The origin of this software must not be misrepresented; you must not
+//   claim that you wrote the original software. If you use this software
+//   in a product, an acknowledgment in the product documentation would be
+//   appreciated but is not required.
+// 2. Altered source versions must be plainly marked as such, and must not be
+//   misrepresented as being the original software.
+// 3. This notice may not be removed or altered from any source distribution.
+
+const adler32 = (adler, buf, len, pos) => {
+  let s1 = adler & 0xffff | 0,
+      s2 = adler >>> 16 & 0xffff | 0,
+      n = 0;
+
+  while (len !== 0) {
+    // Set limit ~ twice less than 5552, to keep
+    // s2 in 31-bits, because we force signed ints.
+    // in other case %= will fail.
+    n = len > 2000 ? 2000 : len;
+    len -= n;
+
+    do {
+      s1 = s1 + buf[pos++] | 0;
+      s2 = s2 + s1 | 0;
+    } while (--n);
+
+    s1 %= 65521;
+    s2 %= 65521;
+  }
+
+  return s1 | s2 << 16 | 0;
+};
+
+var adler32_1 = adler32; // Note: we can't get significant speed boost here.
+// So write code to minimize size - no pregenerated tables
+// and array tools dependencies.
+// (C) 1995-2013 Jean-loup Gailly and Mark Adler
+// (C) 2014-2017 Vitaly Puzrin and Andrey Tupitsin
+//
+// This software is provided 'as-is', without any express or implied
+// warranty. In no event will the authors be held liable for any damages
+// arising from the use of this software.
+//
+// Permission is granted to anyone to use this software for any purpose,
+// including commercial applications, and to alter it and redistribute it
+// freely, subject to the following restrictions:
+//
+// 1. The origin of this software must not be misrepresented; you must not
+//   claim that you wrote the original software. If you use this software
+//   in a product, an acknowledgment in the product documentation would be
+//   appreciated but is not required.
+// 2. Altered source versions must be plainly marked as such, and must not be
+//   misrepresented as being the original software.
+// 3. This notice may not be removed or altered from any source distribution.
+// Use ordinary array, since untyped makes no boost here
+
+const makeTable = () => {
+  let c,
+      table = [];
+
+  for (var n = 0; n < 256; n++) {
+    c = n;
+
+    for (var k = 0; k < 8; k++) {
+      c = c & 1 ? 0xEDB88320 ^ c >>> 1 : c >>> 1;
+    }
+
+    table[n] = c;
+  }
+
+  return table;
+}; // Create table on load. Just 255 signed longs. Not a problem.
+
+
+const crcTable = new Uint32Array(makeTable());
+
+const crc32 = (crc, buf, len, pos) => {
+  const t = crcTable;
+  const end = pos + len;
+  crc ^= -1;
+
+  for (let i = pos; i < end; i++) {
+    crc = crc >>> 8 ^ t[(crc ^ buf[i]) & 0xFF];
+  }
+
+  return crc ^ -1; // >>> 0;
+};
+
+var crc32_1 = crc32; // (C) 1995-2013 Jean-loup Gailly and Mark Adler
+// (C) 2014-2017 Vitaly Puzrin and Andrey Tupitsin
+//
+// This software is provided 'as-is', without any express or implied
+// warranty. In no event will the authors be held liable for any damages
+// arising from the use of this software.
+//
+// Permission is granted to anyone to use this software for any purpose,
+// including commercial applications, and to alter it and redistribute it
+// freely, subject to the following restrictions:
+//
+// 1. The origin of this software must not be misrepresented; you must not
+//   claim that you wrote the original software. If you use this software
+//   in a product, an acknowledgment in the product documentation would be
+//   appreciated but is not required.
+// 2. Altered source versions must be plainly marked as such, and must not be
+//   misrepresented as being the original software.
+// 3. This notice may not be removed or altered from any source distribution.
+
+var messages = {
+  2: 'need dictionary',
+
+  /* Z_NEED_DICT       2  */
+  1: 'stream end',
+
+  /* Z_STREAM_END      1  */
+  0: '',
+
+  /* Z_OK              0  */
+  '-1': 'file error',
+
+  /* Z_ERRNO         (-1) */
+  '-2': 'stream error',
+
+  /* Z_STREAM_ERROR  (-2) */
+  '-3': 'data error',
+
+  /* Z_DATA_ERROR    (-3) */
+  '-4': 'insufficient memory',
+
+  /* Z_MEM_ERROR     (-4) */
+  '-5': 'buffer error',
+
+  /* Z_BUF_ERROR     (-5) */
+  '-6': 'incompatible version'
+  /* Z_VERSION_ERROR (-6) */
+
+}; // (C) 1995-2013 Jean-loup Gailly and Mark Adler
+// (C) 2014-2017 Vitaly Puzrin and Andrey Tupitsin
+//
+// This software is provided 'as-is', without any express or implied
+// warranty. In no event will the authors be held liable for any damages
+// arising from the use of this software.
+//
+// Permission is granted to anyone to use this software for any purpose,
+// including commercial applications, and to alter it and redistribute it
+// freely, subject to the following restrictions:
+//
+// 1. The origin of this software must not be misrepresented; you must not
+//   claim that you wrote the original software. If you use this software
+//   in a product, an acknowledgment in the product documentation would be
+//   appreciated but is not required.
+// 2. Altered source versions must be plainly marked as such, and must not be
+//   misrepresented as being the original software.
+// 3. This notice may not be removed or altered from any source distribution.
+
+var constants$2 = {
+  /* Allowed flush values; see deflate() and inflate() below for details */
+  Z_NO_FLUSH: 0,
+  Z_PARTIAL_FLUSH: 1,
+  Z_SYNC_FLUSH: 2,
+  Z_FULL_FLUSH: 3,
+  Z_FINISH: 4,
+  Z_BLOCK: 5,
+  Z_TREES: 6,
+
+  /* Return codes for the compression/decompression functions. Negative values
+  * are errors, positive values are used for special but normal events.
+  */
+  Z_OK: 0,
+  Z_STREAM_END: 1,
+  Z_NEED_DICT: 2,
+  Z_ERRNO: -1,
+  Z_STREAM_ERROR: -2,
+  Z_DATA_ERROR: -3,
+  Z_MEM_ERROR: -4,
+  Z_BUF_ERROR: -5,
+  //Z_VERSION_ERROR: -6,
+
+  /* compression levels */
+  Z_NO_COMPRESSION: 0,
+  Z_BEST_SPEED: 1,
+  Z_BEST_COMPRESSION: 9,
+  Z_DEFAULT_COMPRESSION: -1,
+  Z_FILTERED: 1,
+  Z_HUFFMAN_ONLY: 2,
+  Z_RLE: 3,
+  Z_FIXED: 4,
+  Z_DEFAULT_STRATEGY: 0,
+
+  /* Possible values of the data_type field (though see inflate()) */
+  Z_BINARY: 0,
+  Z_TEXT: 1,
+  //Z_ASCII:                1, // = Z_TEXT (deprecated)
+  Z_UNKNOWN: 2,
+
+  /* The deflate compression method */
+  Z_DEFLATED: 8 //Z_NULL:                 null // Use -1 or null inline, depending on var type
+
+}; // (C) 1995-2013 Jean-loup Gailly and Mark Adler
+// (C) 2014-2017 Vitaly Puzrin and Andrey Tupitsin
+//
+// This software is provided 'as-is', without any express or implied
+// warranty. In no event will the authors be held liable for any damages
+// arising from the use of this software.
+//
+// Permission is granted to anyone to use this software for any purpose,
+// including commercial applications, and to alter it and redistribute it
+// freely, subject to the following restrictions:
+//
+// 1. The origin of this software must not be misrepresented; you must not
+//   claim that you wrote the original software. If you use this software
+//   in a product, an acknowledgment in the product documentation would be
+//   appreciated but is not required.
+// 2. Altered source versions must be plainly marked as such, and must not be
+//   misrepresented as being the original software.
+// 3. This notice may not be removed or altered from any source distribution.
+
+const {
+  _tr_init,
+  _tr_stored_block,
+  _tr_flush_block,
+  _tr_tally,
+  _tr_align
+} = trees;
+/* Public constants ==========================================================*/
+
+/* ===========================================================================*/
+
+const {
+  Z_NO_FLUSH: Z_NO_FLUSH$2,
+  Z_PARTIAL_FLUSH,
+  Z_FULL_FLUSH: Z_FULL_FLUSH$1,
+  Z_FINISH: Z_FINISH$3,
+  Z_BLOCK: Z_BLOCK$1,
+  Z_OK: Z_OK$3,
+  Z_STREAM_END: Z_STREAM_END$3,
+  Z_STREAM_ERROR: Z_STREAM_ERROR$2,
+  Z_DATA_ERROR: Z_DATA_ERROR$2,
+  Z_BUF_ERROR: Z_BUF_ERROR$1,
+  Z_DEFAULT_COMPRESSION: Z_DEFAULT_COMPRESSION$1,
+  Z_FILTERED,
+  Z_HUFFMAN_ONLY,
+  Z_RLE,
+  Z_FIXED,
+  Z_DEFAULT_STRATEGY: Z_DEFAULT_STRATEGY$1,
+  Z_UNKNOWN,
+  Z_DEFLATED: Z_DEFLATED$2
+} = constants$2;
+/*============================================================================*/
+
+const MAX_MEM_LEVEL = 9;
+/* Maximum value for memLevel in deflateInit2 */
+
+const MAX_WBITS$1 = 15;
+/* 32K LZ77 window */
+
+const DEF_MEM_LEVEL = 8;
+const LENGTH_CODES = 29;
+/* number of length codes, not counting the special END_BLOCK code */
+
+const LITERALS = 256;
+/* number of literal bytes 0..255 */
+
+const L_CODES = LITERALS + 1 + LENGTH_CODES;
+/* number of Literal or Length codes, including the END_BLOCK code */
+
+const D_CODES = 30;
+/* number of distance codes */
+
+const BL_CODES = 19;
+/* number of codes used to transfer the bit lengths */
+
+const HEAP_SIZE = 2 * L_CODES + 1;
+/* maximum heap size */
+
+const MAX_BITS = 15;
+/* All codes must not exceed MAX_BITS bits */
+
+const MIN_MATCH = 3;
+const MAX_MATCH = 258;
+const MIN_LOOKAHEAD = MAX_MATCH + MIN_MATCH + 1;
+const PRESET_DICT = 0x20;
+const INIT_STATE = 42;
+const EXTRA_STATE = 69;
+const NAME_STATE = 73;
+const COMMENT_STATE = 91;
+const HCRC_STATE = 103;
+const BUSY_STATE = 113;
+const FINISH_STATE = 666;
+const BS_NEED_MORE = 1;
+/* block not completed, need more input or more output */
+
+const BS_BLOCK_DONE = 2;
+/* block flush performed */
+
+const BS_FINISH_STARTED = 3;
+/* finish started, need only more output at next deflate */
+
+const BS_FINISH_DONE = 4;
+/* finish done, accept no more input or output */
+
+const OS_CODE = 0x03; // Unix :) . Don't detect, use this default.
+
+const err = (strm, errorCode) => {
+  strm.msg = messages[errorCode];
+  return errorCode;
+};
+
+const rank = f => {
+  return (f << 1) - (f > 4 ? 9 : 0);
+};
+
+const zero = buf => {
+  let len = buf.length;
+
+  while (--len >= 0) {
+    buf[len] = 0;
+  }
+};
+/* eslint-disable new-cap */
+
+
+let HASH_ZLIB = (s, prev, data) => (prev << s.hash_shift ^ data) & s.hash_mask; // This hash causes less collisions, https://github.com/nodeca/pako/issues/135
+// But breaks binary compatibility
+//let HASH_FAST = (s, prev, data) => ((prev << 8) + (prev >> 8) + (data << 4)) & s.hash_mask;
+
+
+let HASH = HASH_ZLIB;
+/* =========================================================================
+ * Flush as much pending output as possible. All deflate() output goes
+ * through this function so some applications may wish to modify it
+ * to avoid allocating a large strm->output buffer and copying into it.
+ * (See also read_buf()).
+ */
+
+const flush_pending = strm => {
+  const s = strm.state; //_tr_flush_bits(s);
+
+  let len = s.pending;
+
+  if (len > strm.avail_out) {
+    len = strm.avail_out;
+  }
+
+  if (len === 0) {
+    return;
+  }
+
+  strm.output.set(s.pending_buf.subarray(s.pending_out, s.pending_out + len), strm.next_out);
+  strm.next_out += len;
+  s.pending_out += len;
+  strm.total_out += len;
+  strm.avail_out -= len;
+  s.pending -= len;
+
+  if (s.pending === 0) {
+    s.pending_out = 0;
+  }
+};
+
+const flush_block_only = (s, last) => {
+  _tr_flush_block(s, s.block_start >= 0 ? s.block_start : -1, s.strstart - s.block_start, last);
+
+  s.block_start = s.strstart;
+  flush_pending(s.strm);
+};
+
+const put_byte = (s, b) => {
+  s.pending_buf[s.pending++] = b;
+};
+/* =========================================================================
+ * Put a short in the pending buffer. The 16-bit value is put in MSB order.
+ * IN assertion: the stream state is correct and there is enough room in
+ * pending_buf.
+ */
+
+
+const putShortMSB = (s, b) => {
+  //  put_byte(s, (Byte)(b >> 8));
+  //  put_byte(s, (Byte)(b & 0xff));
+  s.pending_buf[s.pending++] = b >>> 8 & 0xff;
+  s.pending_buf[s.pending++] = b & 0xff;
+};
+/* ===========================================================================
+ * Read a new buffer from the current input stream, update the adler32
+ * and total number of bytes read.  All deflate() input goes through
+ * this function so some applications may wish to modify it to avoid
+ * allocating a large strm->input buffer and copying from it.
+ * (See also flush_pending()).
+ */
+
+
+const read_buf = (strm, buf, start, size) => {
+  let len = strm.avail_in;
+
+  if (len > size) {
+    len = size;
+  }
+
+  if (len === 0) {
+    return 0;
+  }
+
+  strm.avail_in -= len; // zmemcpy(buf, strm->next_in, len);
+
+  buf.set(strm.input.subarray(strm.next_in, strm.next_in + len), start);
+
+  if (strm.state.wrap === 1) {
+    strm.adler = adler32_1(strm.adler, buf, len, start);
+  } else if (strm.state.wrap === 2) {
+    strm.adler = crc32_1(strm.adler, buf, len, start);
+  }
+
+  strm.next_in += len;
+  strm.total_in += len;
+  return len;
+};
+/* ===========================================================================
+ * Set match_start to the longest match starting at the given string and
+ * return its length. Matches shorter or equal to prev_length are discarded,
+ * in which case the result is equal to prev_length and match_start is
+ * garbage.
+ * IN assertions: cur_match is the head of the hash chain for the current
+ *   string (strstart) and its distance is <= MAX_DIST, and prev_length >= 1
+ * OUT assertion: the match length is not greater than s->lookahead.
+ */
+
+
+const longest_match = (s, cur_match) => {
+  let chain_length = s.max_chain_length;
+  /* max hash chain length */
+
+  let scan = s.strstart;
+  /* current string */
+
+  let match;
+  /* matched string */
+
+  let len;
+  /* length of current match */
+
+  let best_len = s.prev_length;
+  /* best match length so far */
+
+  let nice_match = s.nice_match;
+  /* stop if match long enough */
+
+  const limit = s.strstart > s.w_size - MIN_LOOKAHEAD ? s.strstart - (s.w_size - MIN_LOOKAHEAD) : 0
+  /*NIL*/
+  ;
+  const _win = s.window; // shortcut
+
+  const wmask = s.w_mask;
+  const prev = s.prev;
+  /* Stop when cur_match becomes <= limit. To simplify the code,
+   * we prevent matches with the string of window index 0.
+   */
+
+  const strend = s.strstart + MAX_MATCH;
+  let scan_end1 = _win[scan + best_len - 1];
+  let scan_end = _win[scan + best_len];
+  /* The code is optimized for HASH_BITS >= 8 and MAX_MATCH-2 multiple of 16.
+   * It is easy to get rid of this optimization if necessary.
+   */
+  // Assert(s->hash_bits >= 8 && MAX_MATCH == 258, "Code too clever");
+
+  /* Do not waste too much time if we already have a good match: */
+
+  if (s.prev_length >= s.good_match) {
+    chain_length >>= 2;
+  }
+  /* Do not look for matches beyond the end of the input. This is necessary
+   * to make deflate deterministic.
+   */
+
+
+  if (nice_match > s.lookahead) {
+    nice_match = s.lookahead;
+  } // Assert((ulg)s->strstart <= s->window_size-MIN_LOOKAHEAD, "need lookahead");
+
+
+  do {
+    // Assert(cur_match < s->strstart, "no future");
+    match = cur_match;
+    /* Skip to next match if the match length cannot increase
+     * or if the match length is less than 2.  Note that the checks below
+     * for insufficient lookahead only occur occasionally for performance
+     * reasons.  Therefore uninitialized memory will be accessed, and
+     * conditional jumps will be made that depend on those values.
+     * However the length of the match is limited to the lookahead, so
+     * the output of deflate is not affected by the uninitialized values.
+     */
+
+    if (_win[match + best_len] !== scan_end || _win[match + best_len - 1] !== scan_end1 || _win[match] !== _win[scan] || _win[++match] !== _win[scan + 1]) {
+      continue;
+    }
+    /* The check at best_len-1 can be removed because it will be made
+     * again later. (This heuristic is not always a win.)
+     * It is not necessary to compare scan[2] and match[2] since they
+     * are always equal when the other bytes match, given that
+     * the hash keys are equal and that HASH_BITS >= 8.
+     */
+
+
+    scan += 2;
+    match++; // Assert(*scan == *match, "match[2]?");
+
+    /* We check for insufficient lookahead only every 8th comparison;
+     * the 256th check will be made at strstart+258.
+     */
+
+    do {
+      /*jshint noempty:false*/
+    } while (_win[++scan] === _win[++match] && _win[++scan] === _win[++match] && _win[++scan] === _win[++match] && _win[++scan] === _win[++match] && _win[++scan] === _win[++match] && _win[++scan] === _win[++match] && _win[++scan] === _win[++match] && _win[++scan] === _win[++match] && scan < strend); // Assert(scan <= s->window+(unsigned)(s->window_size-1), "wild scan");
+
+
+    len = MAX_MATCH - (strend - scan);
+    scan = strend - MAX_MATCH;
+
+    if (len > best_len) {
+      s.match_start = cur_match;
+      best_len = len;
+
+      if (len >= nice_match) {
+        break;
+      }
+
+      scan_end1 = _win[scan + best_len - 1];
+      scan_end = _win[scan + best_len];
+    }
+  } while ((cur_match = prev[cur_match & wmask]) > limit && --chain_length !== 0);
+
+  if (best_len <= s.lookahead) {
+    return best_len;
+  }
+
+  return s.lookahead;
+};
+/* ===========================================================================
+ * Fill the window when the lookahead becomes insufficient.
+ * Updates strstart and lookahead.
+ *
+ * IN assertion: lookahead < MIN_LOOKAHEAD
+ * OUT assertions: strstart <= window_size-MIN_LOOKAHEAD
+ *    At least one byte has been read, or avail_in == 0; reads are
+ *    performed for at least two bytes (required for the zip translate_eol
+ *    option -- not supported here).
+ */
+
+
+const fill_window = s => {
+  const _w_size = s.w_size;
+  let p, n, m, more, str; //Assert(s->lookahead < MIN_LOOKAHEAD, "already enough lookahead");
+
+  do {
+    more = s.window_size - s.lookahead - s.strstart; // JS ints have 32 bit, block below not needed
+
+    /* Deal with !@#$% 64K limit: */
+    //if (sizeof(int) <= 2) {
+    //    if (more == 0 && s->strstart == 0 && s->lookahead == 0) {
+    //        more = wsize;
+    //
+    //  } else if (more == (unsigned)(-1)) {
+    //        /* Very unlikely, but possible on 16 bit machine if
+    //         * strstart == 0 && lookahead == 1 (input done a byte at time)
+    //         */
+    //        more--;
+    //    }
+    //}
+
+    /* If the window is almost full and there is insufficient lookahead,
+     * move the upper half to the lower one to make room in the upper half.
+     */
+
+    if (s.strstart >= _w_size + (_w_size - MIN_LOOKAHEAD)) {
+      s.window.set(s.window.subarray(_w_size, _w_size + _w_size), 0);
+      s.match_start -= _w_size;
+      s.strstart -= _w_size;
+      /* we now have strstart >= MAX_DIST */
+
+      s.block_start -= _w_size;
+      /* Slide the hash table (could be avoided with 32 bit values
+       at the expense of memory usage). We slide even when level == 0
+       to keep the hash table consistent if we switch back to level > 0
+       later. (Using level 0 permanently is not an optimal usage of
+       zlib, so we don't care about this pathological case.)
+       */
+
+      n = s.hash_size;
+      p = n;
+
+      do {
+        m = s.head[--p];
+        s.head[p] = m >= _w_size ? m - _w_size : 0;
+      } while (--n);
+
+      n = _w_size;
+      p = n;
+
+      do {
+        m = s.prev[--p];
+        s.prev[p] = m >= _w_size ? m - _w_size : 0;
+        /* If n is not on any hash chain, prev[n] is garbage but
+         * its value will never be used.
+         */
+      } while (--n);
+
+      more += _w_size;
+    }
+
+    if (s.strm.avail_in === 0) {
+      break;
+    }
+    /* If there was no sliding:
+     *    strstart <= WSIZE+MAX_DIST-1 && lookahead <= MIN_LOOKAHEAD - 1 &&
+     *    more == window_size - lookahead - strstart
+     * => more >= window_size - (MIN_LOOKAHEAD-1 + WSIZE + MAX_DIST-1)
+     * => more >= window_size - 2*WSIZE + 2
+     * In the BIG_MEM or MMAP case (not yet supported),
+     *   window_size == input_size + MIN_LOOKAHEAD  &&
+     *   strstart + s->lookahead <= input_size => more >= MIN_LOOKAHEAD.
+     * Otherwise, window_size == 2*WSIZE so more >= 2.
+     * If there was sliding, more >= WSIZE. So in all cases, more >= 2.
+     */
+    //Assert(more >= 2, "more < 2");
+
+
+    n = read_buf(s.strm, s.window, s.strstart + s.lookahead, more);
+    s.lookahead += n;
+    /* Initialize the hash value now that we have some input: */
+
+    if (s.lookahead + s.insert >= MIN_MATCH) {
+      str = s.strstart - s.insert;
+      s.ins_h = s.window[str];
+      /* UPDATE_HASH(s, s->ins_h, s->window[str + 1]); */
+
+      s.ins_h = HASH(s, s.ins_h, s.window[str + 1]); //#if MIN_MATCH != 3
+      //        Call update_hash() MIN_MATCH-3 more times
+      //#endif
+
+      while (s.insert) {
+        /* UPDATE_HASH(s, s->ins_h, s->window[str + MIN_MATCH-1]); */
+        s.ins_h = HASH(s, s.ins_h, s.window[str + MIN_MATCH - 1]);
+        s.prev[str & s.w_mask] = s.head[s.ins_h];
+        s.head[s.ins_h] = str;
+        str++;
+        s.insert--;
+
+        if (s.lookahead + s.insert < MIN_MATCH) {
+          break;
+        }
+      }
+    }
+    /* If the whole input has less than MIN_MATCH bytes, ins_h is garbage,
+     * but this is not important since only literal bytes will be emitted.
+     */
+
+  } while (s.lookahead < MIN_LOOKAHEAD && s.strm.avail_in !== 0);
+  /* If the WIN_INIT bytes after the end of the current data have never been
+   * written, then zero those bytes in order to avoid memory check reports of
+   * the use of uninitialized (or uninitialised as Julian writes) bytes by
+   * the longest match routines.  Update the high water mark for the next
+   * time through here.  WIN_INIT is set to MAX_MATCH since the longest match
+   * routines allow scanning to strstart + MAX_MATCH, ignoring lookahead.
+   */
+  //  if (s.high_water < s.window_size) {
+  //    const curr = s.strstart + s.lookahead;
+  //    let init = 0;
+  //
+  //    if (s.high_water < curr) {
+  //      /* Previous high water mark below current data -- zero WIN_INIT
+  //       * bytes or up to end of window, whichever is less.
+  //       */
+  //      init = s.window_size - curr;
+  //      if (init > WIN_INIT)
+  //        init = WIN_INIT;
+  //      zmemzero(s->window + curr, (unsigned)init);
+  //      s->high_water = curr + init;
+  //    }
+  //    else if (s->high_water < (ulg)curr + WIN_INIT) {
+  //      /* High water mark at or above current data, but below current data
+  //       * plus WIN_INIT -- zero out to current data plus WIN_INIT, or up
+  //       * to end of window, whichever is less.
+  //       */
+  //      init = (ulg)curr + WIN_INIT - s->high_water;
+  //      if (init > s->window_size - s->high_water)
+  //        init = s->window_size - s->high_water;
+  //      zmemzero(s->window + s->high_water, (unsigned)init);
+  //      s->high_water += init;
+  //    }
+  //  }
+  //
+  //  Assert((ulg)s->strstart <= s->window_size - MIN_LOOKAHEAD,
+  //    "not enough room for search");
+
+};
+/* ===========================================================================
+ * Copy without compression as much as possible from the input stream, return
+ * the current block state.
+ * This function does not insert new strings in the dictionary since
+ * uncompressible data is probably not useful. This function is used
+ * only for the level=0 compression option.
+ * NOTE: this function should be optimized to avoid extra copying from
+ * window to pending_buf.
+ */
+
+
+const deflate_stored = (s, flush) => {
+  /* Stored blocks are limited to 0xffff bytes, pending_buf is limited
+   * to pending_buf_size, and each stored block has a 5 byte header:
+   */
+  let max_block_size = 0xffff;
+
+  if (max_block_size > s.pending_buf_size - 5) {
+    max_block_size = s.pending_buf_size - 5;
+  }
+  /* Copy as much as possible from input to output: */
+
+
+  for (;;) {
+    /* Fill the window as much as possible: */
+    if (s.lookahead <= 1) {
+      //Assert(s->strstart < s->w_size+MAX_DIST(s) ||
+      //  s->block_start >= (long)s->w_size, "slide too late");
+      //      if (!(s.strstart < s.w_size + (s.w_size - MIN_LOOKAHEAD) ||
+      //        s.block_start >= s.w_size)) {
+      //        throw  new Error("slide too late");
+      //      }
+      fill_window(s);
+
+      if (s.lookahead === 0 && flush === Z_NO_FLUSH$2) {
+        return BS_NEED_MORE;
+      }
+
+      if (s.lookahead === 0) {
+        break;
+      }
+      /* flush the current block */
+
+    } //Assert(s->block_start >= 0L, "block gone");
+    //    if (s.block_start < 0) throw new Error("block gone");
+
+
+    s.strstart += s.lookahead;
+    s.lookahead = 0;
+    /* Emit a stored block if pending_buf will be full: */
+
+    const max_start = s.block_start + max_block_size;
+
+    if (s.strstart === 0 || s.strstart >= max_start) {
+      /* strstart == 0 is possible when wraparound on 16-bit machine */
+      s.lookahead = s.strstart - max_start;
+      s.strstart = max_start;
+      /*** FLUSH_BLOCK(s, 0); ***/
+
+      flush_block_only(s, false);
+
+      if (s.strm.avail_out === 0) {
+        return BS_NEED_MORE;
+      }
+      /***/
+
+    }
+    /* Flush if we may have to slide, otherwise block_start may become
+     * negative and the data will be gone:
+     */
+
+
+    if (s.strstart - s.block_start >= s.w_size - MIN_LOOKAHEAD) {
+      /*** FLUSH_BLOCK(s, 0); ***/
+      flush_block_only(s, false);
+
+      if (s.strm.avail_out === 0) {
+        return BS_NEED_MORE;
+      }
+      /***/
+
+    }
+  }
+
+  s.insert = 0;
+
+  if (flush === Z_FINISH$3) {
+    /*** FLUSH_BLOCK(s, 1); ***/
+    flush_block_only(s, true);
+
+    if (s.strm.avail_out === 0) {
+      return BS_FINISH_STARTED;
+    }
+    /***/
+
+
+    return BS_FINISH_DONE;
+  }
+
+  if (s.strstart > s.block_start) {
+    /*** FLUSH_BLOCK(s, 0); ***/
+    flush_block_only(s, false);
+
+    if (s.strm.avail_out === 0) {
+      return BS_NEED_MORE;
+    }
+    /***/
+
+  }
+
+  return BS_NEED_MORE;
+};
+/* ===========================================================================
+ * Compress as much as possible from the input stream, return the current
+ * block state.
+ * This function does not perform lazy evaluation of matches and inserts
+ * new strings in the dictionary only for unmatched strings or for short
+ * matches. It is used only for the fast compression options.
+ */
+
+
+const deflate_fast = (s, flush) => {
+  let hash_head;
+  /* head of the hash chain */
+
+  let bflush;
+  /* set if current block must be flushed */
+
+  for (;;) {
+    /* Make sure that we always have enough lookahead, except
+     * at the end of the input file. We need MAX_MATCH bytes
+     * for the next match, plus MIN_MATCH bytes to insert the
+     * string following the next match.
+     */
+    if (s.lookahead < MIN_LOOKAHEAD) {
+      fill_window(s);
+
+      if (s.lookahead < MIN_LOOKAHEAD && flush === Z_NO_FLUSH$2) {
+        return BS_NEED_MORE;
+      }
+
+      if (s.lookahead === 0) {
+        break;
+        /* flush the current block */
+      }
+    }
+    /* Insert the string window[strstart .. strstart+2] in the
+     * dictionary, and set hash_head to the head of the hash chain:
+     */
+
+
+    hash_head = 0
+    /*NIL*/
+    ;
+
+    if (s.lookahead >= MIN_MATCH) {
+      /*** INSERT_STRING(s, s.strstart, hash_head); ***/
+      s.ins_h = HASH(s, s.ins_h, s.window[s.strstart + MIN_MATCH - 1]);
+      hash_head = s.prev[s.strstart & s.w_mask] = s.head[s.ins_h];
+      s.head[s.ins_h] = s.strstart;
+      /***/
+    }
+    /* Find the longest match, discarding those <= prev_length.
+     * At this point we have always match_length < MIN_MATCH
+     */
+
+
+    if (hash_head !== 0
+    /*NIL*/
+    && s.strstart - hash_head <= s.w_size - MIN_LOOKAHEAD) {
+      /* To simplify the code, we prevent matches with the string
+       * of window index 0 (in particular we have to avoid a match
+       * of the string with itself at the start of the input file).
+       */
+      s.match_length = longest_match(s, hash_head);
+      /* longest_match() sets match_start */
+    }
+
+    if (s.match_length >= MIN_MATCH) {
+      // check_match(s, s.strstart, s.match_start, s.match_length); // for debug only
+
+      /*** _tr_tally_dist(s, s.strstart - s.match_start,
+                     s.match_length - MIN_MATCH, bflush); ***/
+      bflush = _tr_tally(s, s.strstart - s.match_start, s.match_length - MIN_MATCH);
+      s.lookahead -= s.match_length;
+      /* Insert new strings in the hash table only if the match length
+       * is not too large. This saves time but degrades compression.
+       */
+
+      if (s.match_length <= s.max_lazy_match
+      /*max_insert_length*/
+      && s.lookahead >= MIN_MATCH) {
+        s.match_length--;
+        /* string at strstart already in table */
+
+        do {
+          s.strstart++;
+          /*** INSERT_STRING(s, s.strstart, hash_head); ***/
+
+          s.ins_h = HASH(s, s.ins_h, s.window[s.strstart + MIN_MATCH - 1]);
+          hash_head = s.prev[s.strstart & s.w_mask] = s.head[s.ins_h];
+          s.head[s.ins_h] = s.strstart;
+          /***/
+
+          /* strstart never exceeds WSIZE-MAX_MATCH, so there are
+           * always MIN_MATCH bytes ahead.
+           */
+        } while (--s.match_length !== 0);
+
+        s.strstart++;
+      } else {
+        s.strstart += s.match_length;
+        s.match_length = 0;
+        s.ins_h = s.window[s.strstart];
+        /* UPDATE_HASH(s, s.ins_h, s.window[s.strstart+1]); */
+
+        s.ins_h = HASH(s, s.ins_h, s.window[s.strstart + 1]); //#if MIN_MATCH != 3
+        //                Call UPDATE_HASH() MIN_MATCH-3 more times
+        //#endif
+
+        /* If lookahead < MIN_MATCH, ins_h is garbage, but it does not
+         * matter since it will be recomputed at next deflate call.
+         */
+      }
+    } else {
+      /* No match, output a literal byte */
+      //Tracevv((stderr,"%c", s.window[s.strstart]));
+
+      /*** _tr_tally_lit(s, s.window[s.strstart], bflush); ***/
+      bflush = _tr_tally(s, 0, s.window[s.strstart]);
+      s.lookahead--;
+      s.strstart++;
+    }
+
+    if (bflush) {
+      /*** FLUSH_BLOCK(s, 0); ***/
+      flush_block_only(s, false);
+
+      if (s.strm.avail_out === 0) {
+        return BS_NEED_MORE;
+      }
+      /***/
+
+    }
+  }
+
+  s.insert = s.strstart < MIN_MATCH - 1 ? s.strstart : MIN_MATCH - 1;
+
+  if (flush === Z_FINISH$3) {
+    /*** FLUSH_BLOCK(s, 1); ***/
+    flush_block_only(s, true);
+
+    if (s.strm.avail_out === 0) {
+      return BS_FINISH_STARTED;
+    }
+    /***/
+
+
+    return BS_FINISH_DONE;
+  }
+
+  if (s.last_lit) {
+    /*** FLUSH_BLOCK(s, 0); ***/
+    flush_block_only(s, false);
+
+    if (s.strm.avail_out === 0) {
+      return BS_NEED_MORE;
+    }
+    /***/
+
+  }
+
+  return BS_BLOCK_DONE;
+};
+/* ===========================================================================
+ * Same as above, but achieves better compression. We use a lazy
+ * evaluation for matches: a match is finally adopted only if there is
+ * no better match at the next window position.
+ */
+
+
+const deflate_slow = (s, flush) => {
+  let hash_head;
+  /* head of hash chain */
+
+  let bflush;
+  /* set if current block must be flushed */
+
+  let max_insert;
+  /* Process the input block. */
+
+  for (;;) {
+    /* Make sure that we always have enough lookahead, except
+     * at the end of the input file. We need MAX_MATCH bytes
+     * for the next match, plus MIN_MATCH bytes to insert the
+     * string following the next match.
+     */
+    if (s.lookahead < MIN_LOOKAHEAD) {
+      fill_window(s);
+
+      if (s.lookahead < MIN_LOOKAHEAD && flush === Z_NO_FLUSH$2) {
+        return BS_NEED_MORE;
+      }
+
+      if (s.lookahead === 0) {
+        break;
+      }
+      /* flush the current block */
+
+    }
+    /* Insert the string window[strstart .. strstart+2] in the
+     * dictionary, and set hash_head to the head of the hash chain:
+     */
+
+
+    hash_head = 0
+    /*NIL*/
+    ;
+
+    if (s.lookahead >= MIN_MATCH) {
+      /*** INSERT_STRING(s, s.strstart, hash_head); ***/
+      s.ins_h = HASH(s, s.ins_h, s.window[s.strstart + MIN_MATCH - 1]);
+      hash_head = s.prev[s.strstart & s.w_mask] = s.head[s.ins_h];
+      s.head[s.ins_h] = s.strstart;
+      /***/
+    }
+    /* Find the longest match, discarding those <= prev_length.
+     */
+
+
+    s.prev_length = s.match_length;
+    s.prev_match = s.match_start;
+    s.match_length = MIN_MATCH - 1;
+
+    if (hash_head !== 0
+    /*NIL*/
+    && s.prev_length < s.max_lazy_match && s.strstart - hash_head <= s.w_size - MIN_LOOKAHEAD
+    /*MAX_DIST(s)*/
+    ) {
+      /* To simplify the code, we prevent matches with the string
+       * of window index 0 (in particular we have to avoid a match
+       * of the string with itself at the start of the input file).
+       */
+      s.match_length = longest_match(s, hash_head);
+      /* longest_match() sets match_start */
+
+      if (s.match_length <= 5 && (s.strategy === Z_FILTERED || s.match_length === MIN_MATCH && s.strstart - s.match_start > 4096
+      /*TOO_FAR*/
+      )) {
+        /* If prev_match is also MIN_MATCH, match_start is garbage
+         * but we will ignore the current match anyway.
+         */
+        s.match_length = MIN_MATCH - 1;
+      }
+    }
+    /* If there was a match at the previous step and the current
+     * match is not better, output the previous match:
+     */
+
+
+    if (s.prev_length >= MIN_MATCH && s.match_length <= s.prev_length) {
+      max_insert = s.strstart + s.lookahead - MIN_MATCH;
+      /* Do not insert strings in hash table beyond this. */
+      //check_match(s, s.strstart-1, s.prev_match, s.prev_length);
+
+      /***_tr_tally_dist(s, s.strstart - 1 - s.prev_match,
+                     s.prev_length - MIN_MATCH, bflush);***/
+
+      bflush = _tr_tally(s, s.strstart - 1 - s.prev_match, s.prev_length - MIN_MATCH);
+      /* Insert in hash table all strings up to the end of the match.
+       * strstart-1 and strstart are already inserted. If there is not
+       * enough lookahead, the last two strings are not inserted in
+       * the hash table.
+       */
+
+      s.lookahead -= s.prev_length - 1;
+      s.prev_length -= 2;
+
+      do {
+        if (++s.strstart <= max_insert) {
+          /*** INSERT_STRING(s, s.strstart, hash_head); ***/
+          s.ins_h = HASH(s, s.ins_h, s.window[s.strstart + MIN_MATCH - 1]);
+          hash_head = s.prev[s.strstart & s.w_mask] = s.head[s.ins_h];
+          s.head[s.ins_h] = s.strstart;
+          /***/
+        }
+      } while (--s.prev_length !== 0);
+
+      s.match_available = 0;
+      s.match_length = MIN_MATCH - 1;
+      s.strstart++;
+
+      if (bflush) {
+        /*** FLUSH_BLOCK(s, 0); ***/
+        flush_block_only(s, false);
+
+        if (s.strm.avail_out === 0) {
+          return BS_NEED_MORE;
+        }
+        /***/
+
+      }
+    } else if (s.match_available) {
+      /* If there was no match at the previous position, output a
+       * single literal. If there was a match but the current match
+       * is longer, truncate the previous match to a single literal.
+       */
+      //Tracevv((stderr,"%c", s->window[s->strstart-1]));
+
+      /*** _tr_tally_lit(s, s.window[s.strstart-1], bflush); ***/
+      bflush = _tr_tally(s, 0, s.window[s.strstart - 1]);
+
+      if (bflush) {
+        /*** FLUSH_BLOCK_ONLY(s, 0) ***/
+        flush_block_only(s, false);
+        /***/
+      }
+
+      s.strstart++;
+      s.lookahead--;
+
+      if (s.strm.avail_out === 0) {
+        return BS_NEED_MORE;
+      }
+    } else {
+      /* There is no previous match to compare with, wait for
+       * the next step to decide.
+       */
+      s.match_available = 1;
+      s.strstart++;
+      s.lookahead--;
+    }
+  } //Assert (flush != Z_NO_FLUSH, "no flush?");
+
+
+  if (s.match_available) {
+    //Tracevv((stderr,"%c", s->window[s->strstart-1]));
+
+    /*** _tr_tally_lit(s, s.window[s.strstart-1], bflush); ***/
+    bflush = _tr_tally(s, 0, s.window[s.strstart - 1]);
+    s.match_available = 0;
+  }
+
+  s.insert = s.strstart < MIN_MATCH - 1 ? s.strstart : MIN_MATCH - 1;
+
+  if (flush === Z_FINISH$3) {
+    /*** FLUSH_BLOCK(s, 1); ***/
+    flush_block_only(s, true);
+
+    if (s.strm.avail_out === 0) {
+      return BS_FINISH_STARTED;
+    }
+    /***/
+
+
+    return BS_FINISH_DONE;
+  }
+
+  if (s.last_lit) {
+    /*** FLUSH_BLOCK(s, 0); ***/
+    flush_block_only(s, false);
+
+    if (s.strm.avail_out === 0) {
+      return BS_NEED_MORE;
+    }
+    /***/
+
+  }
+
+  return BS_BLOCK_DONE;
+};
+/* ===========================================================================
+ * For Z_RLE, simply look for runs of bytes, generate matches only of distance
+ * one.  Do not maintain a hash table.  (It will be regenerated if this run of
+ * deflate switches away from Z_RLE.)
+ */
+
+
+const deflate_rle = (s, flush) => {
+  let bflush;
+  /* set if current block must be flushed */
+
+  let prev;
+  /* byte at distance one to match */
+
+  let scan, strend;
+  /* scan goes up to strend for length of run */
+
+  const _win = s.window;
+
+  for (;;) {
+    /* Make sure that we always have enough lookahead, except
+     * at the end of the input file. We need MAX_MATCH bytes
+     * for the longest run, plus one for the unrolled loop.
+     */
+    if (s.lookahead <= MAX_MATCH) {
+      fill_window(s);
+
+      if (s.lookahead <= MAX_MATCH && flush === Z_NO_FLUSH$2) {
+        return BS_NEED_MORE;
+      }
+
+      if (s.lookahead === 0) {
+        break;
+      }
+      /* flush the current block */
+
+    }
+    /* See how many times the previous byte repeats */
+
+
+    s.match_length = 0;
+
+    if (s.lookahead >= MIN_MATCH && s.strstart > 0) {
+      scan = s.strstart - 1;
+      prev = _win[scan];
+
+      if (prev === _win[++scan] && prev === _win[++scan] && prev === _win[++scan]) {
+        strend = s.strstart + MAX_MATCH;
+
+        do {
+          /*jshint noempty:false*/
+        } while (prev === _win[++scan] && prev === _win[++scan] && prev === _win[++scan] && prev === _win[++scan] && prev === _win[++scan] && prev === _win[++scan] && prev === _win[++scan] && prev === _win[++scan] && scan < strend);
+
+        s.match_length = MAX_MATCH - (strend - scan);
+
+        if (s.match_length > s.lookahead) {
+          s.match_length = s.lookahead;
+        }
+      } //Assert(scan <= s->window+(uInt)(s->window_size-1), "wild scan");
+
+    }
+    /* Emit match if have run of MIN_MATCH or longer, else emit literal */
+
+
+    if (s.match_length >= MIN_MATCH) {
+      //check_match(s, s.strstart, s.strstart - 1, s.match_length);
+
+      /*** _tr_tally_dist(s, 1, s.match_length - MIN_MATCH, bflush); ***/
+      bflush = _tr_tally(s, 1, s.match_length - MIN_MATCH);
+      s.lookahead -= s.match_length;
+      s.strstart += s.match_length;
+      s.match_length = 0;
+    } else {
+      /* No match, output a literal byte */
+      //Tracevv((stderr,"%c", s->window[s->strstart]));
+
+      /*** _tr_tally_lit(s, s.window[s.strstart], bflush); ***/
+      bflush = _tr_tally(s, 0, s.window[s.strstart]);
+      s.lookahead--;
+      s.strstart++;
+    }
+
+    if (bflush) {
+      /*** FLUSH_BLOCK(s, 0); ***/
+      flush_block_only(s, false);
+
+      if (s.strm.avail_out === 0) {
+        return BS_NEED_MORE;
+      }
+      /***/
+
+    }
+  }
+
+  s.insert = 0;
+
+  if (flush === Z_FINISH$3) {
+    /*** FLUSH_BLOCK(s, 1); ***/
+    flush_block_only(s, true);
+
+    if (s.strm.avail_out === 0) {
+      return BS_FINISH_STARTED;
+    }
+    /***/
+
+
+    return BS_FINISH_DONE;
+  }
+
+  if (s.last_lit) {
+    /*** FLUSH_BLOCK(s, 0); ***/
+    flush_block_only(s, false);
+
+    if (s.strm.avail_out === 0) {
+      return BS_NEED_MORE;
+    }
+    /***/
+
+  }
+
+  return BS_BLOCK_DONE;
+};
+/* ===========================================================================
+ * For Z_HUFFMAN_ONLY, do not look for matches.  Do not maintain a hash table.
+ * (It will be regenerated if this run of deflate switches away from Huffman.)
+ */
+
+
+const deflate_huff = (s, flush) => {
+  let bflush;
+  /* set if current block must be flushed */
+
+  for (;;) {
+    /* Make sure that we have a literal to write. */
+    if (s.lookahead === 0) {
+      fill_window(s);
+
+      if (s.lookahead === 0) {
+        if (flush === Z_NO_FLUSH$2) {
+          return BS_NEED_MORE;
+        }
+
+        break;
+        /* flush the current block */
+      }
+    }
+    /* Output a literal byte */
+
+
+    s.match_length = 0; //Tracevv((stderr,"%c", s->window[s->strstart]));
+
+    /*** _tr_tally_lit(s, s.window[s.strstart], bflush); ***/
+
+    bflush = _tr_tally(s, 0, s.window[s.strstart]);
+    s.lookahead--;
+    s.strstart++;
+
+    if (bflush) {
+      /*** FLUSH_BLOCK(s, 0); ***/
+      flush_block_only(s, false);
+
+      if (s.strm.avail_out === 0) {
+        return BS_NEED_MORE;
+      }
+      /***/
+
+    }
+  }
+
+  s.insert = 0;
+
+  if (flush === Z_FINISH$3) {
+    /*** FLUSH_BLOCK(s, 1); ***/
+    flush_block_only(s, true);
+
+    if (s.strm.avail_out === 0) {
+      return BS_FINISH_STARTED;
+    }
+    /***/
+
+
+    return BS_FINISH_DONE;
+  }
+
+  if (s.last_lit) {
+    /*** FLUSH_BLOCK(s, 0); ***/
+    flush_block_only(s, false);
+
+    if (s.strm.avail_out === 0) {
+      return BS_NEED_MORE;
+    }
+    /***/
+
+  }
+
+  return BS_BLOCK_DONE;
+};
+/* Values for max_lazy_match, good_match and max_chain_length, depending on
+ * the desired pack level (0..9). The values given below have been tuned to
+ * exclude worst case performance for pathological files. Better values may be
+ * found for specific files.
+ */
+
+
+function Config(good_length, max_lazy, nice_length, max_chain, func) {
+  this.good_length = good_length;
+  this.max_lazy = max_lazy;
+  this.nice_length = nice_length;
+  this.max_chain = max_chain;
+  this.func = func;
+}
+
+const configuration_table = [
+/*      good lazy nice chain */
+new Config(0, 0, 0, 0, deflate_stored),
+/* 0 store only */
+new Config(4, 4, 8, 4, deflate_fast),
+/* 1 max speed, no lazy matches */
+new Config(4, 5, 16, 8, deflate_fast),
+/* 2 */
+new Config(4, 6, 32, 32, deflate_fast),
+/* 3 */
+new Config(4, 4, 16, 16, deflate_slow),
+/* 4 lazy matches */
+new Config(8, 16, 32, 32, deflate_slow),
+/* 5 */
+new Config(8, 16, 128, 128, deflate_slow),
+/* 6 */
+new Config(8, 32, 128, 256, deflate_slow),
+/* 7 */
+new Config(32, 128, 258, 1024, deflate_slow),
+/* 8 */
+new Config(32, 258, 258, 4096, deflate_slow)
+/* 9 max compression */
+];
+/* ===========================================================================
+ * Initialize the "longest match" routines for a new zlib stream
+ */
+
+const lm_init = s => {
+  s.window_size = 2 * s.w_size;
+  /*** CLEAR_HASH(s); ***/
+
+  zero(s.head); // Fill with NIL (= 0);
+
+  /* Set the default configuration parameters:
+   */
+
+  s.max_lazy_match = configuration_table[s.level].max_lazy;
+  s.good_match = configuration_table[s.level].good_length;
+  s.nice_match = configuration_table[s.level].nice_length;
+  s.max_chain_length = configuration_table[s.level].max_chain;
+  s.strstart = 0;
+  s.block_start = 0;
+  s.lookahead = 0;
+  s.insert = 0;
+  s.match_length = s.prev_length = MIN_MATCH - 1;
+  s.match_available = 0;
+  s.ins_h = 0;
+};
+
+function DeflateState() {
+  this.strm = null;
+  /* pointer back to this zlib stream */
+
+  this.status = 0;
+  /* as the name implies */
+
+  this.pending_buf = null;
+  /* output still pending */
+
+  this.pending_buf_size = 0;
+  /* size of pending_buf */
+
+  this.pending_out = 0;
+  /* next pending byte to output to the stream */
+
+  this.pending = 0;
+  /* nb of bytes in the pending buffer */
+
+  this.wrap = 0;
+  /* bit 0 true for zlib, bit 1 true for gzip */
+
+  this.gzhead = null;
+  /* gzip header information to write */
+
+  this.gzindex = 0;
+  /* where in extra, name, or comment */
+
+  this.method = Z_DEFLATED$2;
+  /* can only be DEFLATED */
+
+  this.last_flush = -1;
+  /* value of flush param for previous deflate call */
+
+  this.w_size = 0;
+  /* LZ77 window size (32K by default) */
+
+  this.w_bits = 0;
+  /* log2(w_size)  (8..16) */
+
+  this.w_mask = 0;
+  /* w_size - 1 */
+
+  this.window = null;
+  /* Sliding window. Input bytes are read into the second half of the window,
+   * and move to the first half later to keep a dictionary of at least wSize
+   * bytes. With this organization, matches are limited to a distance of
+   * wSize-MAX_MATCH bytes, but this ensures that IO is always
+   * performed with a length multiple of the block size.
+   */
+
+  this.window_size = 0;
+  /* Actual size of window: 2*wSize, except when the user input buffer
+   * is directly used as sliding window.
+   */
+
+  this.prev = null;
+  /* Link to older string with same hash index. To limit the size of this
+   * array to 64K, this link is maintained only for the last 32K strings.
+   * An index in this array is thus a window index modulo 32K.
+   */
+
+  this.head = null;
+  /* Heads of the hash chains or NIL. */
+
+  this.ins_h = 0;
+  /* hash index of string to be inserted */
+
+  this.hash_size = 0;
+  /* number of elements in hash table */
+
+  this.hash_bits = 0;
+  /* log2(hash_size) */
+
+  this.hash_mask = 0;
+  /* hash_size-1 */
+
+  this.hash_shift = 0;
+  /* Number of bits by which ins_h must be shifted at each input
+   * step. It must be such that after MIN_MATCH steps, the oldest
+   * byte no longer takes part in the hash key, that is:
+   *   hash_shift * MIN_MATCH >= hash_bits
+   */
+
+  this.block_start = 0;
+  /* Window position at the beginning of the current output block. Gets
+   * negative when the window is moved backwards.
+   */
+
+  this.match_length = 0;
+  /* length of best match */
+
+  this.prev_match = 0;
+  /* previous match */
+
+  this.match_available = 0;
+  /* set if previous match exists */
+
+  this.strstart = 0;
+  /* start of string to insert */
+
+  this.match_start = 0;
+  /* start of matching string */
+
+  this.lookahead = 0;
+  /* number of valid bytes ahead in window */
+
+  this.prev_length = 0;
+  /* Length of the best match at previous step. Matches not greater than this
+   * are discarded. This is used in the lazy match evaluation.
+   */
+
+  this.max_chain_length = 0;
+  /* To speed up deflation, hash chains are never searched beyond this
+   * length.  A higher limit improves compression ratio but degrades the
+   * speed.
+   */
+
+  this.max_lazy_match = 0;
+  /* Attempt to find a better match only when the current match is strictly
+   * smaller than this value. This mechanism is used only for compression
+   * levels >= 4.
+   */
+  // That's alias to max_lazy_match, don't use directly
+  //this.max_insert_length = 0;
+
+  /* Insert new strings in the hash table only if the match length is not
+   * greater than this length. This saves time but degrades compression.
+   * max_insert_length is used only for compression levels <= 3.
+   */
+
+  this.level = 0;
+  /* compression level (1..9) */
+
+  this.strategy = 0;
+  /* favor or force Huffman coding*/
+
+  this.good_match = 0;
+  /* Use a faster search when the previous match is longer than this */
+
+  this.nice_match = 0;
+  /* Stop searching when current match exceeds this */
+
+  /* used by trees.c: */
+
+  /* Didn't use ct_data typedef below to suppress compiler warning */
+  // struct ct_data_s dyn_ltree[HEAP_SIZE];   /* literal and length tree */
+  // struct ct_data_s dyn_dtree[2*D_CODES+1]; /* distance tree */
+  // struct ct_data_s bl_tree[2*BL_CODES+1];  /* Huffman tree for bit lengths */
+  // Use flat array of DOUBLE size, with interleaved fata,
+  // because JS does not support effective
+
+  this.dyn_ltree = new Uint16Array(HEAP_SIZE * 2);
+  this.dyn_dtree = new Uint16Array((2 * D_CODES + 1) * 2);
+  this.bl_tree = new Uint16Array((2 * BL_CODES + 1) * 2);
+  zero(this.dyn_ltree);
+  zero(this.dyn_dtree);
+  zero(this.bl_tree);
+  this.l_desc = null;
+  /* desc. for literal tree */
+
+  this.d_desc = null;
+  /* desc. for distance tree */
+
+  this.bl_desc = null;
+  /* desc. for bit length tree */
+  //ush bl_count[MAX_BITS+1];
+
+  this.bl_count = new Uint16Array(MAX_BITS + 1);
+  /* number of codes at each bit length for an optimal tree */
+  //int heap[2*L_CODES+1];      /* heap used to build the Huffman trees */
+
+  this.heap = new Uint16Array(2 * L_CODES + 1);
+  /* heap used to build the Huffman trees */
+
+  zero(this.heap);
+  this.heap_len = 0;
+  /* number of elements in the heap */
+
+  this.heap_max = 0;
+  /* element of largest frequency */
+
+  /* The sons of heap[n] are heap[2*n] and heap[2*n+1]. heap[0] is not used.
+   * The same heap array is used to build all trees.
+   */
+
+  this.depth = new Uint16Array(2 * L_CODES + 1); //uch depth[2*L_CODES+1];
+
+  zero(this.depth);
+  /* Depth of each subtree used as tie breaker for trees of equal frequency
+   */
+
+  this.l_buf = 0;
+  /* buffer index for literals or lengths */
+
+  this.lit_bufsize = 0;
+  /* Size of match buffer for literals/lengths.  There are 4 reasons for
+   * limiting lit_bufsize to 64K:
+   *   - frequencies can be kept in 16 bit counters
+   *   - if compression is not successful for the first block, all input
+   *     data is still in the window so we can still emit a stored block even
+   *     when input comes from standard input.  (This can also be done for
+   *     all blocks if lit_bufsize is not greater than 32K.)
+   *   - if compression is not successful for a file smaller than 64K, we can
+   *     even emit a stored file instead of a stored block (saving 5 bytes).
+   *     This is applicable only for zip (not gzip or zlib).
+   *   - creating new Huffman trees less frequently may not provide fast
+   *     adaptation to changes in the input data statistics. (Take for
+   *     example a binary file with poorly compressible code followed by
+   *     a highly compressible string table.) Smaller buffer sizes give
+   *     fast adaptation but have of course the overhead of transmitting
+   *     trees more frequently.
+   *   - I can't count above 4
+   */
+
+  this.last_lit = 0;
+  /* running index in l_buf */
+
+  this.d_buf = 0;
+  /* Buffer index for distances. To simplify the code, d_buf and l_buf have
+   * the same number of elements. To use different lengths, an extra flag
+   * array would be necessary.
+   */
+
+  this.opt_len = 0;
+  /* bit length of current block with optimal trees */
+
+  this.static_len = 0;
+  /* bit length of current block with static trees */
+
+  this.matches = 0;
+  /* number of string matches in current block */
+
+  this.insert = 0;
+  /* bytes at end of window left to insert */
+
+  this.bi_buf = 0;
+  /* Output buffer. bits are inserted starting at the bottom (least
+   * significant bits).
+   */
+
+  this.bi_valid = 0;
+  /* Number of valid bits in bi_buf.  All bits above the last valid bit
+   * are always zero.
+   */
+  // Used for window memory init. We safely ignore it for JS. That makes
+  // sense only for pointers and memory check tools.
+  //this.high_water = 0;
+
+  /* High water mark offset in window for initialized bytes -- bytes above
+   * this are set to zero in order to avoid memory check warnings when
+   * longest match routines access bytes past the input.  This is then
+   * updated to the new high water mark.
+   */
+}
+
+const deflateResetKeep = strm => {
+  if (!strm || !strm.state) {
+    return err(strm, Z_STREAM_ERROR$2);
+  }
+
+  strm.total_in = strm.total_out = 0;
+  strm.data_type = Z_UNKNOWN;
+  const s = strm.state;
+  s.pending = 0;
+  s.pending_out = 0;
+
+  if (s.wrap < 0) {
+    s.wrap = -s.wrap;
+    /* was made negative by deflate(..., Z_FINISH); */
+  }
+
+  s.status = s.wrap ? INIT_STATE : BUSY_STATE;
+  strm.adler = s.wrap === 2 ? 0 // crc32(0, Z_NULL, 0)
+  : 1; // adler32(0, Z_NULL, 0)
+
+  s.last_flush = Z_NO_FLUSH$2;
+
+  _tr_init(s);
+
+  return Z_OK$3;
+};
+
+const deflateReset = strm => {
+  const ret = deflateResetKeep(strm);
+
+  if (ret === Z_OK$3) {
+    lm_init(strm.state);
+  }
+
+  return ret;
+};
+
+const deflateSetHeader = (strm, head) => {
+  if (!strm || !strm.state) {
+    return Z_STREAM_ERROR$2;
+  }
+
+  if (strm.state.wrap !== 2) {
+    return Z_STREAM_ERROR$2;
+  }
+
+  strm.state.gzhead = head;
+  return Z_OK$3;
+};
+
+const deflateInit2 = (strm, level, method, windowBits, memLevel, strategy) => {
+  if (!strm) {
+    // === Z_NULL
+    return Z_STREAM_ERROR$2;
+  }
+
+  let wrap = 1;
+
+  if (level === Z_DEFAULT_COMPRESSION$1) {
+    level = 6;
+  }
+
+  if (windowBits < 0) {
+    /* suppress zlib wrapper */
+    wrap = 0;
+    windowBits = -windowBits;
+  } else if (windowBits > 15) {
+    wrap = 2;
+    /* write gzip wrapper instead */
+
+    windowBits -= 16;
+  }
+
+  if (memLevel < 1 || memLevel > MAX_MEM_LEVEL || method !== Z_DEFLATED$2 || windowBits < 8 || windowBits > 15 || level < 0 || level > 9 || strategy < 0 || strategy > Z_FIXED) {
+    return err(strm, Z_STREAM_ERROR$2);
+  }
+
+  if (windowBits === 8) {
+    windowBits = 9;
+  }
+  /* until 256-byte window bug fixed */
+
+
+  const s = new DeflateState();
+  strm.state = s;
+  s.strm = strm;
+  s.wrap = wrap;
+  s.gzhead = null;
+  s.w_bits = windowBits;
+  s.w_size = 1 << s.w_bits;
+  s.w_mask = s.w_size - 1;
+  s.hash_bits = memLevel + 7;
+  s.hash_size = 1 << s.hash_bits;
+  s.hash_mask = s.hash_size - 1;
+  s.hash_shift = ~~((s.hash_bits + MIN_MATCH - 1) / MIN_MATCH);
+  s.window = new Uint8Array(s.w_size * 2);
+  s.head = new Uint16Array(s.hash_size);
+  s.prev = new Uint16Array(s.w_size); // Don't need mem init magic for JS.
+  //s.high_water = 0;  /* nothing written to s->window yet */
+
+  s.lit_bufsize = 1 << memLevel + 6;
+  /* 16K elements by default */
+
+  s.pending_buf_size = s.lit_bufsize * 4; //overlay = (ushf *) ZALLOC(strm, s->lit_bufsize, sizeof(ush)+2);
+  //s->pending_buf = (uchf *) overlay;
+
+  s.pending_buf = new Uint8Array(s.pending_buf_size); // It is offset from `s.pending_buf` (size is `s.lit_bufsize * 2`)
+  //s->d_buf = overlay + s->lit_bufsize/sizeof(ush);
+
+  s.d_buf = 1 * s.lit_bufsize; //s->l_buf = s->pending_buf + (1+sizeof(ush))*s->lit_bufsize;
+
+  s.l_buf = (1 + 2) * s.lit_bufsize;
+  s.level = level;
+  s.strategy = strategy;
+  s.method = method;
+  return deflateReset(strm);
+};
+
+const deflateInit = (strm, level) => {
+  return deflateInit2(strm, level, Z_DEFLATED$2, MAX_WBITS$1, DEF_MEM_LEVEL, Z_DEFAULT_STRATEGY$1);
+};
+
+const deflate$2 = (strm, flush) => {
+  let beg, val; // for gzip header write only
+
+  if (!strm || !strm.state || flush > Z_BLOCK$1 || flush < 0) {
+    return strm ? err(strm, Z_STREAM_ERROR$2) : Z_STREAM_ERROR$2;
+  }
+
+  const s = strm.state;
+
+  if (!strm.output || !strm.input && strm.avail_in !== 0 || s.status === FINISH_STATE && flush !== Z_FINISH$3) {
+    return err(strm, strm.avail_out === 0 ? Z_BUF_ERROR$1 : Z_STREAM_ERROR$2);
+  }
+
+  s.strm = strm;
+  /* just in case */
+
+  const old_flush = s.last_flush;
+  s.last_flush = flush;
+  /* Write the header */
+
+  if (s.status === INIT_STATE) {
+    if (s.wrap === 2) {
+      // GZIP header
+      strm.adler = 0; //crc32(0L, Z_NULL, 0);
+
+      put_byte(s, 31);
+      put_byte(s, 139);
+      put_byte(s, 8);
+
+      if (!s.gzhead) {
+        // s->gzhead == Z_NULL
+        put_byte(s, 0);
+        put_byte(s, 0);
+        put_byte(s, 0);
+        put_byte(s, 0);
+        put_byte(s, 0);
+        put_byte(s, s.level === 9 ? 2 : s.strategy >= Z_HUFFMAN_ONLY || s.level < 2 ? 4 : 0);
+        put_byte(s, OS_CODE);
+        s.status = BUSY_STATE;
+      } else {
+        put_byte(s, (s.gzhead.text ? 1 : 0) + (s.gzhead.hcrc ? 2 : 0) + (!s.gzhead.extra ? 0 : 4) + (!s.gzhead.name ? 0 : 8) + (!s.gzhead.comment ? 0 : 16));
+        put_byte(s, s.gzhead.time & 0xff);
+        put_byte(s, s.gzhead.time >> 8 & 0xff);
+        put_byte(s, s.gzhead.time >> 16 & 0xff);
+        put_byte(s, s.gzhead.time >> 24 & 0xff);
+        put_byte(s, s.level === 9 ? 2 : s.strategy >= Z_HUFFMAN_ONLY || s.level < 2 ? 4 : 0);
+        put_byte(s, s.gzhead.os & 0xff);
+
+        if (s.gzhead.extra && s.gzhead.extra.length) {
+          put_byte(s, s.gzhead.extra.length & 0xff);
+          put_byte(s, s.gzhead.extra.length >> 8 & 0xff);
+        }
+
+        if (s.gzhead.hcrc) {
+          strm.adler = crc32_1(strm.adler, s.pending_buf, s.pending, 0);
+        }
+
+        s.gzindex = 0;
+        s.status = EXTRA_STATE;
+      }
+    } else // DEFLATE header
+      {
+        let header = Z_DEFLATED$2 + (s.w_bits - 8 << 4) << 8;
+        let level_flags = -1;
+
+        if (s.strategy >= Z_HUFFMAN_ONLY || s.level < 2) {
+          level_flags = 0;
+        } else if (s.level < 6) {
+          level_flags = 1;
+        } else if (s.level === 6) {
+          level_flags = 2;
+        } else {
+          level_flags = 3;
+        }
+
+        header |= level_flags << 6;
+
+        if (s.strstart !== 0) {
+          header |= PRESET_DICT;
+        }
+
+        header += 31 - header % 31;
+        s.status = BUSY_STATE;
+        putShortMSB(s, header);
+        /* Save the adler32 of the preset dictionary: */
+
+        if (s.strstart !== 0) {
+          putShortMSB(s, strm.adler >>> 16);
+          putShortMSB(s, strm.adler & 0xffff);
+        }
+
+        strm.adler = 1; // adler32(0L, Z_NULL, 0);
+      }
+  } //#ifdef GZIP
+
+
+  if (s.status === EXTRA_STATE) {
+    if (s.gzhead.extra
+    /* != Z_NULL*/
+    ) {
+      beg = s.pending;
+      /* start of bytes to update crc */
+
+      while (s.gzindex < (s.gzhead.extra.length & 0xffff)) {
+        if (s.pending === s.pending_buf_size) {
+          if (s.gzhead.hcrc && s.pending > beg) {
+            strm.adler = crc32_1(strm.adler, s.pending_buf, s.pending - beg, beg);
+          }
+
+          flush_pending(strm);
+          beg = s.pending;
+
+          if (s.pending === s.pending_buf_size) {
+            break;
+          }
+        }
+
+        put_byte(s, s.gzhead.extra[s.gzindex] & 0xff);
+        s.gzindex++;
+      }
+
+      if (s.gzhead.hcrc && s.pending > beg) {
+        strm.adler = crc32_1(strm.adler, s.pending_buf, s.pending - beg, beg);
+      }
+
+      if (s.gzindex === s.gzhead.extra.length) {
+        s.gzindex = 0;
+        s.status = NAME_STATE;
+      }
+    } else {
+      s.status = NAME_STATE;
+    }
+  }
+
+  if (s.status === NAME_STATE) {
+    if (s.gzhead.name
+    /* != Z_NULL*/
+    ) {
+      beg = s.pending;
+      /* start of bytes to update crc */
+      //int val;
+
+      do {
+        if (s.pending === s.pending_buf_size) {
+          if (s.gzhead.hcrc && s.pending > beg) {
+            strm.adler = crc32_1(strm.adler, s.pending_buf, s.pending - beg, beg);
+          }
+
+          flush_pending(strm);
+          beg = s.pending;
+
+          if (s.pending === s.pending_buf_size) {
+            val = 1;
+            break;
+          }
+        } // JS specific: little magic to add zero terminator to end of string
+
+
+        if (s.gzindex < s.gzhead.name.length) {
+          val = s.gzhead.name.charCodeAt(s.gzindex++) & 0xff;
+        } else {
+          val = 0;
+        }
+
+        put_byte(s, val);
+      } while (val !== 0);
+
+      if (s.gzhead.hcrc && s.pending > beg) {
+        strm.adler = crc32_1(strm.adler, s.pending_buf, s.pending - beg, beg);
+      }
+
+      if (val === 0) {
+        s.gzindex = 0;
+        s.status = COMMENT_STATE;
+      }
+    } else {
+      s.status = COMMENT_STATE;
+    }
+  }
+
+  if (s.status === COMMENT_STATE) {
+    if (s.gzhead.comment
+    /* != Z_NULL*/
+    ) {
+      beg = s.pending;
+      /* start of bytes to update crc */
+      //int val;
+
+      do {
+        if (s.pending === s.pending_buf_size) {
+          if (s.gzhead.hcrc && s.pending > beg) {
+            strm.adler = crc32_1(strm.adler, s.pending_buf, s.pending - beg, beg);
+          }
+
+          flush_pending(strm);
+          beg = s.pending;
+
+          if (s.pending === s.pending_buf_size) {
+            val = 1;
+            break;
+          }
+        } // JS specific: little magic to add zero terminator to end of string
+
+
+        if (s.gzindex < s.gzhead.comment.length) {
+          val = s.gzhead.comment.charCodeAt(s.gzindex++) & 0xff;
+        } else {
+          val = 0;
+        }
+
+        put_byte(s, val);
+      } while (val !== 0);
+
+      if (s.gzhead.hcrc && s.pending > beg) {
+        strm.adler = crc32_1(strm.adler, s.pending_buf, s.pending - beg, beg);
+      }
+
+      if (val === 0) {
+        s.status = HCRC_STATE;
+      }
+    } else {
+      s.status = HCRC_STATE;
+    }
+  }
+
+  if (s.status === HCRC_STATE) {
+    if (s.gzhead.hcrc) {
+      if (s.pending + 2 > s.pending_buf_size) {
+        flush_pending(strm);
+      }
+
+      if (s.pending + 2 <= s.pending_buf_size) {
+        put_byte(s, strm.adler & 0xff);
+        put_byte(s, strm.adler >> 8 & 0xff);
+        strm.adler = 0; //crc32(0L, Z_NULL, 0);
+
+        s.status = BUSY_STATE;
+      }
+    } else {
+      s.status = BUSY_STATE;
+    }
+  } //#endif
+
+  /* Flush as much pending output as possible */
+
+
+  if (s.pending !== 0) {
+    flush_pending(strm);
+
+    if (strm.avail_out === 0) {
+      /* Since avail_out is 0, deflate will be called again with
+       * more output space, but possibly with both pending and
+       * avail_in equal to zero. There won't be anything to do,
+       * but this is not an error situation so make sure we
+       * return OK instead of BUF_ERROR at next call of deflate:
+       */
+      s.last_flush = -1;
+      return Z_OK$3;
+    }
+    /* Make sure there is something to do and avoid duplicate consecutive
+     * flushes. For repeated and useless calls with Z_FINISH, we keep
+     * returning Z_STREAM_END instead of Z_BUF_ERROR.
+     */
+
+  } else if (strm.avail_in === 0 && rank(flush) <= rank(old_flush) && flush !== Z_FINISH$3) {
+    return err(strm, Z_BUF_ERROR$1);
+  }
+  /* User must not provide more input after the first FINISH: */
+
+
+  if (s.status === FINISH_STATE && strm.avail_in !== 0) {
+    return err(strm, Z_BUF_ERROR$1);
+  }
+  /* Start a new block or continue the current one.
+   */
+
+
+  if (strm.avail_in !== 0 || s.lookahead !== 0 || flush !== Z_NO_FLUSH$2 && s.status !== FINISH_STATE) {
+    let bstate = s.strategy === Z_HUFFMAN_ONLY ? deflate_huff(s, flush) : s.strategy === Z_RLE ? deflate_rle(s, flush) : configuration_table[s.level].func(s, flush);
+
+    if (bstate === BS_FINISH_STARTED || bstate === BS_FINISH_DONE) {
+      s.status = FINISH_STATE;
+    }
+
+    if (bstate === BS_NEED_MORE || bstate === BS_FINISH_STARTED) {
+      if (strm.avail_out === 0) {
+        s.last_flush = -1;
+        /* avoid BUF_ERROR next call, see above */
+      }
+
+      return Z_OK$3;
+      /* If flush != Z_NO_FLUSH && avail_out == 0, the next call
+       * of deflate should use the same flush parameter to make sure
+       * that the flush is complete. So we don't have to output an
+       * empty block here, this will be done at next call. This also
+       * ensures that for a very small output buffer, we emit at most
+       * one empty block.
+       */
+    }
+
+    if (bstate === BS_BLOCK_DONE) {
+      if (flush === Z_PARTIAL_FLUSH) {
+        _tr_align(s);
+      } else if (flush !== Z_BLOCK$1) {
+        /* FULL_FLUSH or SYNC_FLUSH */
+        _tr_stored_block(s, 0, 0, false);
+        /* For a full flush, this empty block will be recognized
+         * as a special marker by inflate_sync().
+         */
+
+
+        if (flush === Z_FULL_FLUSH$1) {
+          /*** CLEAR_HASH(s); ***/
+
+          /* forget history */
+          zero(s.head); // Fill with NIL (= 0);
+
+          if (s.lookahead === 0) {
+            s.strstart = 0;
+            s.block_start = 0;
+            s.insert = 0;
+          }
+        }
+      }
+
+      flush_pending(strm);
+
+      if (strm.avail_out === 0) {
+        s.last_flush = -1;
+        /* avoid BUF_ERROR at next call, see above */
+
+        return Z_OK$3;
+      }
+    }
+  } //Assert(strm->avail_out > 0, "bug2");
+  //if (strm.avail_out <= 0) { throw new Error("bug2");}
+
+
+  if (flush !== Z_FINISH$3) {
+    return Z_OK$3;
+  }
+
+  if (s.wrap <= 0) {
+    return Z_STREAM_END$3;
+  }
+  /* Write the trailer */
+
+
+  if (s.wrap === 2) {
+    put_byte(s, strm.adler & 0xff);
+    put_byte(s, strm.adler >> 8 & 0xff);
+    put_byte(s, strm.adler >> 16 & 0xff);
+    put_byte(s, strm.adler >> 24 & 0xff);
+    put_byte(s, strm.total_in & 0xff);
+    put_byte(s, strm.total_in >> 8 & 0xff);
+    put_byte(s, strm.total_in >> 16 & 0xff);
+    put_byte(s, strm.total_in >> 24 & 0xff);
+  } else {
+    putShortMSB(s, strm.adler >>> 16);
+    putShortMSB(s, strm.adler & 0xffff);
+  }
+
+  flush_pending(strm);
+  /* If avail_out is zero, the application will call deflate again
+   * to flush the rest.
+   */
+
+  if (s.wrap > 0) {
+    s.wrap = -s.wrap;
+  }
+  /* write the trailer only once! */
+
+
+  return s.pending !== 0 ? Z_OK$3 : Z_STREAM_END$3;
+};
+
+const deflateEnd = strm => {
+  if (!strm
+  /*== Z_NULL*/
+  || !strm.state
+  /*== Z_NULL*/
+  ) {
+    return Z_STREAM_ERROR$2;
+  }
+
+  const status = strm.state.status;
+
+  if (status !== INIT_STATE && status !== EXTRA_STATE && status !== NAME_STATE && status !== COMMENT_STATE && status !== HCRC_STATE && status !== BUSY_STATE && status !== FINISH_STATE) {
+    return err(strm, Z_STREAM_ERROR$2);
+  }
+
+  strm.state = null;
+  return status === BUSY_STATE ? err(strm, Z_DATA_ERROR$2) : Z_OK$3;
+};
+/* =========================================================================
+ * Initializes the compression dictionary from the given byte
+ * sequence without producing any compressed output.
+ */
+
+
+const deflateSetDictionary = (strm, dictionary) => {
+  let dictLength = dictionary.length;
+
+  if (!strm
+  /*== Z_NULL*/
+  || !strm.state
+  /*== Z_NULL*/
+  ) {
+    return Z_STREAM_ERROR$2;
+  }
+
+  const s = strm.state;
+  const wrap = s.wrap;
+
+  if (wrap === 2 || wrap === 1 && s.status !== INIT_STATE || s.lookahead) {
+    return Z_STREAM_ERROR$2;
+  }
+  /* when using zlib wrappers, compute Adler-32 for provided dictionary */
+
+
+  if (wrap === 1) {
+    /* adler32(strm->adler, dictionary, dictLength); */
+    strm.adler = adler32_1(strm.adler, dictionary, dictLength, 0);
+  }
+
+  s.wrap = 0;
+  /* avoid computing Adler-32 in read_buf */
+
+  /* if dictionary would fill window, just replace the history */
+
+  if (dictLength >= s.w_size) {
+    if (wrap === 0) {
+      /* already empty otherwise */
+
+      /*** CLEAR_HASH(s); ***/
+      zero(s.head); // Fill with NIL (= 0);
+
+      s.strstart = 0;
+      s.block_start = 0;
+      s.insert = 0;
+    }
+    /* use the tail */
+    // dictionary = dictionary.slice(dictLength - s.w_size);
+
+
+    let tmpDict = new Uint8Array(s.w_size);
+    tmpDict.set(dictionary.subarray(dictLength - s.w_size, dictLength), 0);
+    dictionary = tmpDict;
+    dictLength = s.w_size;
+  }
+  /* insert dictionary into window and hash */
+
+
+  const avail = strm.avail_in;
+  const next = strm.next_in;
+  const input = strm.input;
+  strm.avail_in = dictLength;
+  strm.next_in = 0;
+  strm.input = dictionary;
+  fill_window(s);
+
+  while (s.lookahead >= MIN_MATCH) {
+    let str = s.strstart;
+    let n = s.lookahead - (MIN_MATCH - 1);
+
+    do {
+      /* UPDATE_HASH(s, s->ins_h, s->window[str + MIN_MATCH-1]); */
+      s.ins_h = HASH(s, s.ins_h, s.window[str + MIN_MATCH - 1]);
+      s.prev[str & s.w_mask] = s.head[s.ins_h];
+      s.head[s.ins_h] = str;
+      str++;
+    } while (--n);
+
+    s.strstart = str;
+    s.lookahead = MIN_MATCH - 1;
+    fill_window(s);
+  }
+
+  s.strstart += s.lookahead;
+  s.block_start = s.strstart;
+  s.insert = s.lookahead;
+  s.lookahead = 0;
+  s.match_length = s.prev_length = MIN_MATCH - 1;
+  s.match_available = 0;
+  strm.next_in = next;
+  strm.input = input;
+  strm.avail_in = avail;
+  s.wrap = wrap;
+  return Z_OK$3;
+};
+
+var deflateInit_1 = deflateInit;
+var deflateInit2_1 = deflateInit2;
+var deflateReset_1 = deflateReset;
+var deflateResetKeep_1 = deflateResetKeep;
+var deflateSetHeader_1 = deflateSetHeader;
+var deflate_2$1 = deflate$2;
+var deflateEnd_1 = deflateEnd;
+var deflateSetDictionary_1 = deflateSetDictionary;
+var deflateInfo = 'pako deflate (from Nodeca project)';
+/* Not implemented
+module.exports.deflateBound = deflateBound;
+module.exports.deflateCopy = deflateCopy;
+module.exports.deflateParams = deflateParams;
+module.exports.deflatePending = deflatePending;
+module.exports.deflatePrime = deflatePrime;
+module.exports.deflateTune = deflateTune;
+*/
+
+var deflate_1$2 = {
+  deflateInit: deflateInit_1,
+  deflateInit2: deflateInit2_1,
+  deflateReset: deflateReset_1,
+  deflateResetKeep: deflateResetKeep_1,
+  deflateSetHeader: deflateSetHeader_1,
+  deflate: deflate_2$1,
+  deflateEnd: deflateEnd_1,
+  deflateSetDictionary: deflateSetDictionary_1,
+  deflateInfo: deflateInfo
+};
+
+const _has = (obj, key) => {
+  return Object.prototype.hasOwnProperty.call(obj, key);
+};
+
+var assign = function (obj
+/*from1, from2, from3, ...*/
+) {
+  const sources = Array.prototype.slice.call(arguments, 1);
+
+  while (sources.length) {
+    const source = sources.shift();
+
+    if (!source) {
+      continue;
+    }
+
+    if (typeof source !== 'object') {
+      throw new TypeError(source + 'must be non-object');
+    }
+
+    for (const p in source) {
+      if (_has(source, p)) {
+        obj[p] = source[p];
+      }
+    }
+  }
+
+  return obj;
+}; // Join array of chunks to single array.
+
+
+var flattenChunks = chunks => {
+  // calculate data length
+  let len = 0;
+
+  for (let i = 0, l = chunks.length; i < l; i++) {
+    len += chunks[i].length;
+  } // join chunks
+
+
+  const result = new Uint8Array(len);
+
+  for (let i = 0, pos = 0, l = chunks.length; i < l; i++) {
+    let chunk = chunks[i];
+    result.set(chunk, pos);
+    pos += chunk.length;
+  }
+
+  return result;
+};
+
+var common = {
+  assign: assign,
+  flattenChunks: flattenChunks
+}; // String encode/decode helpers
+// Quick check if we can use fast array to bin string conversion
+//
+// - apply(Array) can fail on Android 2.2
+// - apply(Uint8Array) can fail on iOS 5.1 Safari
+//
+
+let STR_APPLY_UIA_OK = true;
+
+try {
+  String.fromCharCode.apply(null, new Uint8Array(1));
+} catch (__) {
+  STR_APPLY_UIA_OK = false;
+} // Table with utf8 lengths (calculated by first byte of sequence)
+// Note, that 5 & 6-byte values and some 4-byte values can not be represented in JS,
+// because max possible codepoint is 0x10ffff
+
+
+const _utf8len = new Uint8Array(256);
+
+for (let q = 0; q < 256; q++) {
+  _utf8len[q] = q >= 252 ? 6 : q >= 248 ? 5 : q >= 240 ? 4 : q >= 224 ? 3 : q >= 192 ? 2 : 1;
+}
+
+_utf8len[254] = _utf8len[254] = 1; // Invalid sequence start
+// convert string to array (typed, when possible)
+
+var string2buf = str => {
+  if (typeof TextEncoder === 'function' && TextEncoder.prototype.encode) {
+    return new TextEncoder().encode(str);
+  }
+
+  let buf,
+      c,
+      c2,
+      m_pos,
+      i,
+      str_len = str.length,
+      buf_len = 0; // count binary size
+
+  for (m_pos = 0; m_pos < str_len; m_pos++) {
+    c = str.charCodeAt(m_pos);
+
+    if ((c & 0xfc00) === 0xd800 && m_pos + 1 < str_len) {
+      c2 = str.charCodeAt(m_pos + 1);
+
+      if ((c2 & 0xfc00) === 0xdc00) {
+        c = 0x10000 + (c - 0xd800 << 10) + (c2 - 0xdc00);
+        m_pos++;
+      }
+    }
+
+    buf_len += c < 0x80 ? 1 : c < 0x800 ? 2 : c < 0x10000 ? 3 : 4;
+  } // allocate buffer
+
+
+  buf = new Uint8Array(buf_len); // convert
+
+  for (i = 0, m_pos = 0; i < buf_len; m_pos++) {
+    c = str.charCodeAt(m_pos);
+
+    if ((c & 0xfc00) === 0xd800 && m_pos + 1 < str_len) {
+      c2 = str.charCodeAt(m_pos + 1);
+
+      if ((c2 & 0xfc00) === 0xdc00) {
+        c = 0x10000 + (c - 0xd800 << 10) + (c2 - 0xdc00);
+        m_pos++;
+      }
+    }
+
+    if (c < 0x80) {
+      /* one byte */
+      buf[i++] = c;
+    } else if (c < 0x800) {
+      /* two bytes */
+      buf[i++] = 0xC0 | c >>> 6;
+      buf[i++] = 0x80 | c & 0x3f;
+    } else if (c < 0x10000) {
+      /* three bytes */
+      buf[i++] = 0xE0 | c >>> 12;
+      buf[i++] = 0x80 | c >>> 6 & 0x3f;
+      buf[i++] = 0x80 | c & 0x3f;
+    } else {
+      /* four bytes */
+      buf[i++] = 0xf0 | c >>> 18;
+      buf[i++] = 0x80 | c >>> 12 & 0x3f;
+      buf[i++] = 0x80 | c >>> 6 & 0x3f;
+      buf[i++] = 0x80 | c & 0x3f;
+    }
+  }
+
+  return buf;
+}; // Helper
+
+
+const buf2binstring = (buf, len) => {
+  // On Chrome, the arguments in a function call that are allowed is `65534`.
+  // If the length of the buffer is smaller than that, we can use this optimization,
+  // otherwise we will take a slower path.
+  if (len < 65534) {
+    if (buf.subarray && STR_APPLY_UIA_OK) {
+      return String.fromCharCode.apply(null, buf.length === len ? buf : buf.subarray(0, len));
+    }
+  }
+
+  let result = '';
+
+  for (let i = 0; i < len; i++) {
+    result += String.fromCharCode(buf[i]);
+  }
+
+  return result;
+}; // convert array to string
+
+
+var buf2string = (buf, max) => {
+  const len = max || buf.length;
+
+  if (typeof TextDecoder === 'function' && TextDecoder.prototype.decode) {
+    return new TextDecoder().decode(buf.subarray(0, max));
+  }
+
+  let i, out; // Reserve max possible length (2 words per char)
+  // NB: by unknown reasons, Array is significantly faster for
+  //     String.fromCharCode.apply than Uint16Array.
+
+  const utf16buf = new Array(len * 2);
+
+  for (out = 0, i = 0; i < len;) {
+    let c = buf[i++]; // quick process ascii
+
+    if (c < 0x80) {
+      utf16buf[out++] = c;
+      continue;
+    }
+
+    let c_len = _utf8len[c]; // skip 5 & 6 byte codes
+
+    if (c_len > 4) {
+      utf16buf[out++] = 0xfffd;
+      i += c_len - 1;
+      continue;
+    } // apply mask on first byte
+
+
+    c &= c_len === 2 ? 0x1f : c_len === 3 ? 0x0f : 0x07; // join the rest
+
+    while (c_len > 1 && i < len) {
+      c = c << 6 | buf[i++] & 0x3f;
+      c_len--;
+    } // terminated by end of string?
+
+
+    if (c_len > 1) {
+      utf16buf[out++] = 0xfffd;
+      continue;
+    }
+
+    if (c < 0x10000) {
+      utf16buf[out++] = c;
+    } else {
+      c -= 0x10000;
+      utf16buf[out++] = 0xd800 | c >> 10 & 0x3ff;
+      utf16buf[out++] = 0xdc00 | c & 0x3ff;
+    }
+  }
+
+  return buf2binstring(utf16buf, out);
+}; // Calculate max possible position in utf8 buffer,
+// that will not break sequence. If that's not possible
+// - (very small limits) return max size as is.
+//
+// buf[] - utf8 bytes array
+// max   - length limit (mandatory);
+
+
+var utf8border = (buf, max) => {
+  max = max || buf.length;
+
+  if (max > buf.length) {
+    max = buf.length;
+  } // go back from last position, until start of sequence found
+
+
+  let pos = max - 1;
+
+  while (pos >= 0 && (buf[pos] & 0xC0) === 0x80) {
+    pos--;
+  } // Very small and broken sequence,
+  // return max, because we should return something anyway.
+
+
+  if (pos < 0) {
+    return max;
+  } // If we came to start of buffer - that means buffer is too small,
+  // return max too.
+
+
+  if (pos === 0) {
+    return max;
+  }
+
+  return pos + _utf8len[buf[pos]] > max ? pos : max;
+};
+
+var strings = {
+  string2buf: string2buf,
+  buf2string: buf2string,
+  utf8border: utf8border
+}; // (C) 1995-2013 Jean-loup Gailly and Mark Adler
+// (C) 2014-2017 Vitaly Puzrin and Andrey Tupitsin
+//
+// This software is provided 'as-is', without any express or implied
+// warranty. In no event will the authors be held liable for any damages
+// arising from the use of this software.
+//
+// Permission is granted to anyone to use this software for any purpose,
+// including commercial applications, and to alter it and redistribute it
+// freely, subject to the following restrictions:
+//
+// 1. The origin of this software must not be misrepresented; you must not
+//   claim that you wrote the original software. If you use this software
+//   in a product, an acknowledgment in the product documentation would be
+//   appreciated but is not required.
+// 2. Altered source versions must be plainly marked as such, and must not be
+//   misrepresented as being the original software.
+// 3. This notice may not be removed or altered from any source distribution.
+
+function ZStream() {
+  /* next input byte */
+  this.input = null; // JS specific, because we have no pointers
+
+  this.next_in = 0;
+  /* number of bytes available at input */
+
+  this.avail_in = 0;
+  /* total number of input bytes read so far */
+
+  this.total_in = 0;
+  /* next output byte should be put there */
+
+  this.output = null; // JS specific, because we have no pointers
+
+  this.next_out = 0;
+  /* remaining free space at output */
+
+  this.avail_out = 0;
+  /* total number of bytes output so far */
+
+  this.total_out = 0;
+  /* last error message, NULL if no error */
+
+  this.msg = ''
+  /*Z_NULL*/
+  ;
+  /* not visible by applications */
+
+  this.state = null;
+  /* best guess about the data type: binary or text */
+
+  this.data_type = 2
+  /*Z_UNKNOWN*/
+  ;
+  /* adler32 value of the uncompressed data */
+
+  this.adler = 0;
+}
+
+var zstream = ZStream;
+const toString$1 = Object.prototype.toString;
+/* Public constants ==========================================================*/
+
+/* ===========================================================================*/
+
+const {
+  Z_NO_FLUSH: Z_NO_FLUSH$1,
+  Z_SYNC_FLUSH,
+  Z_FULL_FLUSH,
+  Z_FINISH: Z_FINISH$2,
+  Z_OK: Z_OK$2,
+  Z_STREAM_END: Z_STREAM_END$2,
+  Z_DEFAULT_COMPRESSION,
+  Z_DEFAULT_STRATEGY,
+  Z_DEFLATED: Z_DEFLATED$1
+} = constants$2;
+/* ===========================================================================*/
+
+/**
+ * class Deflate
+ *
+ * Generic JS-style wrapper for zlib calls. If you don't need
+ * streaming behaviour - use more simple functions: [[deflate]],
+ * [[deflateRaw]] and [[gzip]].
+ **/
+
+/* internal
+ * Deflate.chunks -> Array
+ *
+ * Chunks of output data, if [[Deflate#onData]] not overridden.
+ **/
+
+/**
+ * Deflate.result -> Uint8Array
+ *
+ * Compressed result, generated by default [[Deflate#onData]]
+ * and [[Deflate#onEnd]] handlers. Filled after you push last chunk
+ * (call [[Deflate#push]] with `Z_FINISH` / `true` param).
+ **/
+
+/**
+ * Deflate.err -> Number
+ *
+ * Error code after deflate finished. 0 (Z_OK) on success.
+ * You will not need it in real life, because deflate errors
+ * are possible only on wrong options or bad `onData` / `onEnd`
+ * custom handlers.
+ **/
+
+/**
+ * Deflate.msg -> String
+ *
+ * Error message, if [[Deflate.err]] != 0
+ **/
+
+/**
+ * new Deflate(options)
+ * - options (Object): zlib deflate options.
+ *
+ * Creates new deflator instance with specified params. Throws exception
+ * on bad params. Supported options:
+ *
+ * - `level`
+ * - `windowBits`
+ * - `memLevel`
+ * - `strategy`
+ * - `dictionary`
+ *
+ * [http://zlib.net/manual.html#Advanced](http://zlib.net/manual.html#Advanced)
+ * for more information on these.
+ *
+ * Additional options, for internal needs:
+ *
+ * - `chunkSize` - size of generated data chunks (16K by default)
+ * - `raw` (Boolean) - do raw deflate
+ * - `gzip` (Boolean) - create gzip wrapper
+ * - `header` (Object) - custom header for gzip
+ *   - `text` (Boolean) - true if compressed data believed to be text
+ *   - `time` (Number) - modification time, unix timestamp
+ *   - `os` (Number) - operation system code
+ *   - `extra` (Array) - array of bytes with extra data (max 65536)
+ *   - `name` (String) - file name (binary string)
+ *   - `comment` (String) - comment (binary string)
+ *   - `hcrc` (Boolean) - true if header crc should be added
+ *
+ * ##### Example:
+ *
+ * ```javascript
+ * const pako = require('pako')
+ *   , chunk1 = new Uint8Array([1,2,3,4,5,6,7,8,9])
+ *   , chunk2 = new Uint8Array([10,11,12,13,14,15,16,17,18,19]);
+ *
+ * const deflate = new pako.Deflate({ level: 3});
+ *
+ * deflate.push(chunk1, false);
+ * deflate.push(chunk2, true);  // true -> last chunk
+ *
+ * if (deflate.err) { throw new Error(deflate.err); }
+ *
+ * console.log(deflate.result);
+ * ```
+ **/
+
+function Deflate$1(options) {
+  this.options = common.assign({
+    level: Z_DEFAULT_COMPRESSION,
+    method: Z_DEFLATED$1,
+    chunkSize: 16384,
+    windowBits: 15,
+    memLevel: 8,
+    strategy: Z_DEFAULT_STRATEGY
+  }, options || {});
+  let opt = this.options;
+
+  if (opt.raw && opt.windowBits > 0) {
+    opt.windowBits = -opt.windowBits;
+  } else if (opt.gzip && opt.windowBits > 0 && opt.windowBits < 16) {
+    opt.windowBits += 16;
+  }
+
+  this.err = 0; // error code, if happens (0 = Z_OK)
+
+  this.msg = ''; // error message
+
+  this.ended = false; // used to avoid multiple onEnd() calls
+
+  this.chunks = []; // chunks of compressed data
+
+  this.strm = new zstream();
+  this.strm.avail_out = 0;
+  let status = deflate_1$2.deflateInit2(this.strm, opt.level, opt.method, opt.windowBits, opt.memLevel, opt.strategy);
+
+  if (status !== Z_OK$2) {
+    throw new Error(messages[status]);
+  }
+
+  if (opt.header) {
+    deflate_1$2.deflateSetHeader(this.strm, opt.header);
+  }
+
+  if (opt.dictionary) {
+    let dict; // Convert data if needed
+
+    if (typeof opt.dictionary === 'string') {
+      // If we need to compress text, change encoding to utf8.
+      dict = strings.string2buf(opt.dictionary);
+    } else if (toString$1.call(opt.dictionary) === '[object ArrayBuffer]') {
+      dict = new Uint8Array(opt.dictionary);
+    } else {
+      dict = opt.dictionary;
+    }
+
+    status = deflate_1$2.deflateSetDictionary(this.strm, dict);
+
+    if (status !== Z_OK$2) {
+      throw new Error(messages[status]);
+    }
+
+    this._dict_set = true;
+  }
+}
+/**
+ * Deflate#push(data[, flush_mode]) -> Boolean
+ * - data (Uint8Array|ArrayBuffer|String): input data. Strings will be
+ *   converted to utf8 byte sequence.
+ * - flush_mode (Number|Boolean): 0..6 for corresponding Z_NO_FLUSH..Z_TREE modes.
+ *   See constants. Skipped or `false` means Z_NO_FLUSH, `true` means Z_FINISH.
+ *
+ * Sends input data to deflate pipe, generating [[Deflate#onData]] calls with
+ * new compressed chunks. Returns `true` on success. The last data block must
+ * have `flush_mode` Z_FINISH (or `true`). That will flush internal pending
+ * buffers and call [[Deflate#onEnd]].
+ *
+ * On fail call [[Deflate#onEnd]] with error code and return false.
+ *
+ * ##### Example
+ *
+ * ```javascript
+ * push(chunk, false); // push one of data chunks
+ * ...
+ * push(chunk, true);  // push last chunk
+ * ```
+ **/
+
+
+Deflate$1.prototype.push = function (data, flush_mode) {
+  const strm = this.strm;
+  const chunkSize = this.options.chunkSize;
+
+  let status, _flush_mode;
+
+  if (this.ended) {
+    return false;
+  }
+
+  if (flush_mode === ~~flush_mode) _flush_mode = flush_mode;else _flush_mode = flush_mode === true ? Z_FINISH$2 : Z_NO_FLUSH$1; // Convert data if needed
+
+  if (typeof data === 'string') {
+    // If we need to compress text, change encoding to utf8.
+    strm.input = strings.string2buf(data);
+  } else if (toString$1.call(data) === '[object ArrayBuffer]') {
+    strm.input = new Uint8Array(data);
+  } else {
+    strm.input = data;
+  }
+
+  strm.next_in = 0;
+  strm.avail_in = strm.input.length;
+
+  for (;;) {
+    if (strm.avail_out === 0) {
+      strm.output = new Uint8Array(chunkSize);
+      strm.next_out = 0;
+      strm.avail_out = chunkSize;
+    } // Make sure avail_out > 6 to avoid repeating markers
+
+
+    if ((_flush_mode === Z_SYNC_FLUSH || _flush_mode === Z_FULL_FLUSH) && strm.avail_out <= 6) {
+      this.onData(strm.output.subarray(0, strm.next_out));
+      strm.avail_out = 0;
+      continue;
+    }
+
+    status = deflate_1$2.deflate(strm, _flush_mode); // Ended => flush and finish
+
+    if (status === Z_STREAM_END$2) {
+      if (strm.next_out > 0) {
+        this.onData(strm.output.subarray(0, strm.next_out));
+      }
+
+      status = deflate_1$2.deflateEnd(this.strm);
+      this.onEnd(status);
+      this.ended = true;
+      return status === Z_OK$2;
+    } // Flush if out buffer full
+
+
+    if (strm.avail_out === 0) {
+      this.onData(strm.output);
+      continue;
+    } // Flush if requested and has data
+
+
+    if (_flush_mode > 0 && strm.next_out > 0) {
+      this.onData(strm.output.subarray(0, strm.next_out));
+      strm.avail_out = 0;
+      continue;
+    }
+
+    if (strm.avail_in === 0) break;
+  }
+
+  return true;
+};
+/**
+ * Deflate#onData(chunk) -> Void
+ * - chunk (Uint8Array): output data.
+ *
+ * By default, stores data blocks in `chunks[]` property and glue
+ * those in `onEnd`. Override this handler, if you need another behaviour.
+ **/
+
+
+Deflate$1.prototype.onData = function (chunk) {
+  this.chunks.push(chunk);
+};
+/**
+ * Deflate#onEnd(status) -> Void
+ * - status (Number): deflate status. 0 (Z_OK) on success,
+ *   other if not.
+ *
+ * Called once after you tell deflate that the input stream is
+ * complete (Z_FINISH). By default - join collected chunks,
+ * free memory and fill `results` / `err` properties.
+ **/
+
+
+Deflate$1.prototype.onEnd = function (status) {
+  // On success - join
+  if (status === Z_OK$2) {
+    this.result = common.flattenChunks(this.chunks);
+  }
+
+  this.chunks = [];
+  this.err = status;
+  this.msg = this.strm.msg;
+};
+/**
+ * deflate(data[, options]) -> Uint8Array
+ * - data (Uint8Array|String): input data to compress.
+ * - options (Object): zlib deflate options.
+ *
+ * Compress `data` with deflate algorithm and `options`.
+ *
+ * Supported options are:
+ *
+ * - level
+ * - windowBits
+ * - memLevel
+ * - strategy
+ * - dictionary
+ *
+ * [http://zlib.net/manual.html#Advanced](http://zlib.net/manual.html#Advanced)
+ * for more information on these.
+ *
+ * Sugar (options):
+ *
+ * - `raw` (Boolean) - say that we work with raw stream, if you don't wish to specify
+ *   negative windowBits implicitly.
+ *
+ * ##### Example:
+ *
+ * ```javascript
+ * const pako = require('pako')
+ * const data = new Uint8Array([1,2,3,4,5,6,7,8,9]);
+ *
+ * console.log(pako.deflate(data));
+ * ```
+ **/
+
+
+function deflate$1(input, options) {
+  const deflator = new Deflate$1(options);
+  deflator.push(input, true); // That will never happens, if you don't cheat with options :)
+
+  if (deflator.err) {
+    throw deflator.msg || messages[deflator.err];
+  }
+
+  return deflator.result;
+}
+/**
+ * deflateRaw(data[, options]) -> Uint8Array
+ * - data (Uint8Array|String): input data to compress.
+ * - options (Object): zlib deflate options.
+ *
+ * The same as [[deflate]], but creates raw data, without wrapper
+ * (header and adler32 crc).
+ **/
+
+
+function deflateRaw$1(input, options) {
+  options = options || {};
+  options.raw = true;
+  return deflate$1(input, options);
+}
+/**
+ * gzip(data[, options]) -> Uint8Array
+ * - data (Uint8Array|String): input data to compress.
+ * - options (Object): zlib deflate options.
+ *
+ * The same as [[deflate]], but create gzip wrapper instead of
+ * deflate one.
+ **/
+
+
+function gzip$1(input, options) {
+  options = options || {};
+  options.gzip = true;
+  return deflate$1(input, options);
+}
+
+var Deflate_1$1 = Deflate$1;
+var deflate_2 = deflate$1;
+var deflateRaw_1$1 = deflateRaw$1;
+var gzip_1$1 = gzip$1;
+var constants$1 = constants$2;
+var deflate_1$1 = {
+  Deflate: Deflate_1$1,
+  deflate: deflate_2,
+  deflateRaw: deflateRaw_1$1,
+  gzip: gzip_1$1,
+  constants: constants$1
+}; // (C) 1995-2013 Jean-loup Gailly and Mark Adler
+// (C) 2014-2017 Vitaly Puzrin and Andrey Tupitsin
+//
+// This software is provided 'as-is', without any express or implied
+// warranty. In no event will the authors be held liable for any damages
+// arising from the use of this software.
+//
+// Permission is granted to anyone to use this software for any purpose,
+// including commercial applications, and to alter it and redistribute it
+// freely, subject to the following restrictions:
+//
+// 1. The origin of this software must not be misrepresented; you must not
+//   claim that you wrote the original software. If you use this software
+//   in a product, an acknowledgment in the product documentation would be
+//   appreciated but is not required.
+// 2. Altered source versions must be plainly marked as such, and must not be
+//   misrepresented as being the original software.
+// 3. This notice may not be removed or altered from any source distribution.
+// See state defs from inflate.js
+
+const BAD$1 = 30;
+/* got a data error -- remain here until reset */
+
+const TYPE$1 = 12;
+/* i: waiting for type bits, including last-flag bit */
+
+/*
+   Decode literal, length, and distance codes and write out the resulting
+   literal and match bytes until either not enough input or output is
+   available, an end-of-block is encountered, or a data error is encountered.
+   When large enough input and output buffers are supplied to inflate(), for
+   example, a 16K input buffer and a 64K output buffer, more than 95% of the
+   inflate execution time is spent in this routine.
+
+   Entry assumptions:
+
+        state.mode === LEN
+        strm.avail_in >= 6
+        strm.avail_out >= 258
+        start >= strm.avail_out
+        state.bits < 8
+
+   On return, state.mode is one of:
+
+        LEN -- ran out of enough output space or enough available input
+        TYPE -- reached end of block code, inflate() to interpret next block
+        BAD -- error in block data
+
+   Notes:
+
+    - The maximum input bits used by a length/distance pair is 15 bits for the
+      length code, 5 bits for the length extra, 15 bits for the distance code,
+      and 13 bits for the distance extra.  This totals 48 bits, or six bytes.
+      Therefore if strm.avail_in >= 6, then there is enough input to avoid
+      checking for available input while decoding.
+
+    - The maximum bytes that a single length/distance pair can output is 258
+      bytes, which is the maximum length that can be coded.  inflate_fast()
+      requires strm.avail_out >= 258 for each loop to avoid checking for
+      output space.
+ */
+
+var inffast = function inflate_fast(strm, start) {
+  let _in;
+  /* local strm.input */
+
+
+  let last;
+  /* have enough input while in < last */
+
+  let _out;
+  /* local strm.output */
+
+
+  let beg;
+  /* inflate()'s initial strm.output */
+
+  let end;
+  /* while out < end, enough space available */
+  //#ifdef INFLATE_STRICT
+
+  let dmax;
+  /* maximum distance from zlib header */
+  //#endif
+
+  let wsize;
+  /* window size or zero if not using window */
+
+  let whave;
+  /* valid bytes in the window */
+
+  let wnext;
+  /* window write index */
+  // Use `s_window` instead `window`, avoid conflict with instrumentation tools
+
+  let s_window;
+  /* allocated sliding window, if wsize != 0 */
+
+  let hold;
+  /* local strm.hold */
+
+  let bits;
+  /* local strm.bits */
+
+  let lcode;
+  /* local strm.lencode */
+
+  let dcode;
+  /* local strm.distcode */
+
+  let lmask;
+  /* mask for first level of length codes */
+
+  let dmask;
+  /* mask for first level of distance codes */
+
+  let here;
+  /* retrieved table entry */
+
+  let op;
+  /* code bits, operation, extra bits, or */
+
+  /*  window position, window bytes to copy */
+
+  let len;
+  /* match length, unused bytes */
+
+  let dist;
+  /* match distance */
+
+  let from;
+  /* where to copy match from */
+
+  let from_source;
+  let input, output; // JS specific, because we have no pointers
+
+  /* copy state to local variables */
+
+  const state = strm.state; //here = state.here;
+
+  _in = strm.next_in;
+  input = strm.input;
+  last = _in + (strm.avail_in - 5);
+  _out = strm.next_out;
+  output = strm.output;
+  beg = _out - (start - strm.avail_out);
+  end = _out + (strm.avail_out - 257); //#ifdef INFLATE_STRICT
+
+  dmax = state.dmax; //#endif
+
+  wsize = state.wsize;
+  whave = state.whave;
+  wnext = state.wnext;
+  s_window = state.window;
+  hold = state.hold;
+  bits = state.bits;
+  lcode = state.lencode;
+  dcode = state.distcode;
+  lmask = (1 << state.lenbits) - 1;
+  dmask = (1 << state.distbits) - 1;
+  /* decode literals and length/distances until end-of-block or not enough
+     input data or output space */
+
+  top: do {
+    if (bits < 15) {
+      hold += input[_in++] << bits;
+      bits += 8;
+      hold += input[_in++] << bits;
+      bits += 8;
+    }
+
+    here = lcode[hold & lmask];
+
+    dolen: for (;;) {
+      // Goto emulation
+      op = here >>> 24
+      /*here.bits*/
+      ;
+      hold >>>= op;
+      bits -= op;
+      op = here >>> 16 & 0xff
+      /*here.op*/
+      ;
+
+      if (op === 0) {
+        /* literal */
+        //Tracevv((stderr, here.val >= 0x20 && here.val < 0x7f ?
+        //        "inflate:         literal '%c'\n" :
+        //        "inflate:         literal 0x%02x\n", here.val));
+        output[_out++] = here & 0xffff
+        /*here.val*/
+        ;
+      } else if (op & 16) {
+        /* length base */
+        len = here & 0xffff
+        /*here.val*/
+        ;
+        op &= 15;
+        /* number of extra bits */
+
+        if (op) {
+          if (bits < op) {
+            hold += input[_in++] << bits;
+            bits += 8;
+          }
+
+          len += hold & (1 << op) - 1;
+          hold >>>= op;
+          bits -= op;
+        } //Tracevv((stderr, "inflate:         length %u\n", len));
+
+
+        if (bits < 15) {
+          hold += input[_in++] << bits;
+          bits += 8;
+          hold += input[_in++] << bits;
+          bits += 8;
+        }
+
+        here = dcode[hold & dmask];
+
+        dodist: for (;;) {
+          // goto emulation
+          op = here >>> 24
+          /*here.bits*/
+          ;
+          hold >>>= op;
+          bits -= op;
+          op = here >>> 16 & 0xff
+          /*here.op*/
+          ;
+
+          if (op & 16) {
+            /* distance base */
+            dist = here & 0xffff
+            /*here.val*/
+            ;
+            op &= 15;
+            /* number of extra bits */
+
+            if (bits < op) {
+              hold += input[_in++] << bits;
+              bits += 8;
+
+              if (bits < op) {
+                hold += input[_in++] << bits;
+                bits += 8;
+              }
+            }
+
+            dist += hold & (1 << op) - 1; //#ifdef INFLATE_STRICT
+
+            if (dist > dmax) {
+              strm.msg = 'invalid distance too far back';
+              state.mode = BAD$1;
+              break top;
+            } //#endif
+
+
+            hold >>>= op;
+            bits -= op; //Tracevv((stderr, "inflate:         distance %u\n", dist));
+
+            op = _out - beg;
+            /* max distance in output */
+
+            if (dist > op) {
+              /* see if copy from window */
+              op = dist - op;
+              /* distance back in window */
+
+              if (op > whave) {
+                if (state.sane) {
+                  strm.msg = 'invalid distance too far back';
+                  state.mode = BAD$1;
+                  break top;
+                } // (!) This block is disabled in zlib defaults,
+                // don't enable it for binary compatibility
+                //#ifdef INFLATE_ALLOW_INVALID_DISTANCE_TOOFAR_ARRR
+                //                if (len <= op - whave) {
+                //                  do {
+                //                    output[_out++] = 0;
+                //                  } while (--len);
+                //                  continue top;
+                //                }
+                //                len -= op - whave;
+                //                do {
+                //                  output[_out++] = 0;
+                //                } while (--op > whave);
+                //                if (op === 0) {
+                //                  from = _out - dist;
+                //                  do {
+                //                    output[_out++] = output[from++];
+                //                  } while (--len);
+                //                  continue top;
+                //                }
+                //#endif
+
+              }
+
+              from = 0; // window index
+
+              from_source = s_window;
+
+              if (wnext === 0) {
+                /* very common case */
+                from += wsize - op;
+
+                if (op < len) {
+                  /* some from window */
+                  len -= op;
+
+                  do {
+                    output[_out++] = s_window[from++];
+                  } while (--op);
+
+                  from = _out - dist;
+                  /* rest from output */
+
+                  from_source = output;
+                }
+              } else if (wnext < op) {
+                /* wrap around window */
+                from += wsize + wnext - op;
+                op -= wnext;
+
+                if (op < len) {
+                  /* some from end of window */
+                  len -= op;
+
+                  do {
+                    output[_out++] = s_window[from++];
+                  } while (--op);
+
+                  from = 0;
+
+                  if (wnext < len) {
+                    /* some from start of window */
+                    op = wnext;
+                    len -= op;
+
+                    do {
+                      output[_out++] = s_window[from++];
+                    } while (--op);
+
+                    from = _out - dist;
+                    /* rest from output */
+
+                    from_source = output;
+                  }
+                }
+              } else {
+                /* contiguous in window */
+                from += wnext - op;
+
+                if (op < len) {
+                  /* some from window */
+                  len -= op;
+
+                  do {
+                    output[_out++] = s_window[from++];
+                  } while (--op);
+
+                  from = _out - dist;
+                  /* rest from output */
+
+                  from_source = output;
+                }
+              }
+
+              while (len > 2) {
+                output[_out++] = from_source[from++];
+                output[_out++] = from_source[from++];
+                output[_out++] = from_source[from++];
+                len -= 3;
+              }
+
+              if (len) {
+                output[_out++] = from_source[from++];
+
+                if (len > 1) {
+                  output[_out++] = from_source[from++];
+                }
+              }
+            } else {
+              from = _out - dist;
+              /* copy direct from output */
+
+              do {
+                /* minimum length is three */
+                output[_out++] = output[from++];
+                output[_out++] = output[from++];
+                output[_out++] = output[from++];
+                len -= 3;
+              } while (len > 2);
+
+              if (len) {
+                output[_out++] = output[from++];
+
+                if (len > 1) {
+                  output[_out++] = output[from++];
+                }
+              }
+            }
+          } else if ((op & 64) === 0) {
+            /* 2nd level distance code */
+            here = dcode[(here & 0xffff
+            /*here.val*/
+            ) + (hold & (1 << op) - 1)];
+            continue dodist;
+          } else {
+            strm.msg = 'invalid distance code';
+            state.mode = BAD$1;
+            break top;
+          }
+
+          break; // need to emulate goto via "continue"
+        }
+      } else if ((op & 64) === 0) {
+        /* 2nd level length code */
+        here = lcode[(here & 0xffff
+        /*here.val*/
+        ) + (hold & (1 << op) - 1)];
+        continue dolen;
+      } else if (op & 32) {
+        /* end-of-block */
+        //Tracevv((stderr, "inflate:         end of block\n"));
+        state.mode = TYPE$1;
+        break top;
+      } else {
+        strm.msg = 'invalid literal/length code';
+        state.mode = BAD$1;
+        break top;
+      }
+
+      break; // need to emulate goto via "continue"
+    }
+  } while (_in < last && _out < end);
+  /* return unused bytes (on entry, bits < 8, so in won't go too far back) */
+
+
+  len = bits >> 3;
+  _in -= len;
+  bits -= len << 3;
+  hold &= (1 << bits) - 1;
+  /* update state and return */
+
+  strm.next_in = _in;
+  strm.next_out = _out;
+  strm.avail_in = _in < last ? 5 + (last - _in) : 5 - (_in - last);
+  strm.avail_out = _out < end ? 257 + (end - _out) : 257 - (_out - end);
+  state.hold = hold;
+  state.bits = bits;
+  return;
+}; // (C) 1995-2013 Jean-loup Gailly and Mark Adler
+// (C) 2014-2017 Vitaly Puzrin and Andrey Tupitsin
+//
+// This software is provided 'as-is', without any express or implied
+// warranty. In no event will the authors be held liable for any damages
+// arising from the use of this software.
+//
+// Permission is granted to anyone to use this software for any purpose,
+// including commercial applications, and to alter it and redistribute it
+// freely, subject to the following restrictions:
+//
+// 1. The origin of this software must not be misrepresented; you must not
+//   claim that you wrote the original software. If you use this software
+//   in a product, an acknowledgment in the product documentation would be
+//   appreciated but is not required.
+// 2. Altered source versions must be plainly marked as such, and must not be
+//   misrepresented as being the original software.
+// 3. This notice may not be removed or altered from any source distribution.
+
+
+const MAXBITS = 15;
+const ENOUGH_LENS$1 = 852;
+const ENOUGH_DISTS$1 = 592; //const ENOUGH = (ENOUGH_LENS+ENOUGH_DISTS);
+
+const CODES$1 = 0;
+const LENS$1 = 1;
+const DISTS$1 = 2;
+const lbase = new Uint16Array([
+/* Length codes 257..285 base */
+3, 4, 5, 6, 7, 8, 9, 10, 11, 13, 15, 17, 19, 23, 27, 31, 35, 43, 51, 59, 67, 83, 99, 115, 131, 163, 195, 227, 258, 0, 0]);
+const lext = new Uint8Array([
+/* Length codes 257..285 extra */
+16, 16, 16, 16, 16, 16, 16, 16, 17, 17, 17, 17, 18, 18, 18, 18, 19, 19, 19, 19, 20, 20, 20, 20, 21, 21, 21, 21, 16, 72, 78]);
+const dbase = new Uint16Array([
+/* Distance codes 0..29 base */
+1, 2, 3, 4, 5, 7, 9, 13, 17, 25, 33, 49, 65, 97, 129, 193, 257, 385, 513, 769, 1025, 1537, 2049, 3073, 4097, 6145, 8193, 12289, 16385, 24577, 0, 0]);
+const dext = new Uint8Array([
+/* Distance codes 0..29 extra */
+16, 16, 16, 16, 17, 17, 18, 18, 19, 19, 20, 20, 21, 21, 22, 22, 23, 23, 24, 24, 25, 25, 26, 26, 27, 27, 28, 28, 29, 29, 64, 64]);
+
+const inflate_table = (type, lens, lens_index, codes, table, table_index, work, opts) => {
+  const bits = opts.bits; //here = opts.here; /* table entry for duplication */
+
+  let len = 0;
+  /* a code's length in bits */
+
+  let sym = 0;
+  /* index of code symbols */
+
+  let min = 0,
+      max = 0;
+  /* minimum and maximum code lengths */
+
+  let root = 0;
+  /* number of index bits for root table */
+
+  let curr = 0;
+  /* number of index bits for current table */
+
+  let drop = 0;
+  /* code bits to drop for sub-table */
+
+  let left = 0;
+  /* number of prefix codes available */
+
+  let used = 0;
+  /* code entries in table used */
+
+  let huff = 0;
+  /* Huffman code */
+
+  let incr;
+  /* for incrementing code, index */
+
+  let fill;
+  /* index for replicating entries */
+
+  let low;
+  /* low bits for current root entry */
+
+  let mask;
+  /* mask for low root bits */
+
+  let next;
+  /* next available space in table */
+
+  let base = null;
+  /* base value table to use */
+
+  let base_index = 0; //  let shoextra;    /* extra bits table to use */
+
+  let end;
+  /* use base and extra for symbol > end */
+
+  const count = new Uint16Array(MAXBITS + 1); //[MAXBITS+1];    /* number of codes of each length */
+
+  const offs = new Uint16Array(MAXBITS + 1); //[MAXBITS+1];     /* offsets in table for each length */
+
+  let extra = null;
+  let extra_index = 0;
+  let here_bits, here_op, here_val;
+  /*
+   Process a set of code lengths to create a canonical Huffman code.  The
+   code lengths are lens[0..codes-1].  Each length corresponds to the
+   symbols 0..codes-1.  The Huffman code is generated by first sorting the
+   symbols by length from short to long, and retaining the symbol order
+   for codes with equal lengths.  Then the code starts with all zero bits
+   for the first code of the shortest length, and the codes are integer
+   increments for the same length, and zeros are appended as the length
+   increases.  For the deflate format, these bits are stored backwards
+   from their more natural integer increment ordering, and so when the
+   decoding tables are built in the large loop below, the integer codes
+   are incremented backwards.
+    This routine assumes, but does not check, that all of the entries in
+   lens[] are in the range 0..MAXBITS.  The caller must assure this.
+   1..MAXBITS is interpreted as that code length.  zero means that that
+   symbol does not occur in this code.
+    The codes are sorted by computing a count of codes for each length,
+   creating from that a table of starting indices for each length in the
+   sorted table, and then entering the symbols in order in the sorted
+   table.  The sorted table is work[], with that space being provided by
+   the caller.
+    The length counts are used for other purposes as well, i.e. finding
+   the minimum and maximum length codes, determining if there are any
+   codes at all, checking for a valid set of lengths, and looking ahead
+   at length counts to determine sub-table sizes when building the
+   decoding tables.
+   */
+
+  /* accumulate lengths for codes (assumes lens[] all in 0..MAXBITS) */
+
+  for (len = 0; len <= MAXBITS; len++) {
+    count[len] = 0;
+  }
+
+  for (sym = 0; sym < codes; sym++) {
+    count[lens[lens_index + sym]]++;
+  }
+  /* bound code lengths, force root to be within code lengths */
+
+
+  root = bits;
+
+  for (max = MAXBITS; max >= 1; max--) {
+    if (count[max] !== 0) {
+      break;
+    }
+  }
+
+  if (root > max) {
+    root = max;
+  }
+
+  if (max === 0) {
+    /* no symbols to code at all */
+    //table.op[opts.table_index] = 64;  //here.op = (var char)64;    /* invalid code marker */
+    //table.bits[opts.table_index] = 1;   //here.bits = (var char)1;
+    //table.val[opts.table_index++] = 0;   //here.val = (var short)0;
+    table[table_index++] = 1 << 24 | 64 << 16 | 0; //table.op[opts.table_index] = 64;
+    //table.bits[opts.table_index] = 1;
+    //table.val[opts.table_index++] = 0;
+
+    table[table_index++] = 1 << 24 | 64 << 16 | 0;
+    opts.bits = 1;
+    return 0;
+    /* no symbols, but wait for decoding to report error */
+  }
+
+  for (min = 1; min < max; min++) {
+    if (count[min] !== 0) {
+      break;
+    }
+  }
+
+  if (root < min) {
+    root = min;
+  }
+  /* check for an over-subscribed or incomplete set of lengths */
+
+
+  left = 1;
+
+  for (len = 1; len <= MAXBITS; len++) {
+    left <<= 1;
+    left -= count[len];
+
+    if (left < 0) {
+      return -1;
+    }
+    /* over-subscribed */
+
+  }
+
+  if (left > 0 && (type === CODES$1 || max !== 1)) {
+    return -1;
+    /* incomplete set */
+  }
+  /* generate offsets into symbol table for each length for sorting */
+
+
+  offs[1] = 0;
+
+  for (len = 1; len < MAXBITS; len++) {
+    offs[len + 1] = offs[len] + count[len];
+  }
+  /* sort symbols by length, by symbol order within each length */
+
+
+  for (sym = 0; sym < codes; sym++) {
+    if (lens[lens_index + sym] !== 0) {
+      work[offs[lens[lens_index + sym]]++] = sym;
+    }
+  }
+  /*
+   Create and fill in decoding tables.  In this loop, the table being
+   filled is at next and has curr index bits.  The code being used is huff
+   with length len.  That code is converted to an index by dropping drop
+   bits off of the bottom.  For codes where len is less than drop + curr,
+   those top drop + curr - len bits are incremented through all values to
+   fill the table with replicated entries.
+    root is the number of index bits for the root table.  When len exceeds
+   root, sub-tables are created pointed to by the root entry with an index
+   of the low root bits of huff.  This is saved in low to check for when a
+   new sub-table should be started.  drop is zero when the root table is
+   being filled, and drop is root when sub-tables are being filled.
+    When a new sub-table is needed, it is necessary to look ahead in the
+   code lengths to determine what size sub-table is needed.  The length
+   counts are used for this, and so count[] is decremented as codes are
+   entered in the tables.
+    used keeps track of how many table entries have been allocated from the
+   provided *table space.  It is checked for LENS and DIST tables against
+   the constants ENOUGH_LENS and ENOUGH_DISTS to guard against changes in
+   the initial root table size constants.  See the comments in inftrees.h
+   for more information.
+    sym increments through all symbols, and the loop terminates when
+   all codes of length max, i.e. all codes, have been processed.  This
+   routine permits incomplete codes, so another loop after this one fills
+   in the rest of the decoding tables with invalid code markers.
+   */
+
+  /* set up for code type */
+  // poor man optimization - use if-else instead of switch,
+  // to avoid deopts in old v8
+
+
+  if (type === CODES$1) {
+    base = extra = work;
+    /* dummy value--not used */
+
+    end = 19;
+  } else if (type === LENS$1) {
+    base = lbase;
+    base_index -= 257;
+    extra = lext;
+    extra_index -= 257;
+    end = 256;
+  } else {
+    /* DISTS */
+    base = dbase;
+    extra = dext;
+    end = -1;
+  }
+  /* initialize opts for loop */
+
+
+  huff = 0;
+  /* starting code */
+
+  sym = 0;
+  /* starting code symbol */
+
+  len = min;
+  /* starting code length */
+
+  next = table_index;
+  /* current table to fill in */
+
+  curr = root;
+  /* current table index bits */
+
+  drop = 0;
+  /* current bits to drop from code for index */
+
+  low = -1;
+  /* trigger new sub-table when len > root */
+
+  used = 1 << root;
+  /* use root table entries */
+
+  mask = used - 1;
+  /* mask for comparing low */
+
+  /* check available table space */
+
+  if (type === LENS$1 && used > ENOUGH_LENS$1 || type === DISTS$1 && used > ENOUGH_DISTS$1) {
+    return 1;
+  }
+  /* process all codes and make table entries */
+
+
+  for (;;) {
+    /* create table entry */
+    here_bits = len - drop;
+
+    if (work[sym] < end) {
+      here_op = 0;
+      here_val = work[sym];
+    } else if (work[sym] > end) {
+      here_op = extra[extra_index + work[sym]];
+      here_val = base[base_index + work[sym]];
+    } else {
+      here_op = 32 + 64;
+      /* end of block */
+
+      here_val = 0;
+    }
+    /* replicate for those indices with low len bits equal to huff */
+
+
+    incr = 1 << len - drop;
+    fill = 1 << curr;
+    min = fill;
+    /* save offset to next table */
+
+    do {
+      fill -= incr;
+      table[next + (huff >> drop) + fill] = here_bits << 24 | here_op << 16 | here_val | 0;
+    } while (fill !== 0);
+    /* backwards increment the len-bit code huff */
+
+
+    incr = 1 << len - 1;
+
+    while (huff & incr) {
+      incr >>= 1;
+    }
+
+    if (incr !== 0) {
+      huff &= incr - 1;
+      huff += incr;
+    } else {
+      huff = 0;
+    }
+    /* go to next symbol, update count, len */
+
+
+    sym++;
+
+    if (--count[len] === 0) {
+      if (len === max) {
+        break;
+      }
+
+      len = lens[lens_index + work[sym]];
+    }
+    /* create new sub-table if needed */
+
+
+    if (len > root && (huff & mask) !== low) {
+      /* if first time, transition to sub-tables */
+      if (drop === 0) {
+        drop = root;
+      }
+      /* increment past last table */
+
+
+      next += min;
+      /* here min is 1 << curr */
+
+      /* determine length of next table */
+
+      curr = len - drop;
+      left = 1 << curr;
+
+      while (curr + drop < max) {
+        left -= count[curr + drop];
+
+        if (left <= 0) {
+          break;
+        }
+
+        curr++;
+        left <<= 1;
+      }
+      /* check for enough space */
+
+
+      used += 1 << curr;
+
+      if (type === LENS$1 && used > ENOUGH_LENS$1 || type === DISTS$1 && used > ENOUGH_DISTS$1) {
+        return 1;
+      }
+      /* point entry in root table to sub-table */
+
+
+      low = huff & mask;
+      /*table.op[low] = curr;
+      table.bits[low] = root;
+      table.val[low] = next - opts.table_index;*/
+
+      table[low] = root << 24 | curr << 16 | next - table_index | 0;
+    }
+  }
+  /* fill in remaining table entry if code is incomplete (guaranteed to have
+   at most one remaining entry, since if the code is incomplete, the
+   maximum code length that was allowed to get this far is one bit) */
+
+
+  if (huff !== 0) {
+    //table.op[next + huff] = 64;            /* invalid code marker */
+    //table.bits[next + huff] = len - drop;
+    //table.val[next + huff] = 0;
+    table[next + huff] = len - drop << 24 | 64 << 16 | 0;
+  }
+  /* set return parameters */
+  //opts.table_index += used;
+
+
+  opts.bits = root;
+  return 0;
+};
+
+var inftrees = inflate_table; // (C) 1995-2013 Jean-loup Gailly and Mark Adler
+// (C) 2014-2017 Vitaly Puzrin and Andrey Tupitsin
+//
+// This software is provided 'as-is', without any express or implied
+// warranty. In no event will the authors be held liable for any damages
+// arising from the use of this software.
+//
+// Permission is granted to anyone to use this software for any purpose,
+// including commercial applications, and to alter it and redistribute it
+// freely, subject to the following restrictions:
+//
+// 1. The origin of this software must not be misrepresented; you must not
+//   claim that you wrote the original software. If you use this software
+//   in a product, an acknowledgment in the product documentation would be
+//   appreciated but is not required.
+// 2. Altered source versions must be plainly marked as such, and must not be
+//   misrepresented as being the original software.
+// 3. This notice may not be removed or altered from any source distribution.
+
+const CODES = 0;
+const LENS = 1;
+const DISTS = 2;
+/* Public constants ==========================================================*/
+
+/* ===========================================================================*/
+
+const {
+  Z_FINISH: Z_FINISH$1,
+  Z_BLOCK,
+  Z_TREES,
+  Z_OK: Z_OK$1,
+  Z_STREAM_END: Z_STREAM_END$1,
+  Z_NEED_DICT: Z_NEED_DICT$1,
+  Z_STREAM_ERROR: Z_STREAM_ERROR$1,
+  Z_DATA_ERROR: Z_DATA_ERROR$1,
+  Z_MEM_ERROR: Z_MEM_ERROR$1,
+  Z_BUF_ERROR,
+  Z_DEFLATED
+} = constants$2;
+/* STATES ====================================================================*/
+
+/* ===========================================================================*/
+
+const HEAD = 1;
+/* i: waiting for magic header */
+
+const FLAGS = 2;
+/* i: waiting for method and flags (gzip) */
+
+const TIME = 3;
+/* i: waiting for modification time (gzip) */
+
+const OS = 4;
+/* i: waiting for extra flags and operating system (gzip) */
+
+const EXLEN = 5;
+/* i: waiting for extra length (gzip) */
+
+const EXTRA = 6;
+/* i: waiting for extra bytes (gzip) */
+
+const NAME = 7;
+/* i: waiting for end of file name (gzip) */
+
+const COMMENT = 8;
+/* i: waiting for end of comment (gzip) */
+
+const HCRC = 9;
+/* i: waiting for header crc (gzip) */
+
+const DICTID = 10;
+/* i: waiting for dictionary check value */
+
+const DICT = 11;
+/* waiting for inflateSetDictionary() call */
+
+const TYPE = 12;
+/* i: waiting for type bits, including last-flag bit */
+
+const TYPEDO = 13;
+/* i: same, but skip check to exit inflate on new block */
+
+const STORED = 14;
+/* i: waiting for stored size (length and complement) */
+
+const COPY_ = 15;
+/* i/o: same as COPY below, but only first time in */
+
+const COPY = 16;
+/* i/o: waiting for input or output to copy stored block */
+
+const TABLE = 17;
+/* i: waiting for dynamic block table lengths */
+
+const LENLENS = 18;
+/* i: waiting for code length code lengths */
+
+const CODELENS = 19;
+/* i: waiting for length/lit and distance code lengths */
+
+const LEN_ = 20;
+/* i: same as LEN below, but only first time in */
+
+const LEN = 21;
+/* i: waiting for length/lit/eob code */
+
+const LENEXT = 22;
+/* i: waiting for length extra bits */
+
+const DIST = 23;
+/* i: waiting for distance code */
+
+const DISTEXT = 24;
+/* i: waiting for distance extra bits */
+
+const MATCH = 25;
+/* o: waiting for output space to copy string */
+
+const LIT = 26;
+/* o: waiting for output space to write literal */
+
+const CHECK = 27;
+/* i: waiting for 32-bit check value */
+
+const LENGTH = 28;
+/* i: waiting for 32-bit length (gzip) */
+
+const DONE = 29;
+/* finished check, done -- remain here until reset */
+
+const BAD = 30;
+/* got a data error -- remain here until reset */
+
+const MEM = 31;
+/* got an inflate() memory error -- remain here until reset */
+
+const SYNC = 32;
+/* looking for synchronization bytes to restart inflate() */
+
+/* ===========================================================================*/
+
+const ENOUGH_LENS = 852;
+const ENOUGH_DISTS = 592; //const ENOUGH =  (ENOUGH_LENS+ENOUGH_DISTS);
+
+const MAX_WBITS = 15;
+/* 32K LZ77 window */
+
+const DEF_WBITS = MAX_WBITS;
+
+const zswap32 = q => {
+  return (q >>> 24 & 0xff) + (q >>> 8 & 0xff00) + ((q & 0xff00) << 8) + ((q & 0xff) << 24);
+};
+
+function InflateState() {
+  this.mode = 0;
+  /* current inflate mode */
+
+  this.last = false;
+  /* true if processing last block */
+
+  this.wrap = 0;
+  /* bit 0 true for zlib, bit 1 true for gzip */
+
+  this.havedict = false;
+  /* true if dictionary provided */
+
+  this.flags = 0;
+  /* gzip header method and flags (0 if zlib) */
+
+  this.dmax = 0;
+  /* zlib header max distance (INFLATE_STRICT) */
+
+  this.check = 0;
+  /* protected copy of check value */
+
+  this.total = 0;
+  /* protected copy of output count */
+  // TODO: may be {}
+
+  this.head = null;
+  /* where to save gzip header information */
+
+  /* sliding window */
+
+  this.wbits = 0;
+  /* log base 2 of requested window size */
+
+  this.wsize = 0;
+  /* window size or zero if not using window */
+
+  this.whave = 0;
+  /* valid bytes in the window */
+
+  this.wnext = 0;
+  /* window write index */
+
+  this.window = null;
+  /* allocated sliding window, if needed */
+
+  /* bit accumulator */
+
+  this.hold = 0;
+  /* input bit accumulator */
+
+  this.bits = 0;
+  /* number of bits in "in" */
+
+  /* for string and stored block copying */
+
+  this.length = 0;
+  /* literal or length of data to copy */
+
+  this.offset = 0;
+  /* distance back to copy string from */
+
+  /* for table and code decoding */
+
+  this.extra = 0;
+  /* extra bits needed */
+
+  /* fixed and dynamic code tables */
+
+  this.lencode = null;
+  /* starting table for length/literal codes */
+
+  this.distcode = null;
+  /* starting table for distance codes */
+
+  this.lenbits = 0;
+  /* index bits for lencode */
+
+  this.distbits = 0;
+  /* index bits for distcode */
+
+  /* dynamic table building */
+
+  this.ncode = 0;
+  /* number of code length code lengths */
+
+  this.nlen = 0;
+  /* number of length code lengths */
+
+  this.ndist = 0;
+  /* number of distance code lengths */
+
+  this.have = 0;
+  /* number of code lengths in lens[] */
+
+  this.next = null;
+  /* next available space in codes[] */
+
+  this.lens = new Uint16Array(320);
+  /* temporary storage for code lengths */
+
+  this.work = new Uint16Array(288);
+  /* work area for code table building */
+
+  /*
+   because we don't have pointers in js, we use lencode and distcode directly
+   as buffers so we don't need codes
+  */
+  //this.codes = new Int32Array(ENOUGH);       /* space for code tables */
+
+  this.lendyn = null;
+  /* dynamic table for length/literal codes (JS specific) */
+
+  this.distdyn = null;
+  /* dynamic table for distance codes (JS specific) */
+
+  this.sane = 0;
+  /* if false, allow invalid distance too far */
+
+  this.back = 0;
+  /* bits back of last unprocessed length/lit */
+
+  this.was = 0;
+  /* initial length of match */
+}
+
+const inflateResetKeep = strm => {
+  if (!strm || !strm.state) {
+    return Z_STREAM_ERROR$1;
+  }
+
+  const state = strm.state;
+  strm.total_in = strm.total_out = state.total = 0;
+  strm.msg = '';
+  /*Z_NULL*/
+
+  if (state.wrap) {
+    /* to support ill-conceived Java test suite */
+    strm.adler = state.wrap & 1;
+  }
+
+  state.mode = HEAD;
+  state.last = 0;
+  state.havedict = 0;
+  state.dmax = 32768;
+  state.head = null
+  /*Z_NULL*/
+  ;
+  state.hold = 0;
+  state.bits = 0; //state.lencode = state.distcode = state.next = state.codes;
+
+  state.lencode = state.lendyn = new Int32Array(ENOUGH_LENS);
+  state.distcode = state.distdyn = new Int32Array(ENOUGH_DISTS);
+  state.sane = 1;
+  state.back = -1; //Tracev((stderr, "inflate: reset\n"));
+
+  return Z_OK$1;
+};
+
+const inflateReset = strm => {
+  if (!strm || !strm.state) {
+    return Z_STREAM_ERROR$1;
+  }
+
+  const state = strm.state;
+  state.wsize = 0;
+  state.whave = 0;
+  state.wnext = 0;
+  return inflateResetKeep(strm);
+};
+
+const inflateReset2 = (strm, windowBits) => {
+  let wrap;
+  /* get the state */
+
+  if (!strm || !strm.state) {
+    return Z_STREAM_ERROR$1;
+  }
+
+  const state = strm.state;
+  /* extract wrap request from windowBits parameter */
+
+  if (windowBits < 0) {
+    wrap = 0;
+    windowBits = -windowBits;
+  } else {
+    wrap = (windowBits >> 4) + 1;
+
+    if (windowBits < 48) {
+      windowBits &= 15;
+    }
+  }
+  /* set number of window bits, free window if different */
+
+
+  if (windowBits && (windowBits < 8 || windowBits > 15)) {
+    return Z_STREAM_ERROR$1;
+  }
+
+  if (state.window !== null && state.wbits !== windowBits) {
+    state.window = null;
+  }
+  /* update state and reset the rest of it */
+
+
+  state.wrap = wrap;
+  state.wbits = windowBits;
+  return inflateReset(strm);
+};
+
+const inflateInit2 = (strm, windowBits) => {
+  if (!strm) {
+    return Z_STREAM_ERROR$1;
+  } //strm.msg = Z_NULL;                 /* in case we return an error */
+
+
+  const state = new InflateState(); //if (state === Z_NULL) return Z_MEM_ERROR;
+  //Tracev((stderr, "inflate: allocated\n"));
+
+  strm.state = state;
+  state.window = null
+  /*Z_NULL*/
+  ;
+  const ret = inflateReset2(strm, windowBits);
+
+  if (ret !== Z_OK$1) {
+    strm.state = null
+    /*Z_NULL*/
+    ;
+  }
+
+  return ret;
+};
+
+const inflateInit = strm => {
+  return inflateInit2(strm, DEF_WBITS);
+};
+/*
+ Return state with length and distance decoding tables and index sizes set to
+ fixed code decoding.  Normally this returns fixed tables from inffixed.h.
+ If BUILDFIXED is defined, then instead this routine builds the tables the
+ first time it's called, and returns those tables the first time and
+ thereafter.  This reduces the size of the code by about 2K bytes, in
+ exchange for a little execution time.  However, BUILDFIXED should not be
+ used for threaded applications, since the rewriting of the tables and virgin
+ may not be thread-safe.
+ */
+
+
+let virgin = true;
+let lenfix, distfix; // We have no pointers in JS, so keep tables separate
+
+const fixedtables = state => {
+  /* build fixed huffman tables if first call (may not be thread safe) */
+  if (virgin) {
+    lenfix = new Int32Array(512);
+    distfix = new Int32Array(32);
+    /* literal/length table */
+
+    let sym = 0;
+
+    while (sym < 144) {
+      state.lens[sym++] = 8;
+    }
+
+    while (sym < 256) {
+      state.lens[sym++] = 9;
+    }
+
+    while (sym < 280) {
+      state.lens[sym++] = 7;
+    }
+
+    while (sym < 288) {
+      state.lens[sym++] = 8;
+    }
+
+    inftrees(LENS, state.lens, 0, 288, lenfix, 0, state.work, {
+      bits: 9
+    });
+    /* distance table */
+
+    sym = 0;
+
+    while (sym < 32) {
+      state.lens[sym++] = 5;
+    }
+
+    inftrees(DISTS, state.lens, 0, 32, distfix, 0, state.work, {
+      bits: 5
+    });
+    /* do this just once */
+
+    virgin = false;
+  }
+
+  state.lencode = lenfix;
+  state.lenbits = 9;
+  state.distcode = distfix;
+  state.distbits = 5;
+};
+/*
+ Update the window with the last wsize (normally 32K) bytes written before
+ returning.  If window does not exist yet, create it.  This is only called
+ when a window is already in use, or when output has been written during this
+ inflate call, but the end of the deflate stream has not been reached yet.
+ It is also called to create a window for dictionary data when a dictionary
+ is loaded.
+
+ Providing output buffers larger than 32K to inflate() should provide a speed
+ advantage, since only the last 32K of output is copied to the sliding window
+ upon return from inflate(), and since all distances after the first 32K of
+ output will fall in the output data, making match copies simpler and faster.
+ The advantage may be dependent on the size of the processor's data caches.
+ */
+
+
+const updatewindow = (strm, src, end, copy) => {
+  let dist;
+  const state = strm.state;
+  /* if it hasn't been done already, allocate space for the window */
+
+  if (state.window === null) {
+    state.wsize = 1 << state.wbits;
+    state.wnext = 0;
+    state.whave = 0;
+    state.window = new Uint8Array(state.wsize);
+  }
+  /* copy state->wsize or less output bytes into the circular window */
+
+
+  if (copy >= state.wsize) {
+    state.window.set(src.subarray(end - state.wsize, end), 0);
+    state.wnext = 0;
+    state.whave = state.wsize;
+  } else {
+    dist = state.wsize - state.wnext;
+
+    if (dist > copy) {
+      dist = copy;
+    } //zmemcpy(state->window + state->wnext, end - copy, dist);
+
+
+    state.window.set(src.subarray(end - copy, end - copy + dist), state.wnext);
+    copy -= dist;
+
+    if (copy) {
+      //zmemcpy(state->window, end - copy, copy);
+      state.window.set(src.subarray(end - copy, end), 0);
+      state.wnext = copy;
+      state.whave = state.wsize;
+    } else {
+      state.wnext += dist;
+
+      if (state.wnext === state.wsize) {
+        state.wnext = 0;
+      }
+
+      if (state.whave < state.wsize) {
+        state.whave += dist;
+      }
+    }
+  }
+
+  return 0;
+};
+
+const inflate$2 = (strm, flush) => {
+  let state;
+  let input, output; // input/output buffers
+
+  let next;
+  /* next input INDEX */
+
+  let put;
+  /* next output INDEX */
+
+  let have, left;
+  /* available input and output */
+
+  let hold;
+  /* bit buffer */
+
+  let bits;
+  /* bits in bit buffer */
+
+  let _in, _out;
+  /* save starting available input and output */
+
+
+  let copy;
+  /* number of stored or match bytes to copy */
+
+  let from;
+  /* where to copy match bytes from */
+
+  let from_source;
+  let here = 0;
+  /* current decoding table entry */
+
+  let here_bits, here_op, here_val; // paked "here" denormalized (JS specific)
+  //let last;                   /* parent table entry */
+
+  let last_bits, last_op, last_val; // paked "last" denormalized (JS specific)
+
+  let len;
+  /* length to copy for repeats, bits to drop */
+
+  let ret;
+  /* return code */
+
+  const hbuf = new Uint8Array(4);
+  /* buffer for gzip header crc calculation */
+
+  let opts;
+  let n; // temporary variable for NEED_BITS
+
+  const order =
+  /* permutation of code lengths */
+  new Uint8Array([16, 17, 18, 0, 8, 7, 9, 6, 10, 5, 11, 4, 12, 3, 13, 2, 14, 1, 15]);
+
+  if (!strm || !strm.state || !strm.output || !strm.input && strm.avail_in !== 0) {
+    return Z_STREAM_ERROR$1;
+  }
+
+  state = strm.state;
+
+  if (state.mode === TYPE) {
+    state.mode = TYPEDO;
+  }
+  /* skip check */
+  //--- LOAD() ---
+
+
+  put = strm.next_out;
+  output = strm.output;
+  left = strm.avail_out;
+  next = strm.next_in;
+  input = strm.input;
+  have = strm.avail_in;
+  hold = state.hold;
+  bits = state.bits; //---
+
+  _in = have;
+  _out = left;
+  ret = Z_OK$1;
+
+  inf_leave: // goto emulation
+  for (;;) {
+    switch (state.mode) {
+      case HEAD:
+        if (state.wrap === 0) {
+          state.mode = TYPEDO;
+          break;
+        } //=== NEEDBITS(16);
+
+
+        while (bits < 16) {
+          if (have === 0) {
+            break inf_leave;
+          }
+
+          have--;
+          hold += input[next++] << bits;
+          bits += 8;
+        } //===//
+
+
+        if (state.wrap & 2 && hold === 0x8b1f) {
+          /* gzip header */
+          state.check = 0
+          /*crc32(0L, Z_NULL, 0)*/
+          ; //=== CRC2(state.check, hold);
+
+          hbuf[0] = hold & 0xff;
+          hbuf[1] = hold >>> 8 & 0xff;
+          state.check = crc32_1(state.check, hbuf, 2, 0); //===//
+          //=== INITBITS();
+
+          hold = 0;
+          bits = 0; //===//
+
+          state.mode = FLAGS;
+          break;
+        }
+
+        state.flags = 0;
+        /* expect zlib header */
+
+        if (state.head) {
+          state.head.done = false;
+        }
+
+        if (!(state.wrap & 1) ||
+        /* check if zlib header allowed */
+        (((hold & 0xff
+        /*BITS(8)*/
+        ) << 8) + (hold >> 8)) % 31) {
+          strm.msg = 'incorrect header check';
+          state.mode = BAD;
+          break;
+        }
+
+        if ((hold & 0x0f
+        /*BITS(4)*/
+        ) !== Z_DEFLATED) {
+          strm.msg = 'unknown compression method';
+          state.mode = BAD;
+          break;
+        } //--- DROPBITS(4) ---//
+
+
+        hold >>>= 4;
+        bits -= 4; //---//
+
+        len = (hold & 0x0f
+        /*BITS(4)*/
+        ) + 8;
+
+        if (state.wbits === 0) {
+          state.wbits = len;
+        } else if (len > state.wbits) {
+          strm.msg = 'invalid window size';
+          state.mode = BAD;
+          break;
+        } // !!! pako patch. Force use `options.windowBits` if passed.
+        // Required to always use max window size by default.
+
+
+        state.dmax = 1 << state.wbits; //state.dmax = 1 << len;
+        //Tracev((stderr, "inflate:   zlib header ok\n"));
+
+        strm.adler = state.check = 1
+        /*adler32(0L, Z_NULL, 0)*/
+        ;
+        state.mode = hold & 0x200 ? DICTID : TYPE; //=== INITBITS();
+
+        hold = 0;
+        bits = 0; //===//
+
+        break;
+
+      case FLAGS:
+        //=== NEEDBITS(16); */
+        while (bits < 16) {
+          if (have === 0) {
+            break inf_leave;
+          }
+
+          have--;
+          hold += input[next++] << bits;
+          bits += 8;
+        } //===//
+
+
+        state.flags = hold;
+
+        if ((state.flags & 0xff) !== Z_DEFLATED) {
+          strm.msg = 'unknown compression method';
+          state.mode = BAD;
+          break;
+        }
+
+        if (state.flags & 0xe000) {
+          strm.msg = 'unknown header flags set';
+          state.mode = BAD;
+          break;
+        }
+
+        if (state.head) {
+          state.head.text = hold >> 8 & 1;
+        }
+
+        if (state.flags & 0x0200) {
+          //=== CRC2(state.check, hold);
+          hbuf[0] = hold & 0xff;
+          hbuf[1] = hold >>> 8 & 0xff;
+          state.check = crc32_1(state.check, hbuf, 2, 0); //===//
+        } //=== INITBITS();
+
+
+        hold = 0;
+        bits = 0; //===//
+
+        state.mode = TIME;
+
+      /* falls through */
+
+      case TIME:
+        //=== NEEDBITS(32); */
+        while (bits < 32) {
+          if (have === 0) {
+            break inf_leave;
+          }
+
+          have--;
+          hold += input[next++] << bits;
+          bits += 8;
+        } //===//
+
+
+        if (state.head) {
+          state.head.time = hold;
+        }
+
+        if (state.flags & 0x0200) {
+          //=== CRC4(state.check, hold)
+          hbuf[0] = hold & 0xff;
+          hbuf[1] = hold >>> 8 & 0xff;
+          hbuf[2] = hold >>> 16 & 0xff;
+          hbuf[3] = hold >>> 24 & 0xff;
+          state.check = crc32_1(state.check, hbuf, 4, 0); //===
+        } //=== INITBITS();
+
+
+        hold = 0;
+        bits = 0; //===//
+
+        state.mode = OS;
+
+      /* falls through */
+
+      case OS:
+        //=== NEEDBITS(16); */
+        while (bits < 16) {
+          if (have === 0) {
+            break inf_leave;
+          }
+
+          have--;
+          hold += input[next++] << bits;
+          bits += 8;
+        } //===//
+
+
+        if (state.head) {
+          state.head.xflags = hold & 0xff;
+          state.head.os = hold >> 8;
+        }
+
+        if (state.flags & 0x0200) {
+          //=== CRC2(state.check, hold);
+          hbuf[0] = hold & 0xff;
+          hbuf[1] = hold >>> 8 & 0xff;
+          state.check = crc32_1(state.check, hbuf, 2, 0); //===//
+        } //=== INITBITS();
+
+
+        hold = 0;
+        bits = 0; //===//
+
+        state.mode = EXLEN;
+
+      /* falls through */
+
+      case EXLEN:
+        if (state.flags & 0x0400) {
+          //=== NEEDBITS(16); */
+          while (bits < 16) {
+            if (have === 0) {
+              break inf_leave;
+            }
+
+            have--;
+            hold += input[next++] << bits;
+            bits += 8;
+          } //===//
+
+
+          state.length = hold;
+
+          if (state.head) {
+            state.head.extra_len = hold;
+          }
+
+          if (state.flags & 0x0200) {
+            //=== CRC2(state.check, hold);
+            hbuf[0] = hold & 0xff;
+            hbuf[1] = hold >>> 8 & 0xff;
+            state.check = crc32_1(state.check, hbuf, 2, 0); //===//
+          } //=== INITBITS();
+
+
+          hold = 0;
+          bits = 0; //===//
+        } else if (state.head) {
+          state.head.extra = null
+          /*Z_NULL*/
+          ;
+        }
+
+        state.mode = EXTRA;
+
+      /* falls through */
+
+      case EXTRA:
+        if (state.flags & 0x0400) {
+          copy = state.length;
+
+          if (copy > have) {
+            copy = have;
+          }
+
+          if (copy) {
+            if (state.head) {
+              len = state.head.extra_len - state.length;
+
+              if (!state.head.extra) {
+                // Use untyped array for more convenient processing later
+                state.head.extra = new Uint8Array(state.head.extra_len);
+              }
+
+              state.head.extra.set(input.subarray(next, // extra field is limited to 65536 bytes
+              // - no need for additional size check
+              next + copy),
+              /*len + copy > state.head.extra_max - len ? state.head.extra_max : copy,*/
+              len); //zmemcpy(state.head.extra + len, next,
+              //        len + copy > state.head.extra_max ?
+              //        state.head.extra_max - len : copy);
+            }
+
+            if (state.flags & 0x0200) {
+              state.check = crc32_1(state.check, input, copy, next);
+            }
+
+            have -= copy;
+            next += copy;
+            state.length -= copy;
+          }
+
+          if (state.length) {
+            break inf_leave;
+          }
+        }
+
+        state.length = 0;
+        state.mode = NAME;
+
+      /* falls through */
+
+      case NAME:
+        if (state.flags & 0x0800) {
+          if (have === 0) {
+            break inf_leave;
+          }
+
+          copy = 0;
+
+          do {
+            // TODO: 2 or 1 bytes?
+            len = input[next + copy++];
+            /* use constant limit because in js we should not preallocate memory */
+
+            if (state.head && len && state.length < 65536
+            /*state.head.name_max*/
+            ) {
+              state.head.name += String.fromCharCode(len);
+            }
+          } while (len && copy < have);
+
+          if (state.flags & 0x0200) {
+            state.check = crc32_1(state.check, input, copy, next);
+          }
+
+          have -= copy;
+          next += copy;
+
+          if (len) {
+            break inf_leave;
+          }
+        } else if (state.head) {
+          state.head.name = null;
+        }
+
+        state.length = 0;
+        state.mode = COMMENT;
+
+      /* falls through */
+
+      case COMMENT:
+        if (state.flags & 0x1000) {
+          if (have === 0) {
+            break inf_leave;
+          }
+
+          copy = 0;
+
+          do {
+            len = input[next + copy++];
+            /* use constant limit because in js we should not preallocate memory */
+
+            if (state.head && len && state.length < 65536
+            /*state.head.comm_max*/
+            ) {
+              state.head.comment += String.fromCharCode(len);
+            }
+          } while (len && copy < have);
+
+          if (state.flags & 0x0200) {
+            state.check = crc32_1(state.check, input, copy, next);
+          }
+
+          have -= copy;
+          next += copy;
+
+          if (len) {
+            break inf_leave;
+          }
+        } else if (state.head) {
+          state.head.comment = null;
+        }
+
+        state.mode = HCRC;
+
+      /* falls through */
+
+      case HCRC:
+        if (state.flags & 0x0200) {
+          //=== NEEDBITS(16); */
+          while (bits < 16) {
+            if (have === 0) {
+              break inf_leave;
+            }
+
+            have--;
+            hold += input[next++] << bits;
+            bits += 8;
+          } //===//
+
+
+          if (hold !== (state.check & 0xffff)) {
+            strm.msg = 'header crc mismatch';
+            state.mode = BAD;
+            break;
+          } //=== INITBITS();
+
+
+          hold = 0;
+          bits = 0; //===//
+        }
+
+        if (state.head) {
+          state.head.hcrc = state.flags >> 9 & 1;
+          state.head.done = true;
+        }
+
+        strm.adler = state.check = 0;
+        state.mode = TYPE;
+        break;
+
+      case DICTID:
+        //=== NEEDBITS(32); */
+        while (bits < 32) {
+          if (have === 0) {
+            break inf_leave;
+          }
+
+          have--;
+          hold += input[next++] << bits;
+          bits += 8;
+        } //===//
+
+
+        strm.adler = state.check = zswap32(hold); //=== INITBITS();
+
+        hold = 0;
+        bits = 0; //===//
+
+        state.mode = DICT;
+
+      /* falls through */
+
+      case DICT:
+        if (state.havedict === 0) {
+          //--- RESTORE() ---
+          strm.next_out = put;
+          strm.avail_out = left;
+          strm.next_in = next;
+          strm.avail_in = have;
+          state.hold = hold;
+          state.bits = bits; //---
+
+          return Z_NEED_DICT$1;
+        }
+
+        strm.adler = state.check = 1
+        /*adler32(0L, Z_NULL, 0)*/
+        ;
+        state.mode = TYPE;
+
+      /* falls through */
+
+      case TYPE:
+        if (flush === Z_BLOCK || flush === Z_TREES) {
+          break inf_leave;
+        }
+
+      /* falls through */
+
+      case TYPEDO:
+        if (state.last) {
+          //--- BYTEBITS() ---//
+          hold >>>= bits & 7;
+          bits -= bits & 7; //---//
+
+          state.mode = CHECK;
+          break;
+        } //=== NEEDBITS(3); */
+
+
+        while (bits < 3) {
+          if (have === 0) {
+            break inf_leave;
+          }
+
+          have--;
+          hold += input[next++] << bits;
+          bits += 8;
+        } //===//
+
+
+        state.last = hold & 0x01
+        /*BITS(1)*/
+        ; //--- DROPBITS(1) ---//
+
+        hold >>>= 1;
+        bits -= 1; //---//
+
+        switch (hold & 0x03
+        /*BITS(2)*/
+        ) {
+          case 0:
+            /* stored block */
+            //Tracev((stderr, "inflate:     stored block%s\n",
+            //        state.last ? " (last)" : ""));
+            state.mode = STORED;
+            break;
+
+          case 1:
+            /* fixed block */
+            fixedtables(state); //Tracev((stderr, "inflate:     fixed codes block%s\n",
+            //        state.last ? " (last)" : ""));
+
+            state.mode = LEN_;
+            /* decode codes */
+
+            if (flush === Z_TREES) {
+              //--- DROPBITS(2) ---//
+              hold >>>= 2;
+              bits -= 2; //---//
+
+              break inf_leave;
+            }
+
+            break;
+
+          case 2:
+            /* dynamic block */
+            //Tracev((stderr, "inflate:     dynamic codes block%s\n",
+            //        state.last ? " (last)" : ""));
+            state.mode = TABLE;
+            break;
+
+          case 3:
+            strm.msg = 'invalid block type';
+            state.mode = BAD;
+        } //--- DROPBITS(2) ---//
+
+
+        hold >>>= 2;
+        bits -= 2; //---//
+
+        break;
+
+      case STORED:
+        //--- BYTEBITS() ---// /* go to byte boundary */
+        hold >>>= bits & 7;
+        bits -= bits & 7; //---//
+        //=== NEEDBITS(32); */
+
+        while (bits < 32) {
+          if (have === 0) {
+            break inf_leave;
+          }
+
+          have--;
+          hold += input[next++] << bits;
+          bits += 8;
+        } //===//
+
+
+        if ((hold & 0xffff) !== (hold >>> 16 ^ 0xffff)) {
+          strm.msg = 'invalid stored block lengths';
+          state.mode = BAD;
+          break;
+        }
+
+        state.length = hold & 0xffff; //Tracev((stderr, "inflate:       stored length %u\n",
+        //        state.length));
+        //=== INITBITS();
+
+        hold = 0;
+        bits = 0; //===//
+
+        state.mode = COPY_;
+
+        if (flush === Z_TREES) {
+          break inf_leave;
+        }
+
+      /* falls through */
+
+      case COPY_:
+        state.mode = COPY;
+
+      /* falls through */
+
+      case COPY:
+        copy = state.length;
+
+        if (copy) {
+          if (copy > have) {
+            copy = have;
+          }
+
+          if (copy > left) {
+            copy = left;
+          }
+
+          if (copy === 0) {
+            break inf_leave;
+          } //--- zmemcpy(put, next, copy); ---
+
+
+          output.set(input.subarray(next, next + copy), put); //---//
+
+          have -= copy;
+          next += copy;
+          left -= copy;
+          put += copy;
+          state.length -= copy;
+          break;
+        } //Tracev((stderr, "inflate:       stored end\n"));
+
+
+        state.mode = TYPE;
+        break;
+
+      case TABLE:
+        //=== NEEDBITS(14); */
+        while (bits < 14) {
+          if (have === 0) {
+            break inf_leave;
+          }
+
+          have--;
+          hold += input[next++] << bits;
+          bits += 8;
+        } //===//
+
+
+        state.nlen = (hold & 0x1f
+        /*BITS(5)*/
+        ) + 257; //--- DROPBITS(5) ---//
+
+        hold >>>= 5;
+        bits -= 5; //---//
+
+        state.ndist = (hold & 0x1f
+        /*BITS(5)*/
+        ) + 1; //--- DROPBITS(5) ---//
+
+        hold >>>= 5;
+        bits -= 5; //---//
+
+        state.ncode = (hold & 0x0f
+        /*BITS(4)*/
+        ) + 4; //--- DROPBITS(4) ---//
+
+        hold >>>= 4;
+        bits -= 4; //---//
+        //#ifndef PKZIP_BUG_WORKAROUND
+
+        if (state.nlen > 286 || state.ndist > 30) {
+          strm.msg = 'too many length or distance symbols';
+          state.mode = BAD;
+          break;
+        } //#endif
+        //Tracev((stderr, "inflate:       table sizes ok\n"));
+
+
+        state.have = 0;
+        state.mode = LENLENS;
+
+      /* falls through */
+
+      case LENLENS:
+        while (state.have < state.ncode) {
+          //=== NEEDBITS(3);
+          while (bits < 3) {
+            if (have === 0) {
+              break inf_leave;
+            }
+
+            have--;
+            hold += input[next++] << bits;
+            bits += 8;
+          } //===//
+
+
+          state.lens[order[state.have++]] = hold & 0x07; //BITS(3);
+          //--- DROPBITS(3) ---//
+
+          hold >>>= 3;
+          bits -= 3; //---//
+        }
+
+        while (state.have < 19) {
+          state.lens[order[state.have++]] = 0;
+        } // We have separate tables & no pointers. 2 commented lines below not needed.
+        //state.next = state.codes;
+        //state.lencode = state.next;
+        // Switch to use dynamic table
+
+
+        state.lencode = state.lendyn;
+        state.lenbits = 7;
+        opts = {
+          bits: state.lenbits
+        };
+        ret = inftrees(CODES, state.lens, 0, 19, state.lencode, 0, state.work, opts);
+        state.lenbits = opts.bits;
+
+        if (ret) {
+          strm.msg = 'invalid code lengths set';
+          state.mode = BAD;
+          break;
+        } //Tracev((stderr, "inflate:       code lengths ok\n"));
+
+
+        state.have = 0;
+        state.mode = CODELENS;
+
+      /* falls through */
+
+      case CODELENS:
+        while (state.have < state.nlen + state.ndist) {
+          for (;;) {
+            here = state.lencode[hold & (1 << state.lenbits) - 1];
+            /*BITS(state.lenbits)*/
+
+            here_bits = here >>> 24;
+            here_op = here >>> 16 & 0xff;
+            here_val = here & 0xffff;
+
+            if (here_bits <= bits) {
+              break;
+            } //--- PULLBYTE() ---//
+
+
+            if (have === 0) {
+              break inf_leave;
+            }
+
+            have--;
+            hold += input[next++] << bits;
+            bits += 8; //---//
+          }
+
+          if (here_val < 16) {
+            //--- DROPBITS(here.bits) ---//
+            hold >>>= here_bits;
+            bits -= here_bits; //---//
+
+            state.lens[state.have++] = here_val;
+          } else {
+            if (here_val === 16) {
+              //=== NEEDBITS(here.bits + 2);
+              n = here_bits + 2;
+
+              while (bits < n) {
+                if (have === 0) {
+                  break inf_leave;
+                }
+
+                have--;
+                hold += input[next++] << bits;
+                bits += 8;
+              } //===//
+              //--- DROPBITS(here.bits) ---//
+
+
+              hold >>>= here_bits;
+              bits -= here_bits; //---//
+
+              if (state.have === 0) {
+                strm.msg = 'invalid bit length repeat';
+                state.mode = BAD;
+                break;
+              }
+
+              len = state.lens[state.have - 1];
+              copy = 3 + (hold & 0x03); //BITS(2);
+              //--- DROPBITS(2) ---//
+
+              hold >>>= 2;
+              bits -= 2; //---//
+            } else if (here_val === 17) {
+              //=== NEEDBITS(here.bits + 3);
+              n = here_bits + 3;
+
+              while (bits < n) {
+                if (have === 0) {
+                  break inf_leave;
+                }
+
+                have--;
+                hold += input[next++] << bits;
+                bits += 8;
+              } //===//
+              //--- DROPBITS(here.bits) ---//
+
+
+              hold >>>= here_bits;
+              bits -= here_bits; //---//
+
+              len = 0;
+              copy = 3 + (hold & 0x07); //BITS(3);
+              //--- DROPBITS(3) ---//
+
+              hold >>>= 3;
+              bits -= 3; //---//
+            } else {
+              //=== NEEDBITS(here.bits + 7);
+              n = here_bits + 7;
+
+              while (bits < n) {
+                if (have === 0) {
+                  break inf_leave;
+                }
+
+                have--;
+                hold += input[next++] << bits;
+                bits += 8;
+              } //===//
+              //--- DROPBITS(here.bits) ---//
+
+
+              hold >>>= here_bits;
+              bits -= here_bits; //---//
+
+              len = 0;
+              copy = 11 + (hold & 0x7f); //BITS(7);
+              //--- DROPBITS(7) ---//
+
+              hold >>>= 7;
+              bits -= 7; //---//
+            }
+
+            if (state.have + copy > state.nlen + state.ndist) {
+              strm.msg = 'invalid bit length repeat';
+              state.mode = BAD;
+              break;
+            }
+
+            while (copy--) {
+              state.lens[state.have++] = len;
+            }
+          }
+        }
+        /* handle error breaks in while */
+
+
+        if (state.mode === BAD) {
+          break;
+        }
+        /* check for end-of-block code (better have one) */
+
+
+        if (state.lens[256] === 0) {
+          strm.msg = 'invalid code -- missing end-of-block';
+          state.mode = BAD;
+          break;
+        }
+        /* build code tables -- note: do not change the lenbits or distbits
+           values here (9 and 6) without reading the comments in inftrees.h
+           concerning the ENOUGH constants, which depend on those values */
+
+
+        state.lenbits = 9;
+        opts = {
+          bits: state.lenbits
+        };
+        ret = inftrees(LENS, state.lens, 0, state.nlen, state.lencode, 0, state.work, opts); // We have separate tables & no pointers. 2 commented lines below not needed.
+        // state.next_index = opts.table_index;
+
+        state.lenbits = opts.bits; // state.lencode = state.next;
+
+        if (ret) {
+          strm.msg = 'invalid literal/lengths set';
+          state.mode = BAD;
+          break;
+        }
+
+        state.distbits = 6; //state.distcode.copy(state.codes);
+        // Switch to use dynamic table
+
+        state.distcode = state.distdyn;
+        opts = {
+          bits: state.distbits
+        };
+        ret = inftrees(DISTS, state.lens, state.nlen, state.ndist, state.distcode, 0, state.work, opts); // We have separate tables & no pointers. 2 commented lines below not needed.
+        // state.next_index = opts.table_index;
+
+        state.distbits = opts.bits; // state.distcode = state.next;
+
+        if (ret) {
+          strm.msg = 'invalid distances set';
+          state.mode = BAD;
+          break;
+        } //Tracev((stderr, 'inflate:       codes ok\n'));
+
+
+        state.mode = LEN_;
+
+        if (flush === Z_TREES) {
+          break inf_leave;
+        }
+
+      /* falls through */
+
+      case LEN_:
+        state.mode = LEN;
+
+      /* falls through */
+
+      case LEN:
+        if (have >= 6 && left >= 258) {
+          //--- RESTORE() ---
+          strm.next_out = put;
+          strm.avail_out = left;
+          strm.next_in = next;
+          strm.avail_in = have;
+          state.hold = hold;
+          state.bits = bits; //---
+
+          inffast(strm, _out); //--- LOAD() ---
+
+          put = strm.next_out;
+          output = strm.output;
+          left = strm.avail_out;
+          next = strm.next_in;
+          input = strm.input;
+          have = strm.avail_in;
+          hold = state.hold;
+          bits = state.bits; //---
+
+          if (state.mode === TYPE) {
+            state.back = -1;
+          }
+
+          break;
+        }
+
+        state.back = 0;
+
+        for (;;) {
+          here = state.lencode[hold & (1 << state.lenbits) - 1];
+          /*BITS(state.lenbits)*/
+
+          here_bits = here >>> 24;
+          here_op = here >>> 16 & 0xff;
+          here_val = here & 0xffff;
+
+          if (here_bits <= bits) {
+            break;
+          } //--- PULLBYTE() ---//
+
+
+          if (have === 0) {
+            break inf_leave;
+          }
+
+          have--;
+          hold += input[next++] << bits;
+          bits += 8; //---//
+        }
+
+        if (here_op && (here_op & 0xf0) === 0) {
+          last_bits = here_bits;
+          last_op = here_op;
+          last_val = here_val;
+
+          for (;;) {
+            here = state.lencode[last_val + ((hold & (1 << last_bits + last_op) - 1
+            /*BITS(last.bits + last.op)*/
+            ) >> last_bits)];
+            here_bits = here >>> 24;
+            here_op = here >>> 16 & 0xff;
+            here_val = here & 0xffff;
+
+            if (last_bits + here_bits <= bits) {
+              break;
+            } //--- PULLBYTE() ---//
+
+
+            if (have === 0) {
+              break inf_leave;
+            }
+
+            have--;
+            hold += input[next++] << bits;
+            bits += 8; //---//
+          } //--- DROPBITS(last.bits) ---//
+
+
+          hold >>>= last_bits;
+          bits -= last_bits; //---//
+
+          state.back += last_bits;
+        } //--- DROPBITS(here.bits) ---//
+
+
+        hold >>>= here_bits;
+        bits -= here_bits; //---//
+
+        state.back += here_bits;
+        state.length = here_val;
+
+        if (here_op === 0) {
+          //Tracevv((stderr, here.val >= 0x20 && here.val < 0x7f ?
+          //        "inflate:         literal '%c'\n" :
+          //        "inflate:         literal 0x%02x\n", here.val));
+          state.mode = LIT;
+          break;
+        }
+
+        if (here_op & 32) {
+          //Tracevv((stderr, "inflate:         end of block\n"));
+          state.back = -1;
+          state.mode = TYPE;
+          break;
+        }
+
+        if (here_op & 64) {
+          strm.msg = 'invalid literal/length code';
+          state.mode = BAD;
+          break;
+        }
+
+        state.extra = here_op & 15;
+        state.mode = LENEXT;
+
+      /* falls through */
+
+      case LENEXT:
+        if (state.extra) {
+          //=== NEEDBITS(state.extra);
+          n = state.extra;
+
+          while (bits < n) {
+            if (have === 0) {
+              break inf_leave;
+            }
+
+            have--;
+            hold += input[next++] << bits;
+            bits += 8;
+          } //===//
+
+
+          state.length += hold & (1 << state.extra) - 1
+          /*BITS(state.extra)*/
+          ; //--- DROPBITS(state.extra) ---//
+
+          hold >>>= state.extra;
+          bits -= state.extra; //---//
+
+          state.back += state.extra;
+        } //Tracevv((stderr, "inflate:         length %u\n", state.length));
+
+
+        state.was = state.length;
+        state.mode = DIST;
+
+      /* falls through */
+
+      case DIST:
+        for (;;) {
+          here = state.distcode[hold & (1 << state.distbits) - 1];
+          /*BITS(state.distbits)*/
+
+          here_bits = here >>> 24;
+          here_op = here >>> 16 & 0xff;
+          here_val = here & 0xffff;
+
+          if (here_bits <= bits) {
+            break;
+          } //--- PULLBYTE() ---//
+
+
+          if (have === 0) {
+            break inf_leave;
+          }
+
+          have--;
+          hold += input[next++] << bits;
+          bits += 8; //---//
+        }
+
+        if ((here_op & 0xf0) === 0) {
+          last_bits = here_bits;
+          last_op = here_op;
+          last_val = here_val;
+
+          for (;;) {
+            here = state.distcode[last_val + ((hold & (1 << last_bits + last_op) - 1
+            /*BITS(last.bits + last.op)*/
+            ) >> last_bits)];
+            here_bits = here >>> 24;
+            here_op = here >>> 16 & 0xff;
+            here_val = here & 0xffff;
+
+            if (last_bits + here_bits <= bits) {
+              break;
+            } //--- PULLBYTE() ---//
+
+
+            if (have === 0) {
+              break inf_leave;
+            }
+
+            have--;
+            hold += input[next++] << bits;
+            bits += 8; //---//
+          } //--- DROPBITS(last.bits) ---//
+
+
+          hold >>>= last_bits;
+          bits -= last_bits; //---//
+
+          state.back += last_bits;
+        } //--- DROPBITS(here.bits) ---//
+
+
+        hold >>>= here_bits;
+        bits -= here_bits; //---//
+
+        state.back += here_bits;
+
+        if (here_op & 64) {
+          strm.msg = 'invalid distance code';
+          state.mode = BAD;
+          break;
+        }
+
+        state.offset = here_val;
+        state.extra = here_op & 15;
+        state.mode = DISTEXT;
+
+      /* falls through */
+
+      case DISTEXT:
+        if (state.extra) {
+          //=== NEEDBITS(state.extra);
+          n = state.extra;
+
+          while (bits < n) {
+            if (have === 0) {
+              break inf_leave;
+            }
+
+            have--;
+            hold += input[next++] << bits;
+            bits += 8;
+          } //===//
+
+
+          state.offset += hold & (1 << state.extra) - 1
+          /*BITS(state.extra)*/
+          ; //--- DROPBITS(state.extra) ---//
+
+          hold >>>= state.extra;
+          bits -= state.extra; //---//
+
+          state.back += state.extra;
+        } //#ifdef INFLATE_STRICT
+
+
+        if (state.offset > state.dmax) {
+          strm.msg = 'invalid distance too far back';
+          state.mode = BAD;
+          break;
+        } //#endif
+        //Tracevv((stderr, "inflate:         distance %u\n", state.offset));
+
+
+        state.mode = MATCH;
+
+      /* falls through */
+
+      case MATCH:
+        if (left === 0) {
+          break inf_leave;
+        }
+
+        copy = _out - left;
+
+        if (state.offset > copy) {
+          /* copy from window */
+          copy = state.offset - copy;
+
+          if (copy > state.whave) {
+            if (state.sane) {
+              strm.msg = 'invalid distance too far back';
+              state.mode = BAD;
+              break;
+            } // (!) This block is disabled in zlib defaults,
+            // don't enable it for binary compatibility
+            //#ifdef INFLATE_ALLOW_INVALID_DISTANCE_TOOFAR_ARRR
+            //          Trace((stderr, "inflate.c too far\n"));
+            //          copy -= state.whave;
+            //          if (copy > state.length) { copy = state.length; }
+            //          if (copy > left) { copy = left; }
+            //          left -= copy;
+            //          state.length -= copy;
+            //          do {
+            //            output[put++] = 0;
+            //          } while (--copy);
+            //          if (state.length === 0) { state.mode = LEN; }
+            //          break;
+            //#endif
+
+          }
+
+          if (copy > state.wnext) {
+            copy -= state.wnext;
+            from = state.wsize - copy;
+          } else {
+            from = state.wnext - copy;
+          }
+
+          if (copy > state.length) {
+            copy = state.length;
+          }
+
+          from_source = state.window;
+        } else {
+          /* copy from output */
+          from_source = output;
+          from = put - state.offset;
+          copy = state.length;
+        }
+
+        if (copy > left) {
+          copy = left;
+        }
+
+        left -= copy;
+        state.length -= copy;
+
+        do {
+          output[put++] = from_source[from++];
+        } while (--copy);
+
+        if (state.length === 0) {
+          state.mode = LEN;
+        }
+
+        break;
+
+      case LIT:
+        if (left === 0) {
+          break inf_leave;
+        }
+
+        output[put++] = state.length;
+        left--;
+        state.mode = LEN;
+        break;
+
+      case CHECK:
+        if (state.wrap) {
+          //=== NEEDBITS(32);
+          while (bits < 32) {
+            if (have === 0) {
+              break inf_leave;
+            }
+
+            have--; // Use '|' instead of '+' to make sure that result is signed
+
+            hold |= input[next++] << bits;
+            bits += 8;
+          } //===//
+
+
+          _out -= left;
+          strm.total_out += _out;
+          state.total += _out;
+
+          if (_out) {
+            strm.adler = state.check =
+            /*UPDATE(state.check, put - _out, _out);*/
+            state.flags ? crc32_1(state.check, output, _out, put - _out) : adler32_1(state.check, output, _out, put - _out);
+          }
+
+          _out = left; // NB: crc32 stored as signed 32-bit int, zswap32 returns signed too
+
+          if ((state.flags ? hold : zswap32(hold)) !== state.check) {
+            strm.msg = 'incorrect data check';
+            state.mode = BAD;
+            break;
+          } //=== INITBITS();
+
+
+          hold = 0;
+          bits = 0; //===//
+          //Tracev((stderr, "inflate:   check matches trailer\n"));
+        }
+
+        state.mode = LENGTH;
+
+      /* falls through */
+
+      case LENGTH:
+        if (state.wrap && state.flags) {
+          //=== NEEDBITS(32);
+          while (bits < 32) {
+            if (have === 0) {
+              break inf_leave;
+            }
+
+            have--;
+            hold += input[next++] << bits;
+            bits += 8;
+          } //===//
+
+
+          if (hold !== (state.total & 0xffffffff)) {
+            strm.msg = 'incorrect length check';
+            state.mode = BAD;
+            break;
+          } //=== INITBITS();
+
+
+          hold = 0;
+          bits = 0; //===//
+          //Tracev((stderr, "inflate:   length matches trailer\n"));
+        }
+
+        state.mode = DONE;
+
+      /* falls through */
+
+      case DONE:
+        ret = Z_STREAM_END$1;
+        break inf_leave;
+
+      case BAD:
+        ret = Z_DATA_ERROR$1;
+        break inf_leave;
+
+      case MEM:
+        return Z_MEM_ERROR$1;
+
+      case SYNC:
+      /* falls through */
+
+      default:
+        return Z_STREAM_ERROR$1;
+    }
+  } // inf_leave <- here is real place for "goto inf_leave", emulated via "break inf_leave"
+
+  /*
+     Return from inflate(), updating the total counts and the check value.
+     If there was no progress during the inflate() call, return a buffer
+     error.  Call updatewindow() to create and/or update the window state.
+     Note: a memory error from inflate() is non-recoverable.
+   */
+  //--- RESTORE() ---
+
+
+  strm.next_out = put;
+  strm.avail_out = left;
+  strm.next_in = next;
+  strm.avail_in = have;
+  state.hold = hold;
+  state.bits = bits; //---
+
+  if (state.wsize || _out !== strm.avail_out && state.mode < BAD && (state.mode < CHECK || flush !== Z_FINISH$1)) {
+    if (updatewindow(strm, strm.output, strm.next_out, _out - strm.avail_out)) ;
+  }
+
+  _in -= strm.avail_in;
+  _out -= strm.avail_out;
+  strm.total_in += _in;
+  strm.total_out += _out;
+  state.total += _out;
+
+  if (state.wrap && _out) {
+    strm.adler = state.check =
+    /*UPDATE(state.check, strm.next_out - _out, _out);*/
+    state.flags ? crc32_1(state.check, output, _out, strm.next_out - _out) : adler32_1(state.check, output, _out, strm.next_out - _out);
+  }
+
+  strm.data_type = state.bits + (state.last ? 64 : 0) + (state.mode === TYPE ? 128 : 0) + (state.mode === LEN_ || state.mode === COPY_ ? 256 : 0);
+
+  if ((_in === 0 && _out === 0 || flush === Z_FINISH$1) && ret === Z_OK$1) {
+    ret = Z_BUF_ERROR;
+  }
+
+  return ret;
+};
+
+const inflateEnd = strm => {
+  if (!strm || !strm.state
+  /*|| strm->zfree == (free_func)0*/
+  ) {
+    return Z_STREAM_ERROR$1;
+  }
+
+  let state = strm.state;
+
+  if (state.window) {
+    state.window = null;
+  }
+
+  strm.state = null;
+  return Z_OK$1;
+};
+
+const inflateGetHeader = (strm, head) => {
+  /* check state */
+  if (!strm || !strm.state) {
+    return Z_STREAM_ERROR$1;
+  }
+
+  const state = strm.state;
+
+  if ((state.wrap & 2) === 0) {
+    return Z_STREAM_ERROR$1;
+  }
+  /* save header structure */
+
+
+  state.head = head;
+  head.done = false;
+  return Z_OK$1;
+};
+
+const inflateSetDictionary = (strm, dictionary) => {
+  const dictLength = dictionary.length;
+  let state;
+  let dictid;
+  let ret;
+  /* check state */
+
+  if (!strm
+  /* == Z_NULL */
+  || !strm.state
+  /* == Z_NULL */
+  ) {
+    return Z_STREAM_ERROR$1;
+  }
+
+  state = strm.state;
+
+  if (state.wrap !== 0 && state.mode !== DICT) {
+    return Z_STREAM_ERROR$1;
+  }
+  /* check for correct dictionary identifier */
+
+
+  if (state.mode === DICT) {
+    dictid = 1;
+    /* adler32(0, null, 0)*/
+
+    /* dictid = adler32(dictid, dictionary, dictLength); */
+
+    dictid = adler32_1(dictid, dictionary, dictLength, 0);
+
+    if (dictid !== state.check) {
+      return Z_DATA_ERROR$1;
+    }
+  }
+  /* copy dictionary to window using updatewindow(), which will amend the
+   existing dictionary if appropriate */
+
+
+  ret = updatewindow(strm, dictionary, dictLength, dictLength);
+
+  if (ret) {
+    state.mode = MEM;
+    return Z_MEM_ERROR$1;
+  }
+
+  state.havedict = 1; // Tracev((stderr, "inflate:   dictionary set\n"));
+
+  return Z_OK$1;
+};
+
+var inflateReset_1 = inflateReset;
+var inflateReset2_1 = inflateReset2;
+var inflateResetKeep_1 = inflateResetKeep;
+var inflateInit_1 = inflateInit;
+var inflateInit2_1 = inflateInit2;
+var inflate_2$1 = inflate$2;
+var inflateEnd_1 = inflateEnd;
+var inflateGetHeader_1 = inflateGetHeader;
+var inflateSetDictionary_1 = inflateSetDictionary;
+var inflateInfo = 'pako inflate (from Nodeca project)';
+/* Not implemented
+module.exports.inflateCopy = inflateCopy;
+module.exports.inflateGetDictionary = inflateGetDictionary;
+module.exports.inflateMark = inflateMark;
+module.exports.inflatePrime = inflatePrime;
+module.exports.inflateSync = inflateSync;
+module.exports.inflateSyncPoint = inflateSyncPoint;
+module.exports.inflateUndermine = inflateUndermine;
+*/
+
+var inflate_1$2 = {
+  inflateReset: inflateReset_1,
+  inflateReset2: inflateReset2_1,
+  inflateResetKeep: inflateResetKeep_1,
+  inflateInit: inflateInit_1,
+  inflateInit2: inflateInit2_1,
+  inflate: inflate_2$1,
+  inflateEnd: inflateEnd_1,
+  inflateGetHeader: inflateGetHeader_1,
+  inflateSetDictionary: inflateSetDictionary_1,
+  inflateInfo: inflateInfo
+}; // (C) 1995-2013 Jean-loup Gailly and Mark Adler
+// (C) 2014-2017 Vitaly Puzrin and Andrey Tupitsin
+//
+// This software is provided 'as-is', without any express or implied
+// warranty. In no event will the authors be held liable for any damages
+// arising from the use of this software.
+//
+// Permission is granted to anyone to use this software for any purpose,
+// including commercial applications, and to alter it and redistribute it
+// freely, subject to the following restrictions:
+//
+// 1. The origin of this software must not be misrepresented; you must not
+//   claim that you wrote the original software. If you use this software
+//   in a product, an acknowledgment in the product documentation would be
+//   appreciated but is not required.
+// 2. Altered source versions must be plainly marked as such, and must not be
+//   misrepresented as being the original software.
+// 3. This notice may not be removed or altered from any source distribution.
+
+function GZheader() {
+  /* true if compressed data believed to be text */
+  this.text = 0;
+  /* modification time */
+
+  this.time = 0;
+  /* extra flags (not used when writing a gzip file) */
+
+  this.xflags = 0;
+  /* operating system */
+
+  this.os = 0;
+  /* pointer to extra field or Z_NULL if none */
+
+  this.extra = null;
+  /* extra field length (valid if extra != Z_NULL) */
+
+  this.extra_len = 0; // Actually, we don't need it in JS,
+  // but leave for few code modifications
+  //
+  // Setup limits is not necessary because in js we should not preallocate memory
+  // for inflate use constant limit in 65536 bytes
+  //
+
+  /* space at extra (only when reading header) */
+  // this.extra_max  = 0;
+
+  /* pointer to zero-terminated file name or Z_NULL */
+
+  this.name = '';
+  /* space at name (only when reading header) */
+  // this.name_max   = 0;
+
+  /* pointer to zero-terminated comment or Z_NULL */
+
+  this.comment = '';
+  /* space at comment (only when reading header) */
+  // this.comm_max   = 0;
+
+  /* true if there was or will be a header crc */
+
+  this.hcrc = 0;
+  /* true when done reading gzip header (not used when writing a gzip file) */
+
+  this.done = false;
+}
+
+var gzheader = GZheader;
+const toString = Object.prototype.toString;
+/* Public constants ==========================================================*/
+
+/* ===========================================================================*/
+
+const {
+  Z_NO_FLUSH,
+  Z_FINISH,
+  Z_OK,
+  Z_STREAM_END,
+  Z_NEED_DICT,
+  Z_STREAM_ERROR,
+  Z_DATA_ERROR,
+  Z_MEM_ERROR
+} = constants$2;
+/* ===========================================================================*/
+
+/**
+ * class Inflate
+ *
+ * Generic JS-style wrapper for zlib calls. If you don't need
+ * streaming behaviour - use more simple functions: [[inflate]]
+ * and [[inflateRaw]].
+ **/
+
+/* internal
+ * inflate.chunks -> Array
+ *
+ * Chunks of output data, if [[Inflate#onData]] not overridden.
+ **/
+
+/**
+ * Inflate.result -> Uint8Array|String
+ *
+ * Uncompressed result, generated by default [[Inflate#onData]]
+ * and [[Inflate#onEnd]] handlers. Filled after you push last chunk
+ * (call [[Inflate#push]] with `Z_FINISH` / `true` param).
+ **/
+
+/**
+ * Inflate.err -> Number
+ *
+ * Error code after inflate finished. 0 (Z_OK) on success.
+ * Should be checked if broken data possible.
+ **/
+
+/**
+ * Inflate.msg -> String
+ *
+ * Error message, if [[Inflate.err]] != 0
+ **/
+
+/**
+ * new Inflate(options)
+ * - options (Object): zlib inflate options.
+ *
+ * Creates new inflator instance with specified params. Throws exception
+ * on bad params. Supported options:
+ *
+ * - `windowBits`
+ * - `dictionary`
+ *
+ * [http://zlib.net/manual.html#Advanced](http://zlib.net/manual.html#Advanced)
+ * for more information on these.
+ *
+ * Additional options, for internal needs:
+ *
+ * - `chunkSize` - size of generated data chunks (16K by default)
+ * - `raw` (Boolean) - do raw inflate
+ * - `to` (String) - if equal to 'string', then result will be converted
+ *   from utf8 to utf16 (javascript) string. When string output requested,
+ *   chunk length can differ from `chunkSize`, depending on content.
+ *
+ * By default, when no options set, autodetect deflate/gzip data format via
+ * wrapper header.
+ *
+ * ##### Example:
+ *
+ * ```javascript
+ * const pako = require('pako')
+ * const chunk1 = new Uint8Array([1,2,3,4,5,6,7,8,9])
+ * const chunk2 = new Uint8Array([10,11,12,13,14,15,16,17,18,19]);
+ *
+ * const inflate = new pako.Inflate({ level: 3});
+ *
+ * inflate.push(chunk1, false);
+ * inflate.push(chunk2, true);  // true -> last chunk
+ *
+ * if (inflate.err) { throw new Error(inflate.err); }
+ *
+ * console.log(inflate.result);
+ * ```
+ **/
+
+function Inflate$1(options) {
+  this.options = common.assign({
+    chunkSize: 1024 * 64,
+    windowBits: 15,
+    to: ''
+  }, options || {});
+  const opt = this.options; // Force window size for `raw` data, if not set directly,
+  // because we have no header for autodetect.
+
+  if (opt.raw && opt.windowBits >= 0 && opt.windowBits < 16) {
+    opt.windowBits = -opt.windowBits;
+
+    if (opt.windowBits === 0) {
+      opt.windowBits = -15;
+    }
+  } // If `windowBits` not defined (and mode not raw) - set autodetect flag for gzip/deflate
+
+
+  if (opt.windowBits >= 0 && opt.windowBits < 16 && !(options && options.windowBits)) {
+    opt.windowBits += 32;
+  } // Gzip header has no info about windows size, we can do autodetect only
+  // for deflate. So, if window size not set, force it to max when gzip possible
+
+
+  if (opt.windowBits > 15 && opt.windowBits < 48) {
+    // bit 3 (16) -> gzipped data
+    // bit 4 (32) -> autodetect gzip/deflate
+    if ((opt.windowBits & 15) === 0) {
+      opt.windowBits |= 15;
+    }
+  }
+
+  this.err = 0; // error code, if happens (0 = Z_OK)
+
+  this.msg = ''; // error message
+
+  this.ended = false; // used to avoid multiple onEnd() calls
+
+  this.chunks = []; // chunks of compressed data
+
+  this.strm = new zstream();
+  this.strm.avail_out = 0;
+  let status = inflate_1$2.inflateInit2(this.strm, opt.windowBits);
+
+  if (status !== Z_OK) {
+    throw new Error(messages[status]);
+  }
+
+  this.header = new gzheader();
+  inflate_1$2.inflateGetHeader(this.strm, this.header); // Setup dictionary
+
+  if (opt.dictionary) {
+    // Convert data if needed
+    if (typeof opt.dictionary === 'string') {
+      opt.dictionary = strings.string2buf(opt.dictionary);
+    } else if (toString.call(opt.dictionary) === '[object ArrayBuffer]') {
+      opt.dictionary = new Uint8Array(opt.dictionary);
+    }
+
+    if (opt.raw) {
+      //In raw mode we need to set the dictionary early
+      status = inflate_1$2.inflateSetDictionary(this.strm, opt.dictionary);
+
+      if (status !== Z_OK) {
+        throw new Error(messages[status]);
+      }
+    }
+  }
+}
+/**
+ * Inflate#push(data[, flush_mode]) -> Boolean
+ * - data (Uint8Array|ArrayBuffer): input data
+ * - flush_mode (Number|Boolean): 0..6 for corresponding Z_NO_FLUSH..Z_TREE
+ *   flush modes. See constants. Skipped or `false` means Z_NO_FLUSH,
+ *   `true` means Z_FINISH.
+ *
+ * Sends input data to inflate pipe, generating [[Inflate#onData]] calls with
+ * new output chunks. Returns `true` on success. If end of stream detected,
+ * [[Inflate#onEnd]] will be called.
+ *
+ * `flush_mode` is not needed for normal operation, because end of stream
+ * detected automatically. You may try to use it for advanced things, but
+ * this functionality was not tested.
+ *
+ * On fail call [[Inflate#onEnd]] with error code and return false.
+ *
+ * ##### Example
+ *
+ * ```javascript
+ * push(chunk, false); // push one of data chunks
+ * ...
+ * push(chunk, true);  // push last chunk
+ * ```
+ **/
+
+
+Inflate$1.prototype.push = function (data, flush_mode) {
+  const strm = this.strm;
+  const chunkSize = this.options.chunkSize;
+  const dictionary = this.options.dictionary;
+
+  let status, _flush_mode, last_avail_out;
+
+  if (this.ended) return false;
+  if (flush_mode === ~~flush_mode) _flush_mode = flush_mode;else _flush_mode = flush_mode === true ? Z_FINISH : Z_NO_FLUSH; // Convert data if needed
+
+  if (toString.call(data) === '[object ArrayBuffer]') {
+    strm.input = new Uint8Array(data);
+  } else {
+    strm.input = data;
+  }
+
+  strm.next_in = 0;
+  strm.avail_in = strm.input.length;
+
+  for (;;) {
+    if (strm.avail_out === 0) {
+      strm.output = new Uint8Array(chunkSize);
+      strm.next_out = 0;
+      strm.avail_out = chunkSize;
+    }
+
+    status = inflate_1$2.inflate(strm, _flush_mode);
+
+    if (status === Z_NEED_DICT && dictionary) {
+      status = inflate_1$2.inflateSetDictionary(strm, dictionary);
+
+      if (status === Z_OK) {
+        status = inflate_1$2.inflate(strm, _flush_mode);
+      } else if (status === Z_DATA_ERROR) {
+        // Replace code with more verbose
+        status = Z_NEED_DICT;
+      }
+    } // Skip snyc markers if more data follows and not raw mode
+
+
+    while (strm.avail_in > 0 && status === Z_STREAM_END && strm.state.wrap > 0 && data[strm.next_in] !== 0) {
+      inflate_1$2.inflateReset(strm);
+      status = inflate_1$2.inflate(strm, _flush_mode);
+    }
+
+    switch (status) {
+      case Z_STREAM_ERROR:
+      case Z_DATA_ERROR:
+      case Z_NEED_DICT:
+      case Z_MEM_ERROR:
+        this.onEnd(status);
+        this.ended = true;
+        return false;
+    } // Remember real `avail_out` value, because we may patch out buffer content
+    // to align utf8 strings boundaries.
+
+
+    last_avail_out = strm.avail_out;
+
+    if (strm.next_out) {
+      if (strm.avail_out === 0 || status === Z_STREAM_END) {
+        if (this.options.to === 'string') {
+          let next_out_utf8 = strings.utf8border(strm.output, strm.next_out);
+          let tail = strm.next_out - next_out_utf8;
+          let utf8str = strings.buf2string(strm.output, next_out_utf8); // move tail & realign counters
+
+          strm.next_out = tail;
+          strm.avail_out = chunkSize - tail;
+          if (tail) strm.output.set(strm.output.subarray(next_out_utf8, next_out_utf8 + tail), 0);
+          this.onData(utf8str);
+        } else {
+          this.onData(strm.output.length === strm.next_out ? strm.output : strm.output.subarray(0, strm.next_out));
+        }
+      }
+    } // Must repeat iteration if out buffer is full
+
+
+    if (status === Z_OK && last_avail_out === 0) continue; // Finalize if end of stream reached.
+
+    if (status === Z_STREAM_END) {
+      status = inflate_1$2.inflateEnd(this.strm);
+      this.onEnd(status);
+      this.ended = true;
+      return true;
+    }
+
+    if (strm.avail_in === 0) break;
+  }
+
+  return true;
+};
+/**
+ * Inflate#onData(chunk) -> Void
+ * - chunk (Uint8Array|String): output data. When string output requested,
+ *   each chunk will be string.
+ *
+ * By default, stores data blocks in `chunks[]` property and glue
+ * those in `onEnd`. Override this handler, if you need another behaviour.
+ **/
+
+
+Inflate$1.prototype.onData = function (chunk) {
+  this.chunks.push(chunk);
+};
+/**
+ * Inflate#onEnd(status) -> Void
+ * - status (Number): inflate status. 0 (Z_OK) on success,
+ *   other if not.
+ *
+ * Called either after you tell inflate that the input stream is
+ * complete (Z_FINISH). By default - join collected chunks,
+ * free memory and fill `results` / `err` properties.
+ **/
+
+
+Inflate$1.prototype.onEnd = function (status) {
+  // On success - join
+  if (status === Z_OK) {
+    if (this.options.to === 'string') {
+      this.result = this.chunks.join('');
+    } else {
+      this.result = common.flattenChunks(this.chunks);
+    }
+  }
+
+  this.chunks = [];
+  this.err = status;
+  this.msg = this.strm.msg;
+};
+/**
+ * inflate(data[, options]) -> Uint8Array|String
+ * - data (Uint8Array): input data to decompress.
+ * - options (Object): zlib inflate options.
+ *
+ * Decompress `data` with inflate/ungzip and `options`. Autodetect
+ * format via wrapper header by default. That's why we don't provide
+ * separate `ungzip` method.
+ *
+ * Supported options are:
+ *
+ * - windowBits
+ *
+ * [http://zlib.net/manual.html#Advanced](http://zlib.net/manual.html#Advanced)
+ * for more information.
+ *
+ * Sugar (options):
+ *
+ * - `raw` (Boolean) - say that we work with raw stream, if you don't wish to specify
+ *   negative windowBits implicitly.
+ * - `to` (String) - if equal to 'string', then result will be converted
+ *   from utf8 to utf16 (javascript) string. When string output requested,
+ *   chunk length can differ from `chunkSize`, depending on content.
+ *
+ *
+ * ##### Example:
+ *
+ * ```javascript
+ * const pako = require('pako');
+ * const input = pako.deflate(new Uint8Array([1,2,3,4,5,6,7,8,9]));
+ * let output;
+ *
+ * try {
+ *   output = pako.inflate(input);
+ * } catch (err) {
+ *   console.log(err);
+ * }
+ * ```
+ **/
+
+
+function inflate$1(input, options) {
+  const inflator = new Inflate$1(options);
+  inflator.push(input); // That will never happens, if you don't cheat with options :)
+
+  if (inflator.err) throw inflator.msg || messages[inflator.err];
+  return inflator.result;
+}
+/**
+ * inflateRaw(data[, options]) -> Uint8Array|String
+ * - data (Uint8Array): input data to decompress.
+ * - options (Object): zlib inflate options.
+ *
+ * The same as [[inflate]], but creates raw data, without wrapper
+ * (header and adler32 crc).
+ **/
+
+
+function inflateRaw$1(input, options) {
+  options = options || {};
+  options.raw = true;
+  return inflate$1(input, options);
+}
+/**
+ * ungzip(data[, options]) -> Uint8Array|String
+ * - data (Uint8Array): input data to decompress.
+ * - options (Object): zlib inflate options.
+ *
+ * Just shortcut to [[inflate]], because it autodetects format
+ * by header.content. Done for convenience.
+ **/
+
+
+var Inflate_1$1 = Inflate$1;
+var inflate_2 = inflate$1;
+var inflateRaw_1$1 = inflateRaw$1;
+var ungzip$1 = inflate$1;
+var constants = constants$2;
+var inflate_1$1 = {
+  Inflate: Inflate_1$1,
+  inflate: inflate_2,
+  inflateRaw: inflateRaw_1$1,
+  ungzip: ungzip$1,
+  constants: constants
+};
+const {
+  Deflate,
+  deflate,
+  deflateRaw,
+  gzip
+} = deflate_1$1;
+const {
+  Inflate,
+  inflate,
+  inflateRaw,
+  ungzip
+} = inflate_1$1;
+var Deflate_1 = Deflate;
+exports.Deflate = Deflate_1;
+var deflate_1 = deflate;
+exports.deflate = deflate_1;
+var deflateRaw_1 = deflateRaw;
+exports.deflateRaw = deflateRaw_1;
+var gzip_1 = gzip;
+exports.gzip = gzip_1;
+var Inflate_1 = Inflate;
+exports.Inflate = Inflate_1;
+var inflate_1 = inflate;
+exports.inflate = inflate_1;
+var inflateRaw_1 = inflateRaw;
+exports.inflateRaw = inflateRaw_1;
+var ungzip_1 = ungzip;
+exports.ungzip = ungzip_1;
+var constants_1 = constants$2;
+exports.constants = constants_1;
+var pako = {
+  Deflate: Deflate_1,
+  deflate: deflate_1,
+  deflateRaw: deflateRaw_1,
+  gzip: gzip_1,
+  Inflate: Inflate_1,
+  inflate: inflate_1,
+  inflateRaw: inflateRaw_1,
+  ungzip: ungzip_1,
+  constants: constants_1
+};
+exports.default = pako;
+},{}],"node_modules/parcel-bundler/src/builtins/hmr-runtime.js":[function(require,module,exports) {
 var global = arguments[3];
 var OVERLAY_ID = '__parcel__error__overlay__';
 var OldModule = module.bundle.Module;
@@ -94321,7 +117147,7 @@ var parent = module.bundle.parent;
 if ((!parent || !parent.isParcelRequire) && typeof WebSocket !== 'undefined') {
   var hostname = "" || location.hostname;
   var protocol = location.protocol === 'https:' ? 'wss' : 'ws';
-  var ws = new WebSocket(protocol + '://' + hostname + ':' + "56533" + '/');
+  var ws = new WebSocket(protocol + '://' + hostname + ':' + "57189" + '/');
 
   ws.onmessage = function (event) {
     checkedAssets = {};
@@ -94497,5 +117323,29 @@ function hmrAcceptRun(bundle, id) {
     return true;
   }
 }
-},{}]},{},["node_modules/parcel-bundler/src/builtins/hmr-runtime.js","Scripts/Map.js"], null)
+},{}],"node_modules/parcel-bundler/src/builtins/loaders/browser/js-loader.js":[function(require,module,exports) {
+module.exports = function loadJSBundle(bundle) {
+  return new Promise(function (resolve, reject) {
+    var script = document.createElement('script');
+    script.async = true;
+    script.type = 'text/javascript';
+    script.charset = 'utf-8';
+    script.src = bundle;
+
+    script.onerror = function (e) {
+      script.onerror = script.onload = null;
+      reject(e);
+    };
+
+    script.onload = function () {
+      script.onerror = script.onload = null;
+      resolve();
+    };
+
+    document.getElementsByTagName('head')[0].appendChild(script);
+  });
+};
+},{}],0:[function(require,module,exports) {
+var b=require("node_modules/parcel-bundler/src/builtins/bundle-loader.js");b.register("js",require("node_modules/parcel-bundler/src/builtins/loaders/browser/js-loader.js"));
+},{}]},{},["node_modules/parcel-bundler/src/builtins/hmr-runtime.js",0,"Scripts/Map.js"], null)
 //# sourceMappingURL=/Map.8f0069aa.js.map

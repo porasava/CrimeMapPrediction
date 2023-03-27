@@ -6727,8 +6727,8 @@ var _coordinate = require("ol/coordinate");
 
 function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
 
-var map = $("#map").data("map");
-var mousePosition = new _MousePosition.default({
+const map = $("#map").data("map");
+const mousePosition = new _MousePosition.default({
   coordinateFormat: (0, _coordinate.createStringXY)(5),
   className: "badge-pill badge-warning",
   target: "coordinates"
@@ -6762,7 +6762,7 @@ var parent = module.bundle.parent;
 if ((!parent || !parent.isParcelRequire) && typeof WebSocket !== 'undefined') {
   var hostname = "" || location.hostname;
   var protocol = location.protocol === 'https:' ? 'wss' : 'ws';
-  var ws = new WebSocket(protocol + '://' + hostname + ':' + "56533" + '/');
+  var ws = new WebSocket(protocol + '://' + hostname + ':' + "57189" + '/');
 
   ws.onmessage = function (event) {
     checkedAssets = {};

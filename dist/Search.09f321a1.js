@@ -110738,23 +110738,23 @@ var _style = require("ol/style");
 
 function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
 
-var map = $('#map').data('map');
-var searchBtn = $('#search');
-var wfsUrl = 'http://172.19.16.1:5000/geoserver/Training/wfs';
-var vectorSource = new _Vector.default();
-var style = new _style.Style({
+const map = $('#map').data('map');
+const searchBtn = $('#search');
+const wfsUrl = 'http://localhost:5000/geoserver/Training/wfs';
+const vectorSource = new _Vector.default();
+const style = new _style.Style({
   stroke: new _style.Stroke({
     color: 'blue',
     width: 2
   })
 });
-var vector = new _layer.Vector({
+const vector = new _layer.Vector({
   source: vectorSource,
   style: style
 });
 map.addLayer(vector);
 searchBtn.click(function () {
-  var crimeTAInput = $('#TAInput').val().toString(); // const crimeAreaInput =$('#AreaNameInput').val().toString();
+  const crimeTAInput = $('#TAInput').val().toString(); // const crimeAreaInput =$('#AreaNameInput').val().toString();
   // console.log(crimeTAInput)
   // console.log(crimeAreaInput)
 
@@ -110766,9 +110766,9 @@ searchBtn.click(function () {
   // }
 
 
-  var featureRequest = new _format.WFS().writeGetFeature({
+  const featureRequest = new _format.WFS().writeGetFeature({
     srsName: 'EPSG:4326',
-    featureNS: "http://172.19.16.1:5000/geoserver/wfs",
+    featureNS: "http://localhost:5000/geoserver/wfs",
     featurePrefix: 'TA_rename',
     featureTypes: ['TA_rename'],
     outputFormat: 'application/json',
@@ -110785,7 +110785,7 @@ searchBtn.click(function () {
   }).then(function (json) {
     // console.log(json)
     if (json.features.length > 0) {
-      var features = new _format.GeoJSON().readFeatures(json);
+      const features = new _format.GeoJSON().readFeatures(json);
       vectorSource.clear(true);
       vectorSource.addFeatures(features);
       map.getView().fit(vectorSource.getExtent(), {
@@ -110824,7 +110824,7 @@ var parent = module.bundle.parent;
 if ((!parent || !parent.isParcelRequire) && typeof WebSocket !== 'undefined') {
   var hostname = "" || location.hostname;
   var protocol = location.protocol === 'https:' ? 'wss' : 'ws';
-  var ws = new WebSocket(protocol + '://' + hostname + ':' + "56533" + '/');
+  var ws = new WebSocket(protocol + '://' + hostname + ':' + "57189" + '/');
 
   ws.onmessage = function (event) {
     checkedAssets = {};

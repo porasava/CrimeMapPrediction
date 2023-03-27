@@ -2462,72 +2462,37 @@ var _globals = require("../globals.js");
 
 function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
 
-function _typeof(obj) { "@babel/helpers - typeof"; return _typeof = "function" == typeof Symbol && "symbol" == typeof Symbol.iterator ? function (obj) { return typeof obj; } : function (obj) { return obj && "function" == typeof Symbol && obj.constructor === Symbol && obj !== Symbol.prototype ? "symbol" : typeof obj; }, _typeof(obj); }
-
-function _classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } }
-
-function _defineProperties(target, props) { for (var i = 0; i < props.length; i++) { var descriptor = props[i]; descriptor.enumerable = descriptor.enumerable || false; descriptor.configurable = true; if ("value" in descriptor) descriptor.writable = true; Object.defineProperty(target, descriptor.key, descriptor); } }
-
-function _createClass(Constructor, protoProps, staticProps) { if (protoProps) _defineProperties(Constructor.prototype, protoProps); if (staticProps) _defineProperties(Constructor, staticProps); Object.defineProperty(Constructor, "prototype", { writable: false }); return Constructor; }
-
-function _inherits(subClass, superClass) { if (typeof superClass !== "function" && superClass !== null) { throw new TypeError("Super expression must either be null or a function"); } subClass.prototype = Object.create(superClass && superClass.prototype, { constructor: { value: subClass, writable: true, configurable: true } }); Object.defineProperty(subClass, "prototype", { writable: false }); if (superClass) _setPrototypeOf(subClass, superClass); }
-
-function _setPrototypeOf(o, p) { _setPrototypeOf = Object.setPrototypeOf ? Object.setPrototypeOf.bind() : function _setPrototypeOf(o, p) { o.__proto__ = p; return o; }; return _setPrototypeOf(o, p); }
-
-function _createSuper(Derived) { var hasNativeReflectConstruct = _isNativeReflectConstruct(); return function _createSuperInternal() { var Super = _getPrototypeOf(Derived), result; if (hasNativeReflectConstruct) { var NewTarget = _getPrototypeOf(this).constructor; result = Reflect.construct(Super, arguments, NewTarget); } else { result = Super.apply(this, arguments); } return _possibleConstructorReturn(this, result); }; }
-
-function _possibleConstructorReturn(self, call) { if (call && (_typeof(call) === "object" || typeof call === "function")) { return call; } else if (call !== void 0) { throw new TypeError("Derived constructors may only return object or undefined"); } return _assertThisInitialized(self); }
-
-function _assertThisInitialized(self) { if (self === void 0) { throw new ReferenceError("this hasn't been initialised - super() hasn't been called"); } return self; }
-
-function _isNativeReflectConstruct() { if (typeof Reflect === "undefined" || !Reflect.construct) return false; if (Reflect.construct.sham) return false; if (typeof Proxy === "function") return true; try { Boolean.prototype.valueOf.call(Reflect.construct(Boolean, [], function () {})); return true; } catch (e) { return false; } }
-
-function _getPrototypeOf(o) { _getPrototypeOf = Object.setPrototypeOf ? Object.getPrototypeOf.bind() : function _getPrototypeOf(o) { return o.__proto__ || Object.getPrototypeOf(o); }; return _getPrototypeOf(o); }
-
-var LercDecoder = /*#__PURE__*/function (_BaseDecoder) {
-  _inherits(LercDecoder, _BaseDecoder);
-
-  var _super = _createSuper(LercDecoder);
-
-  function LercDecoder(fileDirectory) {
-    var _this;
-
-    _classCallCheck(this, LercDecoder);
-
-    _this = _super.call(this);
-    _this.planarConfiguration = typeof fileDirectory.PlanarConfiguration !== 'undefined' ? fileDirectory.PlanarConfiguration : 1;
-    _this.samplesPerPixel = typeof fileDirectory.SamplesPerPixel !== 'undefined' ? fileDirectory.SamplesPerPixel : 1;
-    _this.addCompression = fileDirectory.LercParameters[_globals.LercParameters.AddCompression];
-    return _this;
+class LercDecoder extends _basedecoder.default {
+  constructor(fileDirectory) {
+    super();
+    this.planarConfiguration = typeof fileDirectory.PlanarConfiguration !== 'undefined' ? fileDirectory.PlanarConfiguration : 1;
+    this.samplesPerPixel = typeof fileDirectory.SamplesPerPixel !== 'undefined' ? fileDirectory.SamplesPerPixel : 1;
+    this.addCompression = fileDirectory.LercParameters[_globals.LercParameters.AddCompression];
   }
 
-  _createClass(LercDecoder, [{
-    key: "decodeBlock",
-    value: function decodeBlock(buffer) {
-      switch (this.addCompression) {
-        case _globals.LercAddCompression.None:
-          break;
+  decodeBlock(buffer) {
+    switch (this.addCompression) {
+      case _globals.LercAddCompression.None:
+        break;
 
-        case _globals.LercAddCompression.Deflate:
-          buffer = (0, _pako.inflate)(new Uint8Array(buffer)).buffer; // eslint-disable-line no-param-reassign, prefer-destructuring
+      case _globals.LercAddCompression.Deflate:
+        buffer = (0, _pako.inflate)(new Uint8Array(buffer)).buffer; // eslint-disable-line no-param-reassign, prefer-destructuring
 
-          break;
+        break;
 
-        default:
-          throw new Error("Unsupported LERC additional compression method identifier: ".concat(this.addCompression));
-      }
-
-      var lercResult = _lerc.default.decode(buffer, {
-        returnPixelInterleavedDims: this.planarConfiguration === 1
-      });
-
-      var lercData = lercResult.pixels[0];
-      return lercData.buffer;
+      default:
+        throw new Error(`Unsupported LERC additional compression method identifier: ${this.addCompression}`);
     }
-  }]);
 
-  return LercDecoder;
-}(_basedecoder.default);
+    const lercResult = _lerc.default.decode(buffer, {
+      returnPixelInterleavedDims: this.planarConfiguration === 1
+    });
+
+    const lercData = lercResult.pixels[0];
+    return lercData.buffer;
+  }
+
+}
 
 exports.default = LercDecoder;
 },{"pako":"node_modules/pako/dist/pako.esm.mjs","lerc":"node_modules/lerc/LercDecode.js","./basedecoder.js":"node_modules/geotiff/dist-module/compression/basedecoder.js","../globals.js":"node_modules/geotiff/dist-module/globals.js"}],"node_modules/parcel-bundler/src/builtins/hmr-runtime.js":[function(require,module,exports) {
@@ -2558,7 +2523,7 @@ var parent = module.bundle.parent;
 if ((!parent || !parent.isParcelRequire) && typeof WebSocket !== 'undefined') {
   var hostname = "" || location.hostname;
   var protocol = location.protocol === 'https:' ? 'wss' : 'ws';
-  var ws = new WebSocket(protocol + '://' + hostname + ':' + "51847" + '/');
+  var ws = new WebSocket(protocol + '://' + hostname + ':' + "57189" + '/');
 
   ws.onmessage = function (event) {
     checkedAssets = {};

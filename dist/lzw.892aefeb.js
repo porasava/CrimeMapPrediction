@@ -129,42 +129,20 @@ var _basedecoder = _interopRequireDefault(require("./basedecoder.js"));
 
 function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
 
-function _typeof(obj) { "@babel/helpers - typeof"; return _typeof = "function" == typeof Symbol && "symbol" == typeof Symbol.iterator ? function (obj) { return typeof obj; } : function (obj) { return obj && "function" == typeof Symbol && obj.constructor === Symbol && obj !== Symbol.prototype ? "symbol" : typeof obj; }, _typeof(obj); }
+const MIN_BITS = 9;
+const CLEAR_CODE = 256; // clear code
 
-function _classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } }
+const EOI_CODE = 257; // end of information
 
-function _defineProperties(target, props) { for (var i = 0; i < props.length; i++) { var descriptor = props[i]; descriptor.enumerable = descriptor.enumerable || false; descriptor.configurable = true; if ("value" in descriptor) descriptor.writable = true; Object.defineProperty(target, descriptor.key, descriptor); } }
-
-function _createClass(Constructor, protoProps, staticProps) { if (protoProps) _defineProperties(Constructor.prototype, protoProps); if (staticProps) _defineProperties(Constructor, staticProps); Object.defineProperty(Constructor, "prototype", { writable: false }); return Constructor; }
-
-function _inherits(subClass, superClass) { if (typeof superClass !== "function" && superClass !== null) { throw new TypeError("Super expression must either be null or a function"); } subClass.prototype = Object.create(superClass && superClass.prototype, { constructor: { value: subClass, writable: true, configurable: true } }); Object.defineProperty(subClass, "prototype", { writable: false }); if (superClass) _setPrototypeOf(subClass, superClass); }
-
-function _setPrototypeOf(o, p) { _setPrototypeOf = Object.setPrototypeOf ? Object.setPrototypeOf.bind() : function _setPrototypeOf(o, p) { o.__proto__ = p; return o; }; return _setPrototypeOf(o, p); }
-
-function _createSuper(Derived) { var hasNativeReflectConstruct = _isNativeReflectConstruct(); return function _createSuperInternal() { var Super = _getPrototypeOf(Derived), result; if (hasNativeReflectConstruct) { var NewTarget = _getPrototypeOf(this).constructor; result = Reflect.construct(Super, arguments, NewTarget); } else { result = Super.apply(this, arguments); } return _possibleConstructorReturn(this, result); }; }
-
-function _possibleConstructorReturn(self, call) { if (call && (_typeof(call) === "object" || typeof call === "function")) { return call; } else if (call !== void 0) { throw new TypeError("Derived constructors may only return object or undefined"); } return _assertThisInitialized(self); }
-
-function _assertThisInitialized(self) { if (self === void 0) { throw new ReferenceError("this hasn't been initialised - super() hasn't been called"); } return self; }
-
-function _isNativeReflectConstruct() { if (typeof Reflect === "undefined" || !Reflect.construct) return false; if (Reflect.construct.sham) return false; if (typeof Proxy === "function") return true; try { Boolean.prototype.valueOf.call(Reflect.construct(Boolean, [], function () {})); return true; } catch (e) { return false; } }
-
-function _getPrototypeOf(o) { _getPrototypeOf = Object.setPrototypeOf ? Object.getPrototypeOf.bind() : function _getPrototypeOf(o) { return o.__proto__ || Object.getPrototypeOf(o); }; return _getPrototypeOf(o); }
-
-var MIN_BITS = 9;
-var CLEAR_CODE = 256; // clear code
-
-var EOI_CODE = 257; // end of information
-
-var MAX_BYTELENGTH = 12;
+const MAX_BYTELENGTH = 12;
 
 function getByte(array, position, length) {
-  var d = position % 8;
-  var a = Math.floor(position / 8);
-  var de = 8 - d;
-  var ef = position + length - (a + 1) * 8;
-  var fg = 8 * (a + 2) - (position + length);
-  var dg = (a + 2) * 8 - position;
+  const d = position % 8;
+  const a = Math.floor(position / 8);
+  const de = 8 - d;
+  const ef = position + length - (a + 1) * 8;
+  let fg = 8 * (a + 2) - (position + length);
+  const dg = (a + 2) * 8 - position;
   fg = Math.max(0, fg);
 
   if (a >= array.length) {
@@ -172,19 +150,19 @@ function getByte(array, position, length) {
     return EOI_CODE;
   }
 
-  var chunk1 = array[a] & Math.pow(2, 8 - d) - 1;
+  let chunk1 = array[a] & 2 ** (8 - d) - 1;
   chunk1 <<= length - de;
-  var chunks = chunk1;
+  let chunks = chunk1;
 
   if (a + 1 < array.length) {
-    var chunk2 = array[a + 1] >>> fg;
+    let chunk2 = array[a + 1] >>> fg;
     chunk2 <<= Math.max(0, length - dg);
     chunks += chunk2;
   }
 
   if (ef > 8 && a + 2 < array.length) {
-    var hi = (a + 3) * 8 - (position + length);
-    var chunk3 = array[a + 2] >>> hi;
+    const hi = (a + 3) * 8 - (position + length);
+    const chunk3 = array[a + 2] >>> hi;
     chunks += chunk3;
   }
 
@@ -192,7 +170,7 @@ function getByte(array, position, length) {
 }
 
 function appendReversed(dest, source) {
-  for (var i = source.length - 1; i >= 0; i--) {
+  for (let i = source.length - 1; i >= 0; i--) {
     dest.push(source[i]);
   }
 
@@ -200,17 +178,17 @@ function appendReversed(dest, source) {
 }
 
 function decompress(input) {
-  var dictionaryIndex = new Uint16Array(4093);
-  var dictionaryChar = new Uint8Array(4093);
+  const dictionaryIndex = new Uint16Array(4093);
+  const dictionaryChar = new Uint8Array(4093);
 
-  for (var i = 0; i <= 257; i++) {
+  for (let i = 0; i <= 257; i++) {
     dictionaryIndex[i] = 4096;
     dictionaryChar[i] = i;
   }
 
-  var dictionaryLength = 258;
-  var byteLength = MIN_BITS;
-  var position = 0;
+  let dictionaryLength = 258;
+  let byteLength = MIN_BITS;
+  let position = 0;
 
   function initDictionary() {
     dictionaryLength = 258;
@@ -218,7 +196,7 @@ function decompress(input) {
   }
 
   function getNext(array) {
-    var byte = getByte(array, position, byteLength);
+    const byte = getByte(array, position, byteLength);
     position += byteLength;
     return byte;
   }
@@ -231,20 +209,20 @@ function decompress(input) {
   }
 
   function getDictionaryReversed(n) {
-    var rev = [];
+    const rev = [];
 
-    for (var _i = n; _i !== 4096; _i = dictionaryIndex[_i]) {
-      rev.push(dictionaryChar[_i]);
+    for (let i = n; i !== 4096; i = dictionaryIndex[i]) {
+      rev.push(dictionaryChar[i]);
     }
 
     return rev;
   }
 
-  var result = [];
+  const result = [];
   initDictionary();
-  var array = new Uint8Array(input);
-  var code = getNext(array);
-  var oldCode;
+  const array = new Uint8Array(input);
+  let code = getNext(array);
+  let oldCode;
 
   while (code !== EOI_CODE) {
     if (code === CLEAR_CODE) {
@@ -258,23 +236,22 @@ function decompress(input) {
       if (code === EOI_CODE) {
         break;
       } else if (code > CLEAR_CODE) {
-        throw new Error("corrupted code at scanline ".concat(code));
+        throw new Error(`corrupted code at scanline ${code}`);
       } else {
-        var val = getDictionaryReversed(code);
+        const val = getDictionaryReversed(code);
         appendReversed(result, val);
         oldCode = code;
       }
     } else if (code < dictionaryLength) {
-      var _val = getDictionaryReversed(code);
-
-      appendReversed(result, _val);
-      addToDictionary(oldCode, _val[_val.length - 1]);
+      const val = getDictionaryReversed(code);
+      appendReversed(result, val);
+      addToDictionary(oldCode, val[val.length - 1]);
       oldCode = code;
     } else {
-      var oldVal = getDictionaryReversed(oldCode);
+      const oldVal = getDictionaryReversed(oldCode);
 
       if (!oldVal) {
-        throw new Error("Bogus entry. Not in dictionary, ".concat(oldCode, " / ").concat(dictionaryLength, ", position: ").concat(position));
+        throw new Error(`Bogus entry. Not in dictionary, ${oldCode} / ${dictionaryLength}, position: ${position}`);
       }
 
       appendReversed(result, oldVal);
@@ -283,7 +260,7 @@ function decompress(input) {
       oldCode = code;
     }
 
-    if (dictionaryLength + 1 >= Math.pow(2, byteLength)) {
+    if (dictionaryLength + 1 >= 2 ** byteLength) {
       if (byteLength === MAX_BYTELENGTH) {
         oldCode = undefined;
       } else {
@@ -297,26 +274,12 @@ function decompress(input) {
   return new Uint8Array(result);
 }
 
-var LZWDecoder = /*#__PURE__*/function (_BaseDecoder) {
-  _inherits(LZWDecoder, _BaseDecoder);
-
-  var _super = _createSuper(LZWDecoder);
-
-  function LZWDecoder() {
-    _classCallCheck(this, LZWDecoder);
-
-    return _super.apply(this, arguments);
+class LZWDecoder extends _basedecoder.default {
+  decodeBlock(buffer) {
+    return decompress(buffer, false).buffer;
   }
 
-  _createClass(LZWDecoder, [{
-    key: "decodeBlock",
-    value: function decodeBlock(buffer) {
-      return decompress(buffer, false).buffer;
-    }
-  }]);
-
-  return LZWDecoder;
-}(_basedecoder.default);
+}
 
 exports.default = LZWDecoder;
 },{"./basedecoder.js":"node_modules/geotiff/dist-module/compression/basedecoder.js"}],"node_modules/parcel-bundler/src/builtins/hmr-runtime.js":[function(require,module,exports) {
@@ -347,7 +310,7 @@ var parent = module.bundle.parent;
 if ((!parent || !parent.isParcelRequire) && typeof WebSocket !== 'undefined') {
   var hostname = "" || location.hostname;
   var protocol = location.protocol === 'https:' ? 'wss' : 'ws';
-  var ws = new WebSocket(protocol + '://' + hostname + ':' + "51847" + '/');
+  var ws = new WebSocket(protocol + '://' + hostname + ':' + "57189" + '/');
 
   ws.onmessage = function (event) {
     checkedAssets = {};
