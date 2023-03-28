@@ -8,7 +8,8 @@ The full project can be downloaded at https://drive.google.com/file/d/1FCN_27p_8
 
 Application and tools: QGIS, GeoServer, Visual studio code, SQL server management studio, Google Geocode by Awesome, Streamlit Framework, Laptop server.
 
-Programming Language: node.js, Python, CSS, HTML, JavaScript
+Programming Language: node.js, Python, CSS, HTML, JavaScript.
+
 Data: ANZSOC_Full Crime data from 2017 to April 2022 from the police website, Meshblock2013 shape file, and CSV, Territorial Authority 2022 shapefile, and Census data.  
 
 This website shows crime cases in each area in New Zealand. Users can check crime cases by clicking on the area that they want.
