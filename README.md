@@ -4,6 +4,7 @@ Design and Implement crime map and prediction web in New Zealand. It is an indiv
 
 The full project can be downloaded at https://drive.google.com/file/d/1FCN_27p_8MVhlCUoNMBvQzX-qf8VKFZ5/view due to a free account in GitHub.
 
+This project was created to look at the number of crimes in each area. This is divided by city or district (Territorial Authority). Our goal is to provide accurate predictions to serve as a tool for users and individuals interested in crimes occurring in New Zealand.
 
 
 Application and tools: QGIS, GeoServer, Visual studio code, SQL server management studio, Google Geocode by Awesome, Streamlit Framework, Laptop server.
